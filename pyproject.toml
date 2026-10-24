@@ -41,6 +41,9 @@ build-backend = "setuptools.build_meta"
 managed = true
 exclude-newer = "7 days"
 
+[tool.setuptools.package-data]
+arcelikSalesHelper = ["infrastructure/migrations/*.sql"]
+
 [tool.setuptools.packages.find]
 where = ["src"]
 include = ["arcelikSalesHelper*"]

@@ -1,0 +1,382 @@
+from __future__ import annotations
+
+from PySide6.QtCore import (
+    QAbstractTableModel,
+    QModelIndex,
+    QObject,
+    QPersistentModelIndex,
+    Qt,
+    Signal,
+)
+from PySide6.QtGui import QBrush, QColor
+from PySide6.QtWidgets import (
+    QAbstractItemView,
+    QCheckBox,
+    QDialog,
+    QDialogButtonBox,
+    QFormLayout,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QMessageBox,
+    QPlainTextEdit,
+    QPushButton,
+    QTableView,
+    QVBoxLayout,
+    QWidget,
+)
+
+from arcelikSalesHelper.application.calculator import read_money
+from arcelikSalesHelper.domain.formatting import format_money_input, format_try
+from arcelikSalesHelper.domain.products import Product, ProductDraft
+from arcelikSalesHelper.domain.result import Err, Ok
+from arcelikSalesHelper.infrastructure.repositories import (
+    ProductRepository,
+    RepoError,
+)
+
+from .common import ERROR_STYLE, FieldBlock, format_local_timestamp
+
+_ROOT = QModelIndex()
+_Index = QModelIndex | QPersistentModelIndex
+
+
+class ProductTableModel(QAbstractTableModel):
+    HEADERS = (
+        "Name",
+        "Regular price",
+        "Website price",
+        "Default gift",
+        "Notes",
+        "Last updated",
+    )
+
+    def __init__(self, parent: QObject | None = None) -> None:
+        super().__init__(parent)
+        self._rows: list[Product] = []
+
+    def set_products(self, products: list[Product]) -> None:
+        self.beginResetModel()
+        self._rows = list(products)
+        self.endResetModel()
+
+    def product_at(self, row: int) -> Product | None:
+        return self._rows[row] if 0 <= row < len(self._rows) else None
+
+    def row_of(self, product_id: int) -> int | None:
+        return next(
+            (i for i, p in enumerate(self._rows) if p.id == product_id), None
+        )
+
+    def rowCount(self, parent: _Index = _ROOT) -> int:
+        return 0 if parent.isValid() else len(self._rows)
+
+    def columnCount(self, parent: _Index = _ROOT) -> int:
+        return 0 if parent.isValid() else len(self.HEADERS)
+
+    def headerData(
+        self,
+        section: int,
+        orientation: Qt.Orientation,
+        role: int = Qt.ItemDataRole.DisplayRole,
+    ) -> object:
+        if (
+            role == Qt.ItemDataRole.DisplayRole
+            and orientation == Qt.Orientation.Horizontal
+        ):
+            return self.HEADERS[section]
+        return None
+
+    def data(
+        self, index: _Index, role: int = Qt.ItemDataRole.DisplayRole
+    ) -> object:
+        if not index.isValid():
+            return None
+        product = self._rows[index.row()]
+        col = index.column()
+        if role == Qt.ItemDataRole.DisplayRole:
+            return self._display(product, col)
+        if role == Qt.ItemDataRole.TextAlignmentRole and col in (1, 2):
+            return Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+        if role == Qt.ItemDataRole.ForegroundRole and product.archived:
+            return QBrush(QColor(128, 128, 128))
+        if role == Qt.ItemDataRole.ToolTipRole and col == 4:
+            return product.notes
+        return None
+
+    @staticmethod
+    def _display(product: Product, col: int) -> str:
+        match col:
+            case 0:
+                return product.name + (
+                    " (archived)" if product.archived else ""
+                )
+            case 1:
+                return format_try(product.regular_price)
+            case 2:
+                return format_try(product.website_price)
+            case 3:
+                return product.default_gift_name or ""
+            case 4:
+                return " ".join((product.notes or "").split())
+            case _:
+                return format_local_timestamp(product.updated_at)
+
+
+class ProductDialog(QDialog):
+    """Add / edit dialog. Errors are shown inline; the dialog stays open on failure."""
+
+    def __init__(
+        self,
+        repo: ProductRepository,
+        product: Product | None = None,
+        parent: QWidget | None = None,
+    ) -> None:
+        super().__init__(parent)
+        self._repo = repo
+        self._product = product
+        self.saved: Product | None = None
+        self.setWindowTitle("Edit product" if product else "Add product")
+        self.setMinimumWidth(420)
+
+        self.name_edit = QLineEdit()
+        self.regular_edit = QLineEdit()
+        self.regular_edit.setPlaceholderText("for example 5.000,00")
+        self.website_edit = QLineEdit()
+        self.website_edit.setPlaceholderText("for example 4.000,00")
+        self.gift_edit = QLineEdit()
+        self.notes_edit = QPlainTextEdit()
+        self.notes_edit.setFixedHeight(80)
+
+        self.blocks = {
+            "name": FieldBlock(self.name_edit),
+            "regular_price": FieldBlock(self.regular_edit),
+            "website_price": FieldBlock(self.website_edit),
+        }
+        self._general = QLabel()
+        self._general.setStyleSheet(ERROR_STYLE)
+        self._general.setWordWrap(True)
+        self._general.hide()
+
+        form = QFormLayout()
+        form.addRow("Product name", self.blocks["name"])
+        form.addRow("Regular / first price", self.blocks["regular_price"])
+        form.addRow("Website discounted price", self.blocks["website_price"])
+        form.addRow("Default gift (optional)", self.gift_edit)
+        form.addRow("Notes (optional)", self.notes_edit)
+
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Save
+            | QDialogButtonBox.StandardButton.Cancel
+        )
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+
+        layout = QVBoxLayout(self)
+        layout.addLayout(form)
+        layout.addWidget(self._general)
+        layout.addWidget(buttons)
+
+        if product is not None:
+            self.name_edit.setText(product.name)
+            self.regular_edit.setText(
+                format_money_input(product.regular_price)
+            )
+            self.website_edit.setText(
+                format_money_input(product.website_price)
+            )
+            self.gift_edit.setText(product.default_gift_name or "")
+            self.notes_edit.setPlainText(product.notes or "")
+
+        self.regular_edit.textChanged.connect(lambda _t: self._update_hints())
+        self.website_edit.textChanged.connect(lambda _t: self._update_hints())
+        self._update_hints()
+
+    def _update_hints(self) -> None:
+        for key, edit in (
+            ("regular_price", self.regular_edit),
+            ("website_price", self.website_edit),
+        ):
+            self.blocks[key].set_hint(read_money(edit.text()).hint)
+
+    def _clear_errors(self) -> None:
+        for block in self.blocks.values():
+            block.set_error(None)
+        self._general.hide()
+
+    def accept(self) -> None:
+        self._clear_errors()
+        regular = read_money(self.regular_edit.text())
+        website = read_money(self.website_edit.text())
+        problems = False
+        for key, read in (
+            ("regular_price", regular),
+            ("website_price", website),
+        ):
+            if read.error is not None:
+                self.blocks[key].set_error(read.error)
+                problems = True
+        if not " ".join(self.name_edit.text().split()):
+            self.blocks["name"].set_error("Product name is required.")
+            problems = True
+        if problems or regular.value is None or website.value is None:
+            return
+
+        draft = ProductDraft(
+            self.name_edit.text(),
+            regular.value,
+            website.value,
+            self.gift_edit.text(),
+            self.notes_edit.toPlainText(),
+        )
+        outcome = (
+            self._repo.update(self._product.id, draft)
+            if self._product is not None
+            else self._repo.add(draft)
+        )
+        match outcome:
+            case Err(error):
+                self._show_repo_error(error)
+            case Ok(saved):
+                self.saved = saved
+                super().accept()
+
+    def _show_repo_error(self, error: RepoError) -> None:
+        shown = False
+        for detail in error.details:
+            block = self.blocks.get(detail.field)
+            if block is not None:
+                block.set_error(detail.message)
+                shown = True
+        if error.code == "duplicate_name":
+            self.blocks["name"].set_error(error.message)
+            shown = True
+        if not shown:
+            self._general.setText(error.message)
+            self._general.show()
+
+
+class ProductsTab(QWidget):
+    products_changed = Signal()
+
+    def __init__(
+        self, repo: ProductRepository, parent: QWidget | None = None
+    ) -> None:
+        super().__init__(parent)
+        self._repo = repo
+
+        self.search_edit = QLineEdit()
+        self.search_edit.setPlaceholderText("Search by product name")
+        self.search_edit.setClearButtonEnabled(True)
+        self.show_archived = QCheckBox("Show archived")
+
+        self.table_model = ProductTableModel(self)
+        self.table = QTableView()
+        self.table.setModel(self.table_model)
+        self.table.setSelectionBehavior(
+            QAbstractItemView.SelectionBehavior.SelectRows
+        )
+        self.table.setSelectionMode(
+            QAbstractItemView.SelectionMode.SingleSelection
+        )
+        self.table.setEditTriggers(
+            QAbstractItemView.EditTrigger.NoEditTriggers
+        )
+        self.table.verticalHeader().hide()
+        self.table.horizontalHeader().setStretchLastSection(True)
+
+        self.add_button = QPushButton("Add product")
+        self.edit_button = QPushButton("Edit")
+        self.archive_button = QPushButton("Archive")
+
+        top = QHBoxLayout()
+        top.addWidget(self.search_edit, 1)
+        top.addWidget(self.show_archived)
+        bottom = QHBoxLayout()
+        bottom.addWidget(self.add_button)
+        bottom.addWidget(self.edit_button)
+        bottom.addWidget(self.archive_button)
+        bottom.addStretch(1)
+        layout = QVBoxLayout(self)
+        layout.addLayout(top)
+        layout.addWidget(self.table, 1)
+        layout.addLayout(bottom)
+
+        self.search_edit.textChanged.connect(lambda _t: self.reload())
+        self.show_archived.toggled.connect(lambda _c: self.reload())
+        self.add_button.clicked.connect(self._add)
+        self.edit_button.clicked.connect(self._edit)
+        self.archive_button.clicked.connect(self._toggle_archive)
+        self.table.doubleClicked.connect(lambda _i: self._edit())
+        self.table.selectionModel().selectionChanged.connect(
+            lambda _s, _d: self._update_buttons()
+        )
+        self.reload()
+
+    def reload(self) -> None:
+        selected = self.selected_product()
+        self.table_model.set_products(
+            self._repo.search(
+                self.search_edit.text(), self.show_archived.isChecked()
+            )
+        )
+        self.table.resizeColumnsToContents()
+        if selected is not None:
+            self._select_id(selected.id)
+        self._update_buttons()
+
+    def selected_product(self) -> Product | None:
+        rows = self.table.selectionModel().selectedRows()
+        return self.table_model.product_at(rows[0].row()) if rows else None
+
+    def _select_id(self, product_id: int) -> None:
+        row = self.table_model.row_of(product_id)
+        if row is not None:
+            self.table.selectRow(row)
+
+    def _update_buttons(self) -> None:
+        product = self.selected_product()
+        self.edit_button.setEnabled(product is not None)
+        self.archive_button.setEnabled(product is not None)
+        self.archive_button.setText(
+            "Restore"
+            if product is not None and product.archived
+            else "Archive"
+        )
+
+    def _add(self) -> None:
+        dialog = ProductDialog(self._repo, parent=self)
+        if (
+            dialog.exec() == QDialog.DialogCode.Accepted
+            and dialog.saved is not None
+        ):
+            self.reload()
+            self._select_id(dialog.saved.id)
+            self.products_changed.emit()
+
+    def _edit(self) -> None:
+        product = self.selected_product()
+        if product is None:
+            return
+        dialog = ProductDialog(self._repo, product, parent=self)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            self.reload()
+            self.products_changed.emit()
+
+    def _toggle_archive(self) -> None:
+        product = self.selected_product()
+        if product is None:
+            return
+        outcome = (
+            self._repo.restore(product.id)
+            if product.archived
+            else self._repo.archive(product.id)
+        )
+        match outcome:
+            case Err(error):
+                QMessageBox.warning(
+                    self, "Cannot change product", error.message
+                )
+            case Ok(_):
+                self.reload()
+                self.products_changed.emit()
