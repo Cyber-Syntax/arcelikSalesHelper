@@ -7,6 +7,12 @@ from enum import Enum
 POS_LABEL = "POS-entry calculation (verify before use)"
 
 
+class ConfirmationState(Enum):
+    """What the UI told the user about the result when it was saved."""
+
+    POS_UNVERIFIED = "pos_unverified"
+
+
 class ManagerMode(Enum):
     UNIT = "unit"
     LINE = "line"

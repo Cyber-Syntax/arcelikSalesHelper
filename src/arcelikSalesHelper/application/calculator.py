@@ -31,6 +31,7 @@ from arcelikSalesHelper.domain.pricing import (
     calculate_transaction,
 )
 from arcelikSalesHelper.domain.result import Err, Ok
+
 # ---- input ----------------------------------------------------------------
 
 
@@ -401,7 +402,7 @@ def _option_manager(
     """The manager value is shown on exactly one option, never on both."""
     if mode is not None and unit is not None and total is not None:
         is_line = mode is ManagerMode.LINE
-        rows: tuple[Row, ...] = (
+        rows = (
             Row(
                 "Manager value mode",
                 "Total line price" if is_line else "Unit price",
@@ -479,10 +480,10 @@ def _gift_section(
 @dataclass(frozen=True)
 class TransactionEvaluation:
     lines: tuple[Evaluation, ...]
-    forms: tuple[LineForm, ...] = ()
+    forms: tuple[LineForm, ...] = ()  # entered text, kept for the M5 snapshot
     result: TransactionResult | None = None
     totals_sections: tuple[Section, ...] = ()
-    pending_reason: str | None = None
+    pending_reason: str | None = None  # why there are no totals
 
     @property
     def valid(self) -> bool:
@@ -524,7 +525,7 @@ def present_totals(result: TransactionResult) -> tuple[Section, ...]:
             "Not an official or manager-approved POS instruction."
         ),
     )
-    return main, pos
+    return (main, pos)
 
 
 def evaluate_transaction(forms: Sequence[LineForm]) -> TransactionEvaluation:

@@ -283,7 +283,7 @@ def section_box(section: Section) -> QGroupBox:
 
 
 class LineRow(QGroupBox):
-    """One calculator line with controls and its input widget."""
+    """One calculator line: header with move/remove buttons plus the input widget."""
 
     move_up = Signal(object)
     move_down = Signal(object)
@@ -301,6 +301,7 @@ class LineRow(QGroupBox):
         self.remove_button = QToolButton()
         self.remove_button.setText("✕")
         self.remove_button.setToolTip("Remove line")
+
         header = QHBoxLayout()
         header.addStretch(1)
         header.addWidget(self.up_button)
@@ -309,6 +310,7 @@ class LineRow(QGroupBox):
         layout = QVBoxLayout(self)
         layout.addLayout(header)
         layout.addWidget(self.line)
+
         self.up_button.clicked.connect(
             lambda _c=False: self.move_up.emit(self)
         )
@@ -327,7 +329,7 @@ class LineRow(QGroupBox):
 
 
 class TransactionPanel(QWidget):
-    """Renders a transaction evaluation without performing calculations."""
+    """Renders a TransactionEvaluation. Contains no calculations."""
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -369,11 +371,12 @@ class TransactionPanel(QWidget):
                 if evaluation.incomplete_only
                 else "Fix the highlighted fields on this line."
             )
-            layout.addWidget(self._note(text))
+            layout.addWidget(self._note(text))  # never show stale results
             return box
+
         card = view.card
         layout.addWidget(section_box(card.prices))
-        options = QHBoxLayout()
+        options = QHBoxLayout()  # same order and weight: no option is favoured
         options.addWidget(section_box(card.website_option), 1)
         if card.gift_option is not None:
             options.addWidget(section_box(card.gift_option), 1)
@@ -382,8 +385,7 @@ class TransactionPanel(QWidget):
         if view.warnings:
             layout.addWidget(
                 self._note(
-                    "\n".join(f"⚠ {w}" for w in view.warnings),
-                    WARNING_STYLE,
+                    "\n".join(f"⚠ {w}" for w in view.warnings), WARNING_STYLE
                 )
             )
         explain = Collapsible("How this was calculated")
@@ -393,9 +395,11 @@ class TransactionPanel(QWidget):
 
 
 class CalculatorTab(QWidget):
-    """Controller: rows -> forms -> transaction evaluation -> rendering."""
+    """Controller: rows -> LineForms -> evaluate_transaction -> render."""
 
-    save_requested = Signal(object)
+    save_requested = Signal(
+        object
+    )  # TransactionEvaluation; wired to history in M5
 
     def __init__(
         self, repo: ProductRepository, parent: QWidget | None = None
@@ -403,9 +407,12 @@ class CalculatorTab(QWidget):
         super().__init__(parent)
         self._repo = repo
         self._products: list[Product] = repo.search()
-        self._bulk = False
+        self._bulk = (
+            False  # suppress recalculation while all rows are updated at once
+        )
         self.rows: list[LineRow] = []
         self.evaluation = TransactionEvaluation(lines=())
+
         self.panel = TransactionPanel()
         self.add_button = QPushButton("Add line")
         self.save_button = QPushButton("Save calculation")
@@ -413,7 +420,9 @@ class CalculatorTab(QWidget):
 
         self._rows_host = QWidget()
         self._rows_layout = QVBoxLayout(self._rows_host)
-        self._rows_layout.addStretch(1)
+        self._rows_layout.addStretch(
+            1
+        )  # rows are inserted before this stretch
         rows_scroll = QScrollArea()
         rows_scroll.setWidgetResizable(True)
         rows_scroll.setWidget(self._rows_host)
@@ -438,54 +447,58 @@ class CalculatorTab(QWidget):
         splitter.setSizes([430, 620])
         layout = QVBoxLayout(self)
         layout.addWidget(splitter)
+
         self.add_button.clicked.connect(lambda _c=False: self.add_line())
         self.save_button.clicked.connect(
             lambda _c=False: self.save_requested.emit(self.evaluation)
         )
         self.add_line()
 
+    # ---- rows ------------------------------------------------------------
+
     def add_line(self) -> LineRow:
         row = LineRow()
-        row.line.set_products(self._products)
+        row.line.set_products(
+            self._products
+        )  # not connected yet: no recalculation
         row.line.changed.connect(self.recalculate)
         row.move_up.connect(lambda r: self._move(r, -1))
-        row.move_down.connect(lambda r: self._move(r, 1))
+        row.move_down.connect(lambda r: self._move(r, +1))
         row.remove_requested.connect(self.remove_line)
         self.rows.append(row)
         self._rows_layout.insertWidget(len(self.rows) - 1, row)
-        self._refresh_positions()
+        self._renumber()
         self.recalculate()
         return row
 
     def remove_line(self, row: LineRow) -> None:
         if len(self.rows) <= 1 or row not in self.rows:
-            return
+            return  # at least one line always stays
         self.rows.remove(row)
         self._rows_layout.removeWidget(row)
+        row.hide()
+        row.setParent(None)
         row.deleteLater()
-        self._refresh_positions()
+        self._renumber()
         self.recalculate()
 
     def _move(self, row: LineRow, delta: int) -> None:
-        try:
-            index = self.rows.index(row)
-        except ValueError:
+        i = self.rows.index(row)
+        j = i + delta
+        if not 0 <= j < len(self.rows):
             return
-        target = index + delta
-        if not 0 <= target < len(self.rows):
-            return
-        self.rows[index], self.rows[target] = (
-            self.rows[target],
-            self.rows[index],
-        )
+        # The widget itself moves, so all of its entered state moves with it.
+        self.rows[i], self.rows[j] = self.rows[j], self.rows[i]
         self._rows_layout.removeWidget(row)
-        self._rows_layout.insertWidget(target, row)
-        self._refresh_positions()
+        self._rows_layout.insertWidget(j, row)
+        self._renumber()
         self.recalculate()
 
-    def _refresh_positions(self) -> None:
+    def _renumber(self) -> None:
         for index, row in enumerate(self.rows):
             row.set_position(index, len(self.rows))
+
+    # ---- data ------------------------------------------------------------
 
     def refresh_products(self) -> None:
         self._products = self._repo.search()
