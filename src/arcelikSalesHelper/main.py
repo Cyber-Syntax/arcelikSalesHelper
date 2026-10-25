@@ -11,6 +11,11 @@ from PySide6.QtWidgets import QApplication, QMessageBox
 
 from .constants import APP_NAME, COMPANY_NAME, DISPLAY_NAME
 from .domain.result import Err
+from .infrastructure.backups import (
+    BackupManager,
+    BackupReason,
+    PreMigrationBackup,
+)
 from .infrastructure.database import open_database
 from .paths import ensure_dirs, resolve_paths
 from .ui.main_window import MainWindow
@@ -65,7 +70,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     configure_logging(paths.log_path)
     install_excepthook(paths.log_path)
 
-    opened = open_database(paths.db_path)
+    fresh = not paths.db_path.exists() or paths.db_path.stat().st_size == 0
+    pre_migration = PreMigrationBackup(paths.db_path, paths.backup_dir)
+    opened = open_database(paths.db_path, on_before_migrate=pre_migration)
     if isinstance(opened, Err):
         QMessageBox.critical(
             None, "Cannot open the database", opened.error.message
@@ -73,7 +80,19 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 1
     conn = opened.value
     try:
-        window = MainWindow(conn, paths)
+        backups = BackupManager(conn, paths.backup_dir)
+        if pre_migration.ran:
+            backups.mark_dirty()  # the upgrade changed the database after the old-schema backup
+        if fresh:
+            backups.run(BackupReason.BASELINE)
+        else:
+            backups.run_startup_backup_if_needed()
+        # A failed backup is recorded and shown as a banner; it never blocks startup.
+
+        window = MainWindow(conn, paths, backups)
+        app.aboutToQuit.connect(
+            lambda: window.shutdown_backup(interactive=False)
+        )
         window.show()
         return app.exec()
     finally:

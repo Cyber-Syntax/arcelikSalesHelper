@@ -7,6 +7,7 @@ from PySide6.QtWidgets import QLabel, QVBoxLayout, QWidget
 ERROR_STYLE = "color: #d32f2f;"
 HINT_STYLE = "color: gray;"
 WARNING_STYLE = "color: #b26a00;"
+SUCCESS_STYLE = "color: #2e7d32;"
 
 
 def format_local_timestamp(iso_utc: str) -> str:
