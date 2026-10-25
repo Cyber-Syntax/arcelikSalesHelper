@@ -21,6 +21,7 @@ from enum import Enum
 from pathlib import Path
 from typing import TypeAlias
 
+from arcelikSalesHelper import strings as T
 from arcelikSalesHelper.constants import BACKUP_PREFIX
 from arcelikSalesHelper.domain.result import Err, Ok, Result
 
@@ -239,20 +240,17 @@ def verify_backup_file(
     try:
         conn = sqlite3.connect(f"{path.as_uri()}?mode=ro", uri=True)
     except sqlite3.Error as exc:
-        return Err(f"cannot open the copy: {exc}")
+        return Err(T.backup_cannot_open_copy(str(exc)))
     try:
         rows = [
             str(r[0])
             for r in conn.execute("PRAGMA integrity_check").fetchall()
         ]
         if rows != ["ok"]:
-            return Err("integrity check reported: " + "; ".join(rows[:3]))
+            return Err(T.backup_integrity("; ".join(rows[:3])))
         version = int(conn.execute("PRAGMA user_version").fetchone()[0])
         if version != expected_user_version:
-            return Err(
-                f"schema version {version} does not match the live database "
-                f"({expected_user_version})"
-            )
+            return Err(T.backup_version_mismatch(version, expected_user_version))
         return Ok(None)
     except sqlite3.Error as exc:
         return Err(str(exc))
@@ -277,7 +275,7 @@ def create_backup(
             return Err(
                 BackupError(
                     "busy",
-                    "A database change is in progress; try again in a moment.",
+                    T.BACKUP_BUSY,
                 )
             )
         backup_dir.mkdir(parents=True, exist_ok=True)
@@ -290,7 +288,7 @@ def create_backup(
             return Err(
                 BackupError(
                     "verification_failed",
-                    f"The backup copy failed verification: {verified.error}",
+                    T.backup_verification_failed(verified.error),
                 )
             )
         _fsync(tmp)
@@ -301,7 +299,7 @@ def create_backup(
     except (sqlite3.Error, OSError) as exc:
         _discard(tmp)
         return Err(
-            BackupError("failed", f"The backup could not be created: {exc}")
+            BackupError("failed", T.backup_failed_create(str(exc)))
         )
 
     # Only now, with a new verified backup in place, is anything old removed.

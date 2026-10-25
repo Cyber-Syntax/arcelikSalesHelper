@@ -18,6 +18,7 @@ from decimal import Decimal
 from enum import Enum
 from pathlib import Path
 
+from arcelikSalesHelper import strings as T
 from arcelikSalesHelper.domain.formatting import format_try
 from arcelikSalesHelper.domain.money import parse_money_ex
 from arcelikSalesHelper.domain.products import (
@@ -43,11 +44,6 @@ QUANTITY_COLUMN = "quantity"
 STOCK_ONLY_COLUMNS = ("product_name", QUANTITY_COLUMN)
 MAX_FILE_BYTES = 50 * 1024 * 1024
 MAX_ROWS = 100_000
-
-_EXPECTED = (
-    "Expected product_name,regular_price,website_discounted_price (optionally followed by "
-    "quantity), or product_name,quantity for stock counts."
-)
 
 
 class ImportFormat(Enum):
@@ -134,17 +130,15 @@ class ImportSummary:
     rows_with_errors: int
 
     def lines(self) -> tuple[str, ...]:
-        out = [
-            f"New products: {self.created}",
-            f"Prices updated: {self.updated}",
-            f"Restored from archive: {self.restored}",
-            f"Quantities updated: {self.stock_updated}",
-            f"Skipped by you: {self.skipped}",
-            f"Unchanged: {self.unchanged}",
-        ]
-        if self.rows_with_errors:
-            out.append(f"Rows with errors, left out: {self.rows_with_errors}")
-        return tuple(out)
+        return T.import_summary_lines(
+            self.created,
+            self.updated,
+            self.restored,
+            self.stock_updated,
+            self.skipped,
+            self.unchanged,
+            self.rows_with_errors,
+        )
 
 
 @dataclass(frozen=True)
@@ -160,27 +154,16 @@ class ImportFailure:
 
 def _detect_format(header: Sequence[str]) -> Result[ImportFormat, str]:
     if len(header) == 1 and (";" in header[0] or "\t" in header[0]):
-        return Err(
-            "The file looks semicolon- or tab-delimited. Save it as comma-delimited CSV "
-            'and quote prices that contain a comma, for example "54.999,00".'
-        )
+        return Err(T.CSV_DELIMITER)
     if len(set(header)) != len(header):
-        return Err(
-            "Invalid header: a column name appears more than once. "
-            + _EXPECTED
-        )
+        return Err(T.csv_duplicate_header())
     present = set(header)
     if present == set(STOCK_ONLY_COLUMNS):
         return Ok(ImportFormat.STOCK)
     missing = [c for c in REQUIRED_COLUMNS if c not in present]
     unknown = sorted(present - set(REQUIRED_COLUMNS) - {QUANTITY_COLUMN})
-    problems: list[str] = []
-    if missing:
-        problems.append("missing column(s): " + ", ".join(missing))
-    if unknown:
-        problems.append("unexpected column(s): " + ", ".join(unknown))
-    if problems:
-        return Err("Invalid header: " + "; ".join(problems) + ". " + _EXPECTED)
+    if missing or unknown:
+        return Err(T.csv_bad_header(missing, unknown))
     return Ok(ImportFormat.PRICES)
 
 
@@ -195,8 +178,7 @@ def _price(
         case Ok(parsed):
             if parsed.ambiguous:
                 warnings.append(
-                    f"{column}: '{text}' was read as {format_try(parsed.value)} "
-                    "(dot as thousands separator)"
+                    T.csv_ambiguous(column, text, format_try(parsed.value))
                 )
             return parsed.value
         case Err(message):
@@ -222,14 +204,14 @@ def _parse_row(
     key = name_key(name) if name else ""
     if not name:
         errors.append(
-            RowError(line, "product_name", "Product name is required.")
+            RowError(line, "product_name", T.VAL_NAME_REQUIRED)
         )
     elif len(name) > MAX_NAME_LENGTH:
         errors.append(
             RowError(
                 line,
                 "product_name",
-                f"Name must be at most {MAX_NAME_LENGTH} characters.",
+                T.val_name_too_long(MAX_NAME_LENGTH),
             )
         )
     elif key in seen:
@@ -237,7 +219,7 @@ def _parse_row(
             RowError(
                 line,
                 "product_name",
-                f"Duplicate of row {seen[key]} (same product name).",
+                T.csv_duplicate_row(seen[key]),
             )
         )
     else:
@@ -279,9 +261,9 @@ def parse_csv_text(text: str) -> Result[ParsedCsv, str]:
     try:
         header = [h.strip() for h in next(reader)]
     except StopIteration:
-        return Err("The file is empty.")
+        return Err(T.CSV_EMPTY)
     except csv.Error as exc:
-        return Err(f"The file is not valid CSV: {exc}")
+        return Err(T.csv_not_valid(str(exc)))
 
     detected = _detect_format(header)
     if isinstance(detected, Err):
@@ -302,7 +284,7 @@ def parse_csv_text(text: str) -> Result[ParsedCsv, str]:
                 continue
             count += 1
             if count > MAX_ROWS:
-                return Err(f"Too many rows (the limit is {MAX_ROWS:,}).")
+                return Err(T.csv_too_many_rows(MAX_ROWS))
             if len(cells) > len(header) and any(
                 c.strip() for c in cells[len(header) :]
             ):
@@ -310,7 +292,7 @@ def parse_csv_text(text: str) -> Result[ParsedCsv, str]:
                     RowError(
                         line,
                         None,
-                        "Row has more cells than the header. Quote values that contain a comma.",
+                        T.CSV_EXTRA_CELLS,
                     )
                 )
                 continue
@@ -319,23 +301,19 @@ def parse_csv_text(text: str) -> Result[ParsedCsv, str]:
             if row is not None:
                 rows.append(row)
     except csv.Error as exc:
-        return Err(
-            f"The file is not valid CSV near line {reader.line_num}: {exc}"
-        )
+        return Err(T.csv_not_valid_near(reader.line_num, str(exc)))
     return Ok(ParsedCsv(fmt, tuple(rows), tuple(errors), blank))
 
 
 def parse_csv_file(path: Path) -> Result[ParsedCsv, str]:
     try:
         if path.stat().st_size > MAX_FILE_BYTES:
-            return Err(
-                f"The file is larger than {MAX_FILE_BYTES // (1024 * 1024)} MB."
-            )
+            return Err(T.csv_too_large(MAX_FILE_BYTES // (1024 * 1024)))
         text = path.read_bytes().decode("utf-8-sig")
     except OSError as exc:
-        return Err(f"Cannot read the file: {exc}")
+        return Err(T.csv_cannot_read(str(exc)))
     except UnicodeDecodeError:
-        return Err("The file is not valid UTF-8. Save it as 'CSV UTF-8'.")
+        return Err(T.CSV_NOT_UTF8)
     return parse_csv_text(text)
 
 
@@ -372,8 +350,7 @@ def plan_import(
                     RowError(
                         row.row,
                         "product_name",
-                        "No product with this name. Add it first; stock files never "
-                        "create products.",
+                        T.CSV_NO_SUCH_PRODUCT,
                     )
                 )
             elif existing.archived:
@@ -381,7 +358,7 @@ def plan_import(
                     RowError(
                         row.row,
                         "product_name",
-                        "This product is archived. Restore it before updating its quantity.",
+                        T.CSV_ARCHIVED_STOCK,
                     )
                 )
             elif row.quantity == existing.quantity:
@@ -427,13 +404,15 @@ class _Counts:
 
 def _ok(result: Result[Product, RepoError], row: ParsedRow) -> Product:
     if isinstance(result, Err):
-        raise _Abort(f"Row {row.row} ({row.name}): {result.error.message}")
+        raise _Abort(
+            T.import_row_problem(row.row, row.name, result.error.message)
+        )
     return result.value
 
 
 def _prices(row: ParsedRow) -> tuple[Decimal, Decimal]:
     if row.regular_price is None or row.website_price is None:
-        raise _Abort(f"Row {row.row} ({row.name}): prices are missing.")
+        raise _Abort(T.import_prices_missing(row.row, row.name))
     return row.regular_price, row.website_price
 
 
@@ -455,8 +434,7 @@ def apply_plan(
         return Err(
             ImportFailure(
                 "has_errors",
-                f"The file has {len(plan.errors)} row error(s). Fix the file, or choose to "
-                "import the valid rows only.",
+                T.import_has_errors(len(plan.errors)),
             )
         )
     undecided = [
@@ -469,7 +447,7 @@ def apply_plan(
         return Err(
             ImportFailure(
                 "undecided",
-                f"Choose Update or Skip for every conflict (rows {shown}).",
+                T.import_undecided(shown),
             )
         )
 
@@ -503,13 +481,13 @@ def apply_plan(
                     case Kind.STOCK_UPDATE:
                         if existing is None:
                             raise _Abort(
-                                f"Row {row.row}: product missing from the plan."
+                                T.import_row_no_plan(row.row)
                             )
                         set_stock(existing.id, row)
                     case Kind.CONFLICT:
                         if existing is None:
                             raise _Abort(
-                                f"Row {row.row}: product missing from the plan."
+                                T.import_row_no_plan(row.row)
                             )
                         if decisions[row.row] is Decision.SKIP:
                             counts.skipped += 1
@@ -538,14 +516,12 @@ def apply_plan(
                             set_stock(existing.id, row)
     except _Abort as exc:
         return Err(
-            ImportFailure("rolled_back", f"Nothing was imported. {exc}")
+            ImportFailure("rolled_back", T.import_rolled_back(str(exc)))
         )
     except sqlite3.Error as exc:
         log.exception("CSV import failed")
         return Err(
-            ImportFailure(
-                "failed", f"Nothing was imported. Database error: {exc}"
-            )
+            ImportFailure("failed", T.import_db_error(str(exc)))
         )
 
     return Ok(

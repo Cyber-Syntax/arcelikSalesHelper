@@ -13,7 +13,6 @@ from PySide6.QtWidgets import (
     QFileDialog,
     QHBoxLayout,
     QLabel,
-    QMessageBox,
     QPushButton,
     QTableWidget,
     QTableWidgetItem,
@@ -21,6 +20,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from arcelikSalesHelper import strings as T
 from arcelikSalesHelper.domain.formatting import format_try
 from arcelikSalesHelper.domain.result import Err, Ok
 from arcelikSalesHelper.infrastructure.backups import (
@@ -41,27 +41,25 @@ from arcelikSalesHelper.infrastructure.csv_import import (
 )
 from arcelikSalesHelper.infrastructure.repositories import ProductRepository
 
-from .common import ERROR_STYLE, HINT_STYLE
-
-_COLUMNS = (
-    "Row",
-    "Status",
-    "Product",
-    "Regular price",
-    "Website price",
-    "Quantity",
-    "Decision / notes",
+from .common import (
+    ERROR_STYLE,
+    HINT_STYLE,
+    ask_yes_no,
+    show_critical,
+    show_info,
 )
+
+_COLUMNS = T.IMPORT_COLUMNS
 _DECISION_COLUMN = 6
 _STATUS = {
-    Kind.NEW: "New",
-    Kind.CONFLICT: "Conflict",
-    Kind.STOCK_UPDATE: "Stock update",
-    Kind.UNCHANGED: "Unchanged",
+    Kind.NEW: T.STATUS_NEW,
+    Kind.CONFLICT: T.STATUS_CONFLICT,
+    Kind.STOCK_UPDATE: T.STATUS_STOCK_UPDATE,
+    Kind.UNCHANGED: T.STATUS_UNCHANGED,
 }
 _FORMAT_TEXT = {
-    ImportFormat.PRICES: "Price list (quantity column optional)",
-    ImportFormat.STOCK: "Stock counts (never creates products)",
+    ImportFormat.PRICES: T.FORMAT_PRICES,
+    ImportFormat.STOCK: T.FORMAT_STOCK,
 }
 
 
@@ -78,7 +76,7 @@ def _quantity_text(old: int | None, new: int | None) -> str:
         return ""
     if old == new:
         return str(new)
-    return f"{'—' if old is None else old} → {new}"
+    return f"{T.NONE_DASH if old is None else old} → {new}"
 
 
 class ImportDialog(QDialog):
@@ -102,11 +100,11 @@ class ImportDialog(QDialog):
             int, QComboBox
         ] = {}  # keyed by CSV row number
 
-        self.setWindowTitle("Import CSV")
+        self.setWindowTitle(T.IMPORT_TITLE)
         self.resize(980, 620)
 
-        self.choose_button = QPushButton("Choose CSV file…")
-        self.path_label = QLabel("No file chosen.")
+        self.choose_button = QPushButton(T.BTN_CHOOSE_CSV)
+        self.path_label = QLabel(T.NO_FILE_CHOSEN)
         self.path_label.setStyleSheet(HINT_STYLE)
         self.file_error = QLabel()
         self.file_error.setStyleSheet(ERROR_STYLE)
@@ -123,27 +121,23 @@ class ImportDialog(QDialog):
         )
         self.table.verticalHeader().hide()
         self.table.horizontalHeader().setStretchLastSection(True)
-        self.errors_label = QLabel("Rows with errors")
+        self.errors_label = QLabel(T.LBL_ROWS_WITH_ERRORS)
         self.errors_label.setStyleSheet(ERROR_STYLE)
         self.errors_table = QTableWidget(0, 3)
-        self.errors_table.setHorizontalHeaderLabels(
-            ["Row", "Column", "Problem"]
-        )
+        self.errors_table.setHorizontalHeaderLabels(list(T.IMPORT_ERROR_COLUMNS))
         self.errors_table.setEditTriggers(
             QAbstractItemView.EditTrigger.NoEditTriggers
         )
         self.errors_table.verticalHeader().hide()
         self.errors_table.horizontalHeader().setStretchLastSection(True)
         self.errors_table.setMaximumHeight(160)
-        self.valid_only_check = QCheckBox(
-            "Import the valid rows only (leave rows with errors out)"
-        )
+        self.valid_only_check = QCheckBox(T.CHK_VALID_ONLY)
         self.status_label = QLabel()
         self.status_label.setWordWrap(True)
         self.status_label.setStyleSheet(HINT_STYLE)
-        self.apply_button = QPushButton("Apply import")
+        self.apply_button = QPushButton(T.BTN_APPLY_IMPORT)
         self.apply_button.setEnabled(False)
-        self.close_button = QPushButton("Close")
+        self.close_button = QPushButton(T.BTN_CLOSE)
 
         top = QHBoxLayout()
         top.addWidget(self.choose_button)
@@ -172,7 +166,7 @@ class ImportDialog(QDialog):
 
     def choose_file(self) -> None:
         path, _ = QFileDialog.getOpenFileName(
-            self, "Choose a CSV file", "", "CSV files (*.csv);;All files (*)"
+            self, T.FILE_DIALOG_TITLE, "", T.FILE_DIALOG_FILTER
         )
         if path:
             self.load_file(Path(path))
@@ -215,9 +209,14 @@ class ImportDialog(QDialog):
             kind: sum(1 for i in plan.items if i.kind is kind) for kind in Kind
         }
         self.counts_label.setText(
-            f"{format_text}: {n[Kind.NEW]} new · {n[Kind.CONFLICT]} conflicts (decide each) · "
-            f"{n[Kind.STOCK_UPDATE]} quantity updates · {n[Kind.UNCHANGED]} unchanged · "
-            f"{len(plan.errors)} rows with errors"
+            T.import_counts(
+                format_text,
+                n[Kind.NEW],
+                n[Kind.CONFLICT],
+                n[Kind.STOCK_UPDATE],
+                n[Kind.UNCHANGED],
+                len(plan.errors),
+            )
         )
         self.table.resizeColumnsToContents()
         if plan.errors:
@@ -231,7 +230,7 @@ class ImportDialog(QDialog):
 
     def _fill_row(self, r: int, item: PlanItem) -> None:
         row, existing = item.row, item.existing
-        name = row.name + (" (archived)" if item.restores else "")
+        name = row.name + (T.ARCHIVED_SUFFIX if item.restores else "")
         cells = (
             str(row.row),
             _STATUS[item.kind],
@@ -252,12 +251,12 @@ class ImportDialog(QDialog):
             self.table.setItem(r, c, QTableWidgetItem(text))
         if item.kind is Kind.CONFLICT:
             combo = QComboBox()
-            combo.addItem("Choose…", None)
+            combo.addItem(T.COMBO_CHOOSE, None)
             combo.addItem(
-                "Update and restore" if item.restores else "Update",
+                T.COMBO_UPDATE_RESTORE if item.restores else T.COMBO_UPDATE,
                 Decision.UPDATE,
             )
-            combo.addItem("Skip", Decision.SKIP)
+            combo.addItem(T.COMBO_SKIP, Decision.SKIP)
             combo.currentIndexChanged.connect(lambda _i: self._update_apply())
             self.decision_combos[row.row] = combo
             self.table.setCellWidget(r, _DECISION_COLUMN, combo)
@@ -284,13 +283,13 @@ class ImportDialog(QDialog):
             return
         reason: str | None = None
         if plan.errors and not self.valid_only_check.isChecked():
-            reason = "Fix the file, or tick “Import the valid rows only”."
+            reason = T.IMPORT_FIX_FILE
         elif len(self.decisions()) < len(plan.conflicts):
-            reason = "Choose Update or Skip for every conflict."
+            reason = T.IMPORT_DECIDE_ALL
         elif not plan.actionable:
-            reason = "Nothing to import."
+            reason = T.IMPORT_NOTHING
         self.status_label.setText(
-            reason or "Ready. A backup is made before the import is applied."
+            reason or T.IMPORT_READY
         )
         self.apply_button.setEnabled(reason is None)
 
@@ -300,17 +299,12 @@ class ImportDialog(QDialog):
             return
         if self._backups is not None:
             outcome = self._backups.run(BackupReason.PRE_IMPORT)
-            if isinstance(outcome, Err):
-                answer = QMessageBox.question(
-                    self,
-                    "Backup failed",
-                    f"{outcome.error.message}\n\nImport without a fresh backup?",
-                    QMessageBox.StandardButton.Yes
-                    | QMessageBox.StandardButton.No,
-                    QMessageBox.StandardButton.No,
-                )
-                if answer != QMessageBox.StandardButton.Yes:
-                    return
+            if isinstance(outcome, Err) and not ask_yes_no(
+                self,
+                T.IMPORT_BACKUP_FAILED_TITLE,
+                T.import_backup_failed(outcome.error.message),
+            ):
+                return
         note = None if self._path is None else f"csv: {self._path.name}"
         result = apply_plan(
             self._conn,
@@ -321,11 +315,11 @@ class ImportDialog(QDialog):
         )
         match result:
             case Err(failure):
-                QMessageBox.critical(self, "Import failed", failure.message)
+                show_critical(self, T.IMPORT_FAILED_TITLE, failure.message)
             case Ok(summary):
                 self.summary = summary
-                QMessageBox.information(
-                    self, "Import complete", "\n".join(summary.lines())
+                show_info(
+                    self, T.IMPORT_DONE_TITLE, "\n".join(summary.lines())
                 )
                 self.imported.emit()
                 self.accept()

@@ -7,8 +7,9 @@ from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from types import TracebackType
 
-from PySide6.QtWidgets import QApplication, QMessageBox
+from PySide6.QtWidgets import QApplication
 
+from . import strings as T
 from .constants import APP_NAME, COMPANY_NAME, DISPLAY_NAME
 from .domain.result import Err
 from .infrastructure.backups import (
@@ -18,6 +19,7 @@ from .infrastructure.backups import (
 )
 from .infrastructure.database import open_database
 from .paths import ensure_dirs, resolve_paths
+from .ui.common import install_qt_translations, show_critical
 from .ui.main_window import MainWindow
 
 
@@ -45,10 +47,8 @@ def install_excepthook(log_path: Path) -> None:
         logging.getLogger("app").critical(
             "Unhandled exception", exc_info=(exc_type, exc, tb)
         )
-        QMessageBox.critical(
-            None,
-            "Unexpected error",
-            f"An unexpected error occurred:\n{exc}\n\nDetails were written to:\n{log_path}",
+        show_critical(
+            None, T.UNEXPECTED_ERROR_TITLE, T.unexpected_error(exc, log_path)
         )
 
     sys.excepthook = hook
@@ -59,12 +59,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     app.setApplicationName(APP_NAME)
     app.setOrganizationName(COMPANY_NAME)
     app.setApplicationDisplayName(DISPLAY_NAME)
+    install_qt_translations(app)
 
     try:
         paths = ensure_dirs(resolve_paths())
     except OSError as exc:
-        QMessageBox.critical(
-            None, "Cannot start", f"Cannot create the data folder:\n{exc}"
+        show_critical(
+            None, T.CANNOT_START_TITLE, T.cannot_create_data_dir(exc)
         )
         return 1
     configure_logging(paths.log_path)
@@ -74,9 +75,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     pre_migration = PreMigrationBackup(paths.db_path, paths.backup_dir)
     opened = open_database(paths.db_path, on_before_migrate=pre_migration)
     if isinstance(opened, Err):
-        QMessageBox.critical(
-            None, "Cannot open the database", opened.error.message
-        )
+        show_critical(None, T.CANNOT_OPEN_DB_TITLE, opened.error.message)
         return 1
     conn = opened.value
     try:

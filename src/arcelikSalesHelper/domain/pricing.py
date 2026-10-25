@@ -4,6 +4,8 @@ from collections.abc import Sequence
 from decimal import Decimal
 from functools import reduce
 
+from arcelikSalesHelper import strings as T
+
 from .arith import ZERO, add, div, mul, mul_qty, sub
 from .models import (
     GiftOption,
@@ -134,7 +136,7 @@ def calculate_transaction(
         return Err(
             (
                 ValidationError(
-                    "no_lines", "lines", "Add at least one product line."
+                    "no_lines", "lines", T.VAL_NO_LINES
                 ),
             )
         )

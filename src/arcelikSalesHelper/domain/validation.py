@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from decimal import Decimal
 
+from arcelikSalesHelper import strings as T
+
 from .models import LineInput, LineWarning
 
 
@@ -31,30 +33,30 @@ def validate_line(
         err(
             "quantity_invalid",
             "quantity",
-            "Quantity must be a whole number of at least 1.",
+            T.VAL_QUANTITY,
         )
 
     if _bad_money(line.regular_price):
         err(
             "regular_price_invalid",
             "regular_price",
-            "Regular price must be zero or more.",
+            T.VAL_REGULAR_PRICE,
         )
     website_ok = not _bad_money(line.website_price)
     if not website_ok:
         err(
             "website_price_invalid",
             "website_price",
-            "Website price must be zero or more.",
+            T.VAL_WEBSITE_PRICE,
         )
 
     if _bad_money(line.coupon):
-        err("coupon_negative", "coupon", "Coupon amount must be zero or more.")
+        err("coupon_negative", "coupon", T.VAL_COUPON_NEGATIVE)
     elif website_ok and line.coupon > line.website_price:
         err(
             "coupon_exceeds_website",
             "coupon",
-            "Coupon amount cannot exceed the website discounted price.",
+            T.VAL_COUPON_EXCEEDS,
         )
 
     if line.manager_value is not None:
@@ -62,19 +64,19 @@ def validate_line(
             err(
                 "manager_value_invalid",
                 "manager_value",
-                "Manager value must be zero or more.",
+                T.VAL_MANAGER_VALUE,
             )
         if line.manager_mode is None:
             err(
                 "manager_mode_required",
                 "manager_mode",
-                "Choose unit price or total line price.",
+                T.VAL_MANAGER_MODE_REQUIRED,
             )
     elif line.manager_mode is not None:
         err(
             "manager_mode_without_value",
             "manager_mode",
-            "Manager mode was given without a manager value.",
+            T.VAL_MANAGER_MODE_WITHOUT_VALUE,
         )
 
     return tuple(errors)
@@ -95,10 +97,7 @@ def soft_warnings(
         return (
             LineWarning(
                 code="manager_exceeds_website",
-                message=(
-                    "Manager line total is higher than the applicable website total. "
-                    "The value is used exactly as entered."
-                ),
+                message=T.WARN_MANAGER_EXCEEDS,
                 line_index=line_index,
             ),
         )

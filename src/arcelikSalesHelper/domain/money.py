@@ -20,6 +20,8 @@ import re
 from dataclasses import dataclass
 from decimal import Decimal
 
+from arcelikSalesHelper import strings as T
+
 from .result import Err, Ok, Result
 
 _TL_SUFFIX = re.compile(r"\s*(?:TL|TRY)\s*$", re.IGNORECASE)
@@ -29,15 +31,13 @@ _GROUPED_DOT = re.compile(r"[1-9][0-9]{0,2}(?:\.[0-9]{3})+")
 _GROUPED_COMMA = re.compile(r"[1-9][0-9]{0,2}(?:,[0-9]{3})+")
 _MAX_LEN = 40
 
-_MSG_EMPTY = "Enter an amount."
-_MSG_NEGATIVE = "Negative amounts are not allowed."
-_MSG_CHARS = (
-    "Use digits with '.' or ',' separators only (for example 54.999,00)."
-)
-_MSG_FORMAT = "Invalid number format."
-_MSG_GROUPING = "Invalid thousands grouping (for example 1.234.567,89)."
-_MSG_COMMAS = "Only one decimal comma is allowed."
-_MSG_LONG = "Amount is too long."
+_MSG_EMPTY = T.MONEY_EMPTY
+_MSG_NEGATIVE = T.MONEY_NEGATIVE
+_MSG_CHARS = T.MONEY_CHARS
+_MSG_FORMAT = T.MONEY_FORMAT
+_MSG_GROUPING = T.MONEY_GROUPING
+_MSG_COMMAS = T.MONEY_COMMAS
+_MSG_LONG = T.MONEY_TOO_LONG
 
 
 @dataclass(frozen=True)

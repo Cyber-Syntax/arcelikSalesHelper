@@ -4,6 +4,8 @@ import unicodedata
 from dataclasses import dataclass, replace
 from decimal import Decimal
 
+from arcelikSalesHelper import strings as T
+
 from .validation import ValidationError
 
 MAX_NAME_LENGTH = 200
@@ -69,7 +71,7 @@ def validate_draft(draft: ProductDraft) -> tuple[ValidationError, ...]:
     if not draft.name:
         errors.append(
             ValidationError(
-                "name_required", "name", "Product name is required."
+                "name_required", "name", T.VAL_NAME_REQUIRED
             )
         )
     elif len(draft.name) > MAX_NAME_LENGTH:
@@ -77,7 +79,7 @@ def validate_draft(draft: ProductDraft) -> tuple[ValidationError, ...]:
             ValidationError(
                 "name_too_long",
                 "name",
-                f"Name must be at most {MAX_NAME_LENGTH} characters.",
+                T.val_name_too_long(MAX_NAME_LENGTH),
             )
         )
     if _bad_money(draft.regular_price):
@@ -85,7 +87,7 @@ def validate_draft(draft: ProductDraft) -> tuple[ValidationError, ...]:
             ValidationError(
                 "regular_price_invalid",
                 "regular_price",
-                "Regular price must be zero or more.",
+                T.VAL_REGULAR_PRICE,
             )
         )
     if _bad_money(draft.website_price):
@@ -93,7 +95,7 @@ def validate_draft(draft: ProductDraft) -> tuple[ValidationError, ...]:
             ValidationError(
                 "website_price_invalid",
                 "website_price",
-                "Website price must be zero or more.",
+                T.VAL_WEBSITE_PRICE,
             )
         )
     return tuple(errors)

@@ -4,7 +4,9 @@ from dataclasses import dataclass
 from decimal import Decimal
 from enum import Enum
 
-POS_LABEL = "POS-entry calculation (verify before use)"
+from arcelikSalesHelper import strings as T
+
+POS_LABEL = T.POS_LABEL
 
 
 class ConfirmationState(Enum):

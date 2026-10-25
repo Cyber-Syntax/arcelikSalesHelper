@@ -23,6 +23,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from arcelikSalesHelper import strings as T
 from arcelikSalesHelper.application.calculator import (
     Evaluation,
     FieldError,
@@ -39,7 +40,7 @@ from arcelikSalesHelper.infrastructure.repositories import ProductRepository
 
 from .common import HINT_STYLE, WARNING_STYLE, FieldBlock
 
-ONE_OFF_LABEL = "One-off product (type below)"
+ONE_OFF_LABEL = T.ONE_OFF_LABEL
 
 
 class CalculatorLineWidget(QWidget):
@@ -60,17 +61,17 @@ class CalculatorLineWidget(QWidget):
         self.quantity_spin = QSpinBox()
         self.quantity_spin.setRange(1, 9999)
         self.regular_edit = QLineEdit()
-        self.regular_edit.setPlaceholderText("for example 5.000,00")
+        self.regular_edit.setPlaceholderText(T.PH_REGULAR)
         self.website_edit = QLineEdit()
-        self.website_edit.setPlaceholderText("for example 4.000,00")
+        self.website_edit.setPlaceholderText(T.PH_WEBSITE)
         self.coupon_edit = QLineEdit()
-        self.coupon_edit.setPlaceholderText("0,00")
-        self.gift_check = QCheckBox("Gift included")
+        self.coupon_edit.setPlaceholderText(T.PH_COUPON)
+        self.gift_check = QCheckBox(T.CHK_GIFT)
         self.gift_name_edit = QLineEdit()
         self.manager_edit = QLineEdit()
-        self.manager_edit.setPlaceholderText("optional")
-        self.unit_radio = QRadioButton("Unit price")
-        self.line_radio = QRadioButton("Total line price")
+        self.manager_edit.setPlaceholderText(T.PH_OPTIONAL)
+        self.unit_radio = QRadioButton(T.RADIO_UNIT)
+        self.line_radio = QRadioButton(T.RADIO_LINE)
         self.unit_radio.setChecked(True)
 
         mode_box = QWidget()
@@ -91,20 +92,20 @@ class CalculatorLineWidget(QWidget):
         }
 
         form = QFormLayout(self)
-        form.addRow("Product", self.product_combo)
-        form.addRow("Name", self.blocks["product_name"])
-        form.addRow("Quantity", self.blocks["quantity"])
+        form.addRow(T.FORM_PRODUCT, self.product_combo)
+        form.addRow(T.FORM_NAME, self.blocks["product_name"])
+        form.addRow(T.FORM_QUANTITY, self.blocks["quantity"])
         form.addRow(
-            "Regular / first price (unit)", self.blocks["regular_price"]
+            T.FORM_REGULAR, self.blocks["regular_price"]
         )
         form.addRow(
-            "Website discounted price (unit)", self.blocks["website_price"]
+            T.FORM_WEBSITE, self.blocks["website_price"]
         )
-        form.addRow("Additional coupon (per unit)", self.blocks["coupon"])
+        form.addRow(T.FORM_COUPON, self.blocks["coupon"])
         form.addRow("", self.gift_check)
-        form.addRow("Gift name", self.gift_name_edit)
-        form.addRow("Manager-provided value", self.blocks["manager_value"])
-        form.addRow("Manager value is a", self.blocks["manager_mode"])
+        form.addRow(T.FORM_GIFT_NAME, self.gift_name_edit)
+        form.addRow(T.FORM_MANAGER_VALUE, self.blocks["manager_value"])
+        form.addRow(T.FORM_MANAGER_MODE, self.blocks["manager_mode"])
 
         for edit in (
             self.name_edit,
@@ -294,13 +295,13 @@ class LineRow(QGroupBox):
         self.line = CalculatorLineWidget()
         self.up_button = QToolButton()
         self.up_button.setText("↑")
-        self.up_button.setToolTip("Move line up")
+        self.up_button.setToolTip(T.TIP_MOVE_UP)
         self.down_button = QToolButton()
         self.down_button.setText("↓")
-        self.down_button.setToolTip("Move line down")
+        self.down_button.setToolTip(T.TIP_MOVE_DOWN)
         self.remove_button = QToolButton()
         self.remove_button.setText("✕")
-        self.remove_button.setToolTip("Remove line")
+        self.remove_button.setToolTip(T.TIP_REMOVE_LINE)
 
         header = QHBoxLayout()
         header.addStretch(1)
@@ -322,7 +323,7 @@ class LineRow(QGroupBox):
         )
 
     def set_position(self, index: int, count: int) -> None:
-        self.setTitle(f"Line {index + 1}")
+        self.setTitle(T.line_title(index + 1))
         self.up_button.setEnabled(index > 0)
         self.down_button.setEnabled(index < count - 1)
         self.remove_button.setEnabled(count > 1)
@@ -362,14 +363,16 @@ class TransactionPanel(QWidget):
         name = (
             evaluation.line.product_name if evaluation.line is not None else ""
         )
-        box = QGroupBox(f"Line {index + 1}" + (f": {name}" if name else ""))
+        box = QGroupBox(
+            T.line_title_named(index + 1, name) if name else T.line_title(index + 1)
+        )
         layout = QVBoxLayout(box)
         view = evaluation.view
         if view is None:
             text = (
-                "Enter the product name and prices to see this line's results."
+                T.CARD_INCOMPLETE
                 if evaluation.incomplete_only
-                else "Fix the highlighted fields on this line."
+                else T.CARD_FIX
             )
             layout.addWidget(self._note(text))  # never show stale results
             return box
@@ -388,7 +391,7 @@ class TransactionPanel(QWidget):
                     "\n".join(f"⚠ {w}" for w in view.warnings), WARNING_STYLE
                 )
             )
-        explain = Collapsible("How this was calculated")
+        explain = Collapsible(T.EXPLAIN_TITLE)
         explain.set_lines(view.explanation)
         layout.addWidget(explain)
         return box
@@ -414,8 +417,8 @@ class CalculatorTab(QWidget):
         self.evaluation = TransactionEvaluation(lines=())
 
         self.panel = TransactionPanel()
-        self.add_button = QPushButton("Add line")
-        self.save_button = QPushButton("Save calculation")
+        self.add_button = QPushButton(T.BTN_ADD_LINE)
+        self.save_button = QPushButton(T.BTN_SAVE_CALCULATION)
         self.save_button.setEnabled(False)
 
         self._rows_host = QWidget()

@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from arcelikSalesHelper import strings as T
 from arcelikSalesHelper.application.history import (
     SnapshotHeader,
     StoredLine,
@@ -31,7 +32,7 @@ from arcelikSalesHelper.infrastructure.history_repository import (
 from .calculator_tab import Collapsible, section_box
 from .common import HINT_STYLE, WARNING_STYLE, format_local_timestamp
 
-_COLUMNS = ("Saved at", "Products", "Lines", "POS-entry total (verify)")
+_COLUMNS = T.HISTORY_COLUMNS
 
 
 class SnapshotDetail(QWidget):
@@ -44,9 +45,12 @@ class SnapshotDetail(QWidget):
         layout = QVBoxLayout(self)
 
         header = QLabel(
-            f"Saved calculation #{snapshot.id}\n"
-            f"Saved {format_local_timestamp(snapshot.created_at)} · "
-            f"app {snapshot.app_version} · schema {snapshot.schema_version}"
+            T.history_header(
+                snapshot.id,
+                format_local_timestamp(snapshot.created_at),
+                snapshot.app_version,
+                snapshot.schema_version,
+            )
         )
         header.setTextInteractionFlags(
             Qt.TextInteractionFlag.TextSelectableByMouse
@@ -58,10 +62,7 @@ class SnapshotDetail(QWidget):
             )
         )
         layout.addWidget(
-            self._note(
-                "Shown exactly as calculated and saved. Later changes to products, prices "
-                "or gifts do not affect it."
-            )
+            self._note(T.NOTE_HISTORY_FROZEN)
         )
         for line in snapshot.lines:
             layout.addWidget(self._line_box(line))
@@ -77,7 +78,9 @@ class SnapshotDetail(QWidget):
         return label
 
     def _line_box(self, line: StoredLine) -> QGroupBox:
-        box = QGroupBox(f"Line {line.line_index + 1}: {line.product_name}")
+        box = QGroupBox(
+            T.line_title_named(line.line_index + 1, line.product_name)
+        )
         layout = QVBoxLayout(box)
         layout.addWidget(section_box(line.entered))
         layout.addWidget(section_box(line.prices))
@@ -93,7 +96,7 @@ class SnapshotDetail(QWidget):
                     "\n".join(f"⚠ {w}" for w in line.warnings), WARNING_STYLE
                 )
             )
-        explain = Collapsible("How this was calculated")
+        explain = Collapsible(T.EXPLAIN_TITLE)
         explain.set_lines(line.explanation)
         layout.addWidget(explain)
         return box
@@ -129,7 +132,7 @@ class HistoryTab(QWidget):
         self.table.horizontalHeader().setStretchLastSection(True)
         self.count_label = QLabel()
         self.count_label.setStyleSheet(HINT_STYLE)
-        self.load_more_button = QPushButton("Load older calculations")
+        self.load_more_button = QPushButton(T.BTN_LOAD_OLDER)
         self.detail_scroll = QScrollArea()
         self.detail_scroll.setWidgetResizable(True)
 
@@ -215,9 +218,7 @@ class HistoryTab(QWidget):
         total = self._repo.count()
         shown = self.table.rowCount()
         self.count_label.setText(
-            f"Showing {shown} of {total} saved calculations"
-            if total
-            else "No saved calculations yet."
+            T.history_footer(shown, total) if total else T.HISTORY_NONE_YET
         )
         self.load_more_button.setEnabled(self._more)
 
@@ -235,13 +236,11 @@ class HistoryTab(QWidget):
     def _show_selected(self) -> None:
         snapshot_id = self.selected_id()
         if snapshot_id is None:
-            self._show_message(
-                "Select a saved calculation to see its details."
-            )
+            self._show_message(T.HISTORY_SELECT)
             return
         record = self._repo.get(snapshot_id)
         if record is None:
-            self._show_message("This calculation no longer exists.")
+            self._show_message(T.HISTORY_GONE)
             return
         match parse_snapshot(record):
             case Ok(snapshot):

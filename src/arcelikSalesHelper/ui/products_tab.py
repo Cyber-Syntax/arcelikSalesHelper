@@ -20,7 +20,6 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QLineEdit,
-    QMessageBox,
     QPlainTextEdit,
     QPushButton,
     QTableView,
@@ -28,6 +27,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from arcelikSalesHelper import strings as T
 from arcelikSalesHelper.application.calculator import read_money
 from arcelikSalesHelper.domain.formatting import format_money_input, format_try
 from arcelikSalesHelper.domain.products import Product, ProductDraft
@@ -39,7 +39,13 @@ from arcelikSalesHelper.infrastructure.repositories import (
     RepoError,
 )
 
-from .common import ERROR_STYLE, FieldBlock, format_local_timestamp
+from .common import (
+    ERROR_STYLE,
+    FieldBlock,
+    format_local_timestamp,
+    localize_buttons,
+    show_warning,
+)
 from .import_dialog import ImportDialog
 
 _ROOT = QModelIndex()
@@ -47,10 +53,7 @@ _Index = QModelIndex | QPersistentModelIndex
 
 
 class ProductTableModel(QAbstractTableModel):
-    HEADERS = (
-        "Name", "Regular price", "Website price", "Default gift", "Notes", "Last updated",
-        "Counted qty", "Counted as of",
-    )  # fmt: skip
+    HEADERS = T.PRODUCT_HEADERS
 
     def __init__(self, parent: QObject | None = None) -> None:
         super().__init__(parent)
@@ -105,10 +108,7 @@ class ProductTableModel(QAbstractTableModel):
         if role == Qt.ItemDataRole.ToolTipRole and col == 4:
             return product.notes
         if role == Qt.ItemDataRole.ToolTipRole and col in (6, 7):
-            return (
-                "Entered by hand or imported from a warehouse count. It does not change by "
-                "itself and is not an official stock figure."
-            )
+            return T.TIP_COUNTED
         return None
 
     @staticmethod
@@ -116,7 +116,7 @@ class ProductTableModel(QAbstractTableModel):
         match col:
             case 0:
                 return product.name + (
-                    " (archived)" if product.archived else ""
+                    T.ARCHIVED_SUFFIX if product.archived else ""
                 )
             case 1:
                 return format_try(product.regular_price)
@@ -155,14 +155,14 @@ class ProductDialog(QDialog):
         self._repo = repo
         self._product = product
         self.saved: Product | None = None
-        self.setWindowTitle("Edit product" if product else "Add product")
+        self.setWindowTitle(T.DLG_EDIT_PRODUCT if product else T.DLG_ADD_PRODUCT)
         self.setMinimumWidth(420)
 
         self.name_edit = QLineEdit()
         self.regular_edit = QLineEdit()
-        self.regular_edit.setPlaceholderText("for example 5.000,00")
+        self.regular_edit.setPlaceholderText(T.PH_REGULAR)
         self.website_edit = QLineEdit()
-        self.website_edit.setPlaceholderText("for example 4.000,00")
+        self.website_edit.setPlaceholderText(T.PH_WEBSITE)
         self.gift_edit = QLineEdit()
         self.notes_edit = QPlainTextEdit()
         self.notes_edit.setFixedHeight(80)
@@ -178,16 +178,17 @@ class ProductDialog(QDialog):
         self._general.hide()
 
         form = QFormLayout()
-        form.addRow("Product name", self.blocks["name"])
-        form.addRow("Regular / first price", self.blocks["regular_price"])
-        form.addRow("Website discounted price", self.blocks["website_price"])
-        form.addRow("Default gift (optional)", self.gift_edit)
-        form.addRow("Notes (optional)", self.notes_edit)
+        form.addRow(T.LBL_PRODUCT_NAME, self.blocks["name"])
+        form.addRow(T.LBL_REGULAR_FIRST, self.blocks["regular_price"])
+        form.addRow(T.LBL_WEBSITE_DISCOUNTED, self.blocks["website_price"])
+        form.addRow(T.LBL_DEFAULT_GIFT, self.gift_edit)
+        form.addRow(T.LBL_NOTES, self.notes_edit)
 
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Save
             | QDialogButtonBox.StandardButton.Cancel
         )
+        localize_buttons(buttons)
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
 
@@ -236,7 +237,7 @@ class ProductDialog(QDialog):
                 self.blocks[key].set_error(read.error)
                 problems = True
         if not " ".join(self.name_edit.text().split()):
-            self.blocks["name"].set_error("Product name is required.")
+            self.blocks["name"].set_error(T.VAL_NAME_REQUIRED)
             problems = True
         if problems or regular.value is None or website.value is None:
             return
@@ -288,38 +289,34 @@ class StockDialog(QDialog):
         self._repo = repo
         self._product = product
         self.saved: Product | None = None
-        self.setWindowTitle(f"Update quantity: {product.name}")
+        self.setWindowTitle(T.stock_title(product.name))
         self.setMinimumWidth(440)
 
         self.quantity_edit = QLineEdit()
-        self.quantity_edit.setPlaceholderText("whole number, for example 12")
+        self.quantity_edit.setPlaceholderText(T.PH_QTY)
         self.note_edit = QLineEdit()
-        self.note_edit.setPlaceholderText(
-            "optional, for example: warehouse photo 24 Oct"
-        )
+        self.note_edit.setPlaceholderText(T.PH_QTY_NOTE)
         self.block = FieldBlock(self.quantity_edit)
 
         if product.quantity is None or product.quantity_updated_at is None:
-            current = "No count has been recorded for this product yet."
+            current = T.STOCK_NO_COUNT
         else:
-            current = (
-                f"Currently {product.quantity} "
-                f"(counted {format_local_timestamp(product.quantity_updated_at)})."
+            current = T.stock_current(
+                product.quantity,
+                format_local_timestamp(product.quantity_updated_at),
             )
             self.quantity_edit.setText(str(product.quantity))
-        info = QLabel(
-            f"{current}\nEnter the number reported by the warehouse. This is a manual "
-            "record, not live or official stock."
-        )
+        info = QLabel(T.stock_info(current))
         info.setWordWrap(True)
 
         form = QFormLayout()
-        form.addRow("Counted quantity", self.block)
-        form.addRow("Note", self.note_edit)
+        form.addRow(T.LBL_COUNTED_QTY, self.block)
+        form.addRow(T.LBL_NOTE, self.note_edit)
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Save
             | QDialogButtonBox.StandardButton.Cancel
         )
+        localize_buttons(buttons)
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
         layout = QVBoxLayout(self)
@@ -367,9 +364,9 @@ class ProductsTab(QWidget):
         self._backups = backups
 
         self.search_edit = QLineEdit()
-        self.search_edit.setPlaceholderText("Search by product name")
+        self.search_edit.setPlaceholderText(T.PH_SEARCH)
         self.search_edit.setClearButtonEnabled(True)
-        self.show_archived = QCheckBox("Show archived")
+        self.show_archived = QCheckBox(T.CHK_SHOW_ARCHIVED)
 
         self.table_model = ProductTableModel(self)
         self.table = QTableView()
@@ -386,11 +383,11 @@ class ProductsTab(QWidget):
         self.table.verticalHeader().hide()
         self.table.horizontalHeader().setStretchLastSection(True)
 
-        self.add_button = QPushButton("Add product")
-        self.edit_button = QPushButton("Edit")
-        self.archive_button = QPushButton("Archive")
-        self.stock_button = QPushButton("Update quantity")
-        self.import_button = QPushButton("Import from CSV")
+        self.add_button = QPushButton(T.BTN_ADD_PRODUCT)
+        self.edit_button = QPushButton(T.BTN_EDIT)
+        self.archive_button = QPushButton(T.BTN_ARCHIVE)
+        self.stock_button = QPushButton(T.BTN_UPDATE_QTY)
+        self.import_button = QPushButton(T.BTN_IMPORT_CSV)
         self.import_button.setEnabled(conn is not None)
 
         top = QHBoxLayout()
@@ -448,9 +445,9 @@ class ProductsTab(QWidget):
         self.archive_button.setEnabled(product is not None)
         self.stock_button.setEnabled(product is not None)
         self.archive_button.setText(
-            "Restore"
+            T.BTN_RESTORE
             if product is not None and product.archived
-            else "Archive"
+            else T.BTN_ARCHIVE
         )
         self.add_button.setEnabled(product is None or not product.archived)
 
@@ -503,9 +500,7 @@ class ProductsTab(QWidget):
         )
         match outcome:
             case Err(error):
-                QMessageBox.warning(
-                    self, "Cannot change product", error.message
-                )
+                show_warning(self, T.CANNOT_CHANGE_TITLE, error.message)
             case Ok(_):
                 self.reload()
                 self.products_changed.emit()

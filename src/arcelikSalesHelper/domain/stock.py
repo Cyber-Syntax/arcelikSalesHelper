@@ -3,11 +3,13 @@ from __future__ import annotations
 import re
 from enum import Enum
 
+from arcelikSalesHelper import strings as T
+
 from .result import Err, Ok, Result
 
 MAX_QUANTITY = 1_000_000
 _DIGITS = re.compile(r"[0-9]+")
-_TOO_LARGE = f"Quantity cannot exceed {MAX_QUANTITY:,}."
+_TOO_LARGE = T.stock_too_large(MAX_QUANTITY)
 
 
 class StockSource(Enum):
@@ -18,9 +20,9 @@ class StockSource(Enum):
 def validate_quantity(quantity: int) -> str | None:
     """Return an error message, or None when the quantity is acceptable."""
     if isinstance(quantity, bool) or not isinstance(quantity, int):
-        return "Quantity must be a whole number."
+        return T.STOCK_NOT_WHOLE
     if quantity < 0:
-        return "Quantity cannot be negative."
+        return T.STOCK_NEGATIVE
     if quantity > MAX_QUANTITY:
         return _TOO_LARGE
     return None
@@ -30,11 +32,11 @@ def parse_quantity(text: str) -> Result[int, str]:
     """Whole numbers only: no separators, no decimals, no sign."""
     s = text.strip()
     if not s:
-        return Err("Enter a whole number.")
+        return Err(T.STOCK_ENTER_WHOLE)
     if s.startswith("-"):
-        return Err("Quantity cannot be negative.")
+        return Err(T.STOCK_NEGATIVE)
     if not _DIGITS.fullmatch(s):
-        return Err("Use digits only (a whole number such as 12).")
+        return Err(T.STOCK_DIGITS_ONLY)
     if len(s.lstrip("0") or "0") > 7:  # also keeps int() away from huge inputs
         return Err(_TOO_LARGE)
     value = int(s)

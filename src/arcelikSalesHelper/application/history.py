@@ -16,6 +16,7 @@ from decimal import Decimal
 from enum import Enum
 from typing import Any
 
+from arcelikSalesHelper import strings as T
 from arcelikSalesHelper.domain.formatting import format_decimal_exact
 from arcelikSalesHelper.domain.models import (
     POS_LABEL,
@@ -34,7 +35,7 @@ from .calculator import (
     TransactionEvaluation,
 )
 
-_CORRUPT = "The stored calculation data could not be read."
+_CORRUPT = T.HISTORY_CORRUPT
 
 # ---- records (what is written to / read from the database) ------------------
 
@@ -196,7 +197,7 @@ def build_snapshot(
     """Pure. Only a fully valid evaluation can become a snapshot."""
     result = evaluation.result
     if result is None or len(evaluation.forms) != len(evaluation.lines):
-        return Err("Only a complete, valid calculation can be saved.")
+        return Err(T.HISTORY_ONLY_COMPLETE)
 
     lines: list[LineRecord] = []
     warnings: list[LineWarning] = []
@@ -204,7 +205,7 @@ def build_snapshot(
         zip(evaluation.forms, evaluation.lines, strict=True)
     ):
         if ev.line is None or ev.result is None or ev.view is None:
-            return Err("Only a complete, valid calculation can be saved.")
+            return Err(T.HISTORY_ONLY_COMPLETE)
         lines.append(_line_record(index, form, ev.line, ev.result, ev.view))
         warnings.extend(ev.result.warnings)
 
@@ -289,31 +290,31 @@ def _section(data: Any) -> Section:
 
 
 _ENTERED_LABELS = (
-    ("quantity", "Quantity"),
-    ("regular_price", "Regular price"),
-    ("website_price", "Website discounted price"),
-    ("coupon", "Additional coupon"),
-    ("manager_value", "Manager-provided value"),
+    ("quantity", T.LBL_ENTERED_QUANTITY),
+    ("regular_price", T.LBL_ENTERED_REGULAR),
+    ("website_price", T.LBL_ENTERED_WEBSITE),
+    ("coupon", T.LBL_ENTERED_COUPON),
+    ("manager_value", T.LBL_ENTERED_MANAGER),
 )
 
 
 def _entered_section(entered: Mapping[str, Any]) -> Section:
     rows = [
-        Row(label, str(entered.get(key, "")).strip() or "(empty)")
+        Row(label, str(entered.get(key, "")).strip() or T.EMPTY_VALUE)
         for key, label in _ENTERED_LABELS
     ]
     if str(entered.get("manager_value", "")).strip():
         is_line = entered.get("manager_mode") == "line"
         rows.append(
             Row(
-                "Manager value mode",
-                "Total line price" if is_line else "Unit price",
+                T.LBL_ENTERED_MANAGER_MODE,
+                T.MODE_LINE if is_line else T.MODE_UNIT,
             )
         )
     return Section(
-        "As entered",
+        T.SEC_AS_ENTERED,
         tuple(rows),
-        note="Text exactly as typed. The calculation used the normalized values shown elsewhere.",
+        note=T.NOTE_AS_ENTERED,
     )
 
 
@@ -382,8 +383,5 @@ def summarize(header: SnapshotHeader) -> HistorySummary:
 
 def confirmation_text(state: str) -> str:
     if state == ConfirmationState.POS_UNVERIFIED.value:
-        return (
-            f"{POS_LABEL}: the POS-entry amounts were shown as unverified "
-            "when this calculation was saved."
-        )
-    return f"Confirmation state when saved: {state or 'unknown'}"
+        return T.confirmation_pos_unverified()
+    return T.confirmation_other(state)

@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from importlib import resources
 from pathlib import Path
 
+from arcelikSalesHelper import strings as T
 from arcelikSalesHelper.domain.result import Err, Ok, Result
 
 _MIGRATION_FILE = re.compile(r"(\d{4})_([A-Za-z0-9_]+)\.sql")
@@ -129,7 +130,7 @@ def _apply(conn: sqlite3.Connection, migration: Migration) -> None:
         if conn.in_transaction:
             conn.execute("ROLLBACK")
         raise MigrationError(
-            f"Migration {migration.version:04d}_{migration.name} failed: {exc}"
+            T.db_migration_failed(migration.version, migration.name, str(exc))
         ) from exc
 
 
@@ -155,7 +156,7 @@ def migrate(
         try:
             on_before_migrate(current, latest)
         except Exception as exc:
-            raise MigrationError(f"Pre-migration backup failed: {exc}") from exc
+            raise MigrationError(T.db_pre_migration_backup_failed(str(exc))) from exc
 
     applied: list[int] = []
     for migration in pending:
@@ -173,7 +174,7 @@ def open_database(
     try:
         conn = connect(path)
     except sqlite3.Error as exc:
-        return Err(DbOpenError("open_failed", f"Cannot open the database: {exc}"))
+        return Err(DbOpenError("open_failed", T.db_cannot_open(str(exc))))
     try:
         migrate(conn, migs, on_before_migrate)
     except SchemaTooNewError as exc:
@@ -181,9 +182,7 @@ def open_database(
         return Err(
             DbOpenError(
                 "schema_too_new",
-                f"This database was created by a newer version of the application "
-                f"(schema {exc.db_version}; this version supports up to {exc.app_version}). "
-                f"Update the application. The database has not been modified.",
+                T.db_schema_too_new(exc.db_version, exc.app_version),
             )
         )
     except MigrationError as exc:
@@ -191,5 +190,5 @@ def open_database(
         return Err(DbOpenError("migration_failed", str(exc)))
     except sqlite3.Error as exc:
         conn.close()
-        return Err(DbOpenError("open_failed", f"Cannot open the database: {exc}"))
+        return Err(DbOpenError("open_failed", T.db_cannot_open(str(exc))))
     return Ok(conn)

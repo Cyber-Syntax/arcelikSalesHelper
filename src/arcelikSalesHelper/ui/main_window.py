@@ -8,13 +8,13 @@ from PySide6.QtGui import QCloseEvent
 from PySide6.QtWidgets import (
     QLabel,
     QMainWindow,
-    QMessageBox,
     QTabWidget,
     QVBoxLayout,
     QWidget,
 )
 
 from arcelikSalesHelper import __version__
+from arcelikSalesHelper import strings as T
 from arcelikSalesHelper.application.calculator import TransactionEvaluation
 from arcelikSalesHelper.application.history import build_snapshot, to_utc_iso
 from arcelikSalesHelper.constants import DISPLAY_NAME
@@ -33,6 +33,7 @@ from arcelikSalesHelper.paths import AppPaths
 from .calculator_tab import CalculatorTab
 from .history_tab import HistoryTab
 from .products_tab import ProductsTab
+from .common import show_warning
 from .settings_tab import SettingsTab, describe_failure
 
 BANNER_STYLE = "background-color: #d32f2f; color: white; padding: 6px;"
@@ -61,10 +62,10 @@ class MainWindow(QMainWindow):
         self.settings_tab = SettingsTab(paths, backups)
 
         self.tabs = QTabWidget()
-        self.tabs.addTab(self.products_tab, "Products")
-        self.tabs.addTab(self.calculator_tab, "Calculator")
-        self.tabs.addTab(self.history_tab, "History")
-        self.tabs.addTab(self.settings_tab, "Settings")
+        self.tabs.addTab(self.products_tab, T.TAB_PRODUCTS)
+        self.tabs.addTab(self.calculator_tab, T.TAB_CALCULATOR)
+        self.tabs.addTab(self.history_tab, T.TAB_HISTORY)
+        self.tabs.addTab(self.settings_tab, T.TAB_SETTINGS)
 
         self.backup_banner = QLabel()
         self.backup_banner.setWordWrap(True)
@@ -104,10 +105,7 @@ class MainWindow(QMainWindow):
         if failure is None:
             self.backup_banner.hide()
             return
-        self.backup_banner.setText(
-            f"⚠ {describe_failure(failure)} Recent changes may not be backed up. "
-            "Open the Settings tab and choose “Back up now”."
-        )
+        self.backup_banner.setText(T.backup_banner(describe_failure(failure)))
         self.backup_banner.show()
 
     def shutdown_backup(self, interactive: bool = True) -> None:
@@ -122,11 +120,10 @@ class MainWindow(QMainWindow):
             log.exception("Backup on close could not run")
             return
         if isinstance(result, Err) and interactive:
-            QMessageBox.warning(
+            show_warning(
                 self,
-                "Backup on close failed",
-                f"{result.error.message}\n\nThe application will close anyway. "
-                "Start it again and use “Back up now” in Settings.",
+                T.BACKUP_CLOSE_FAILED_TITLE,
+                T.backup_close_failed(result.error.message),
             )
 
     def closeEvent(self, event: QCloseEvent) -> None:  # noqa: N802 (Qt override)
@@ -150,7 +147,7 @@ class MainWindow(QMainWindow):
             snapshot_id = self._history_repo.save(built.value)
         except sqlite3.Error as exc:
             log.exception("Saving the calculation failed")
-            return Err(f"The calculation could not be saved: {exc}")
+            return Err(T.calc_save_failed(str(exc)))
         return Ok(snapshot_id)
 
     def _on_save_requested(self, evaluation: object) -> None:
@@ -158,9 +155,9 @@ class MainWindow(QMainWindow):
             return
         outcome = self.save_calculation(evaluation)
         if isinstance(outcome, Err):
-            QMessageBox.warning(self, "Calculation not saved", outcome.error)
+            show_warning(self, T.CALC_NOT_SAVED_TITLE, outcome.error)
             return
         self.history_tab.reload(select_id=outcome.value)
         self.statusBar().showMessage(
-            f"Calculation #{outcome.value} saved to history.", 8000
+            T.calc_saved_status(outcome.value), 8000
         )

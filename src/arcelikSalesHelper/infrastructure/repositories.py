@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from decimal import Decimal
 
+from arcelikSalesHelper import strings as T
 from arcelikSalesHelper.domain.formatting import format_decimal_exact
 from arcelikSalesHelper.domain.products import (
     Product,
@@ -62,13 +63,11 @@ def _escape_like(text: str) -> str:
 
 
 def _duplicate(name: str) -> RepoError:
-    return RepoError(
-        "duplicate_name", f"An active product named '{name}' already exists."
-    )
+    return RepoError("duplicate_name", T.repo_duplicate(name))
 
 
 def _not_found(product_id: int) -> RepoError:
-    return RepoError("not_found", f"Product {product_id} does not exist.")
+    return RepoError("not_found", T.repo_not_found(product_id))
 
 
 class ProductRepository:
@@ -253,8 +252,7 @@ class ProductRepository:
                     return Err(
                         RepoError(
                             "name_collision",
-                            f"Cannot restore: an active product named '{current.name}' "
-                            "already exists. Rename or archive one of them first.",
+                            T.repo_name_collision(current.name),
                         )
                     )
             self._conn.execute(
