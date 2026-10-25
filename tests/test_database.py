@@ -19,6 +19,26 @@ BAD2 = Migration(
 )
 
 
+def test_upgrade_from_v1_adds_entered_text_column(tmp_path: Path) -> None:
+    migrations = load_migrations()
+    assert len(migrations) >= 2
+    path = tmp_path / "a.sqlite"
+    open_ok(path, migrations=migrations[:1]).close()
+
+    calls: list[tuple[int, int]] = []
+    conn = open_ok(
+        path,
+        on_before_migrate=lambda f, t: calls.append((f, t)),
+        migrations=migrations,
+    )
+    assert calls == [(1, len(migrations))]  # the pre-migration hook ran
+    columns = {
+        r["name"] for r in conn.execute("PRAGMA table_info(calculation_lines)")
+    }
+    assert "entered_json" in columns
+    conn.close()
+
+
 def table_names(conn: sqlite3.Connection) -> set[str]:
     rows = conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'")
     return {r["name"] for r in rows}
