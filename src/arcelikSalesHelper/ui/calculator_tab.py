@@ -28,9 +28,9 @@ from arcelikSalesHelper.application.calculator import (
     FieldError,
     FieldHint,
     LineForm,
-    ResultView,
     Section,
-    evaluate_line,
+    TransactionEvaluation,
+    evaluate_transaction,
 )
 from arcelikSalesHelper.domain.formatting import format_money_input
 from arcelikSalesHelper.domain.models import ManagerMode
@@ -258,131 +258,253 @@ def _clear(layout: QLayout) -> None:
             widget.deleteLater()
 
 
-class ResultPanel(QWidget):
-    """Renders a ``ResultView``. Contains no calculations."""
+def section_box(section: Section) -> QGroupBox:
+    box = QGroupBox(section.title)
+    grid = QGridLayout(box)
+    grid.setColumnStretch(0, 1)
+    for i, row in enumerate(section.rows):
+        label = QLabel(row.label)
+        label.setWordWrap(True)
+        value = QLabel(row.value)
+        value.setAlignment(Qt.AlignmentFlag.AlignRight)
+        value.setTextInteractionFlags(
+            Qt.TextInteractionFlag.TextSelectableByMouse
+        )
+        if row.tooltip:
+            value.setToolTip(row.tooltip)
+        grid.addWidget(label, i, 0)
+        grid.addWidget(value, i, 1)
+    if section.note:
+        note = QLabel(section.note)
+        note.setWordWrap(True)
+        note.setStyleSheet(HINT_STYLE)
+        grid.addWidget(note, len(section.rows), 0, 1, 2)
+    return box
+
+
+class LineRow(QGroupBox):
+    """One calculator line with controls and its input widget."""
+
+    move_up = Signal(object)
+    move_down = Signal(object)
+    remove_requested = Signal(object)
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.message = QLabel()
-        self.message.setWordWrap(True)
-        self.message.setStyleSheet(HINT_STYLE)
-
-        self.content = QWidget()
-        self._sections = QVBoxLayout()
-        self._warnings = QLabel()
-        self._warnings.setWordWrap(True)
-        self._warnings.setStyleSheet(WARNING_STYLE)
-        self._explain = Collapsible("How this was calculated")
-        content_layout = QVBoxLayout(self.content)
-        content_layout.setContentsMargins(0, 0, 0, 0)
-        content_layout.addLayout(self._sections)
-        content_layout.addWidget(self._warnings)
-        content_layout.addWidget(self._explain)
-
+        self.line = CalculatorLineWidget()
+        self.up_button = QToolButton()
+        self.up_button.setText("↑")
+        self.up_button.setToolTip("Move line up")
+        self.down_button = QToolButton()
+        self.down_button.setText("↓")
+        self.down_button.setToolTip("Move line down")
+        self.remove_button = QToolButton()
+        self.remove_button.setText("✕")
+        self.remove_button.setToolTip("Remove line")
+        header = QHBoxLayout()
+        header.addStretch(1)
+        header.addWidget(self.up_button)
+        header.addWidget(self.down_button)
+        header.addWidget(self.remove_button)
         layout = QVBoxLayout(self)
-        layout.addWidget(self.message)
-        layout.addWidget(self.content)
+        layout.addLayout(header)
+        layout.addWidget(self.line)
+        self.up_button.clicked.connect(
+            lambda _c=False: self.move_up.emit(self)
+        )
+        self.down_button.clicked.connect(
+            lambda _c=False: self.move_down.emit(self)
+        )
+        self.remove_button.clicked.connect(
+            lambda _c=False: self.remove_requested.emit(self)
+        )
+
+    def set_position(self, index: int, count: int) -> None:
+        self.setTitle(f"Line {index + 1}")
+        self.up_button.setEnabled(index > 0)
+        self.down_button.setEnabled(index < count - 1)
+        self.remove_button.setEnabled(count > 1)
+
+
+class TransactionPanel(QWidget):
+    """Renders a transaction evaluation without performing calculations."""
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self._cards = QVBoxLayout()
+        self._totals = QVBoxLayout()
+        layout = QVBoxLayout(self)
+        layout.addLayout(self._cards)
+        layout.addLayout(self._totals)
         layout.addStretch(1)
-        self.show_message("Enter the product name and prices to see results.")
-
-    def show_message(self, text: str) -> None:
-        self.message.setText(text)
-        self.message.show()
-        self.content.hide()  # never show stale results
-
-    def show_view(self, view: ResultView) -> None:
-        _clear(self._sections)
-        for section in view.sections:
-            self._sections.addWidget(self._section_box(section))
-        self._warnings.setText("\n".join(f"⚠ {w}" for w in view.warnings))
-        self._warnings.setVisible(bool(view.warnings))
-        self._explain.set_lines(view.explanation)
-        self.message.hide()
-        self.content.show()
 
     @staticmethod
-    def _section_box(section: Section) -> QGroupBox:
-        box = QGroupBox(section.title)
-        grid = QGridLayout(box)
-        grid.setColumnStretch(0, 1)
-        for i, row in enumerate(section.rows):
-            label = QLabel(row.label)
-            value = QLabel(row.value)
-            value.setAlignment(Qt.AlignmentFlag.AlignRight)
-            value.setTextInteractionFlags(
-                Qt.TextInteractionFlag.TextSelectableByMouse
+    def _note(text: str, style: str = HINT_STYLE) -> QLabel:
+        label = QLabel(text)
+        label.setWordWrap(True)
+        label.setStyleSheet(style)
+        return label
+
+    def show_evaluation(self, evaluation: TransactionEvaluation) -> None:
+        _clear(self._cards)
+        _clear(self._totals)
+        for index, line_eval in enumerate(evaluation.lines):
+            self._cards.addWidget(self._line_card(index, line_eval))
+        if evaluation.totals_sections:
+            for section in evaluation.totals_sections:
+                self._totals.addWidget(section_box(section))
+        elif evaluation.pending_reason:
+            self._totals.addWidget(self._note(evaluation.pending_reason))
+
+    def _line_card(self, index: int, evaluation: Evaluation) -> QGroupBox:
+        name = (
+            evaluation.line.product_name if evaluation.line is not None else ""
+        )
+        box = QGroupBox(f"Line {index + 1}" + (f": {name}" if name else ""))
+        layout = QVBoxLayout(box)
+        view = evaluation.view
+        if view is None:
+            text = (
+                "Enter the product name and prices to see this line's results."
+                if evaluation.incomplete_only
+                else "Fix the highlighted fields on this line."
             )
-            if row.tooltip:
-                value.setToolTip(row.tooltip)
-            grid.addWidget(label, i, 0)
-            grid.addWidget(value, i, 1)
-        if section.note:
-            note = QLabel(section.note)
-            note.setWordWrap(True)
-            note.setStyleSheet(HINT_STYLE)
-            grid.addWidget(note, len(section.rows), 0, 1, 2)
+            layout.addWidget(self._note(text))
+            return box
+        card = view.card
+        layout.addWidget(section_box(card.prices))
+        options = QHBoxLayout()
+        options.addWidget(section_box(card.website_option), 1)
+        if card.gift_option is not None:
+            options.addWidget(section_box(card.gift_option), 1)
+        layout.addLayout(options)
+        layout.addWidget(section_box(card.pos))
+        if view.warnings:
+            layout.addWidget(
+                self._note(
+                    "\n".join(f"⚠ {w}" for w in view.warnings),
+                    WARNING_STYLE,
+                )
+            )
+        explain = Collapsible("How this was calculated")
+        explain.set_lines(view.explanation)
+        layout.addWidget(explain)
         return box
 
 
 class CalculatorTab(QWidget):
-    """Controller: widget -> LineForm -> evaluate_line -> render."""
+    """Controller: rows -> forms -> transaction evaluation -> rendering."""
 
-    save_requested = Signal(object)  # Evaluation; wired to history in M5
+    save_requested = Signal(object)
 
     def __init__(
         self, repo: ProductRepository, parent: QWidget | None = None
     ) -> None:
         super().__init__(parent)
         self._repo = repo
-        self.evaluation = Evaluation()
-
-        self.line = CalculatorLineWidget()
-        self.panel = ResultPanel()
+        self._products: list[Product] = repo.search()
+        self._bulk = False
+        self.rows: list[LineRow] = []
+        self.evaluation = TransactionEvaluation(lines=())
+        self.panel = TransactionPanel()
+        self.add_button = QPushButton("Add line")
         self.save_button = QPushButton("Save calculation")
         self.save_button.setEnabled(False)
 
-        left = QScrollArea()
-        left.setWidgetResizable(True)
-        left.setWidget(self.line)
-        right_scroll = QScrollArea()
-        right_scroll.setWidgetResizable(True)
-        right_scroll.setWidget(self.panel)
+        self._rows_host = QWidget()
+        self._rows_layout = QVBoxLayout(self._rows_host)
+        self._rows_layout.addStretch(1)
+        rows_scroll = QScrollArea()
+        rows_scroll.setWidgetResizable(True)
+        rows_scroll.setWidget(self._rows_host)
+        left = QWidget()
+        left_layout = QVBoxLayout(left)
+        left_layout.setContentsMargins(0, 0, 0, 0)
+        left_layout.addWidget(rows_scroll, 1)
+        left_layout.addWidget(self.add_button)
+
+        results_scroll = QScrollArea()
+        results_scroll.setWidgetResizable(True)
+        results_scroll.setWidget(self.panel)
         right = QWidget()
         right_layout = QVBoxLayout(right)
         right_layout.setContentsMargins(0, 0, 0, 0)
-        right_layout.addWidget(right_scroll, 1)
+        right_layout.addWidget(results_scroll, 1)
         right_layout.addWidget(self.save_button)
 
         splitter = QSplitter(Qt.Orientation.Horizontal)
         splitter.addWidget(left)
         splitter.addWidget(right)
-        splitter.setSizes([430, 570])
+        splitter.setSizes([430, 620])
         layout = QVBoxLayout(self)
         layout.addWidget(splitter)
-
-        self.line.changed.connect(self.recalculate)
+        self.add_button.clicked.connect(lambda _c=False: self.add_line())
         self.save_button.clicked.connect(
-            lambda _c: self.save_requested.emit(self.evaluation)
+            lambda _c=False: self.save_requested.emit(self.evaluation)
         )
-        self.refresh_products()
+        self.add_line()
+
+    def add_line(self) -> LineRow:
+        row = LineRow()
+        row.line.set_products(self._products)
+        row.line.changed.connect(self.recalculate)
+        row.move_up.connect(lambda r: self._move(r, -1))
+        row.move_down.connect(lambda r: self._move(r, 1))
+        row.remove_requested.connect(self.remove_line)
+        self.rows.append(row)
+        self._rows_layout.insertWidget(len(self.rows) - 1, row)
+        self._refresh_positions()
+        self.recalculate()
+        return row
+
+    def remove_line(self, row: LineRow) -> None:
+        if len(self.rows) <= 1 or row not in self.rows:
+            return
+        self.rows.remove(row)
+        self._rows_layout.removeWidget(row)
+        row.deleteLater()
+        self._refresh_positions()
+        self.recalculate()
+
+    def _move(self, row: LineRow, delta: int) -> None:
+        try:
+            index = self.rows.index(row)
+        except ValueError:
+            return
+        target = index + delta
+        if not 0 <= target < len(self.rows):
+            return
+        self.rows[index], self.rows[target] = (
+            self.rows[target],
+            self.rows[index],
+        )
+        self._rows_layout.removeWidget(row)
+        self._rows_layout.insertWidget(target, row)
+        self._refresh_positions()
+        self.recalculate()
+
+    def _refresh_positions(self) -> None:
+        for index, row in enumerate(self.rows):
+            row.set_position(index, len(self.rows))
 
     def refresh_products(self) -> None:
-        self.line.set_products(
-            self._repo.search()
-        )  # emits changed -> recalculate
+        self._products = self._repo.search()
+        self._bulk = True
+        try:
+            for row in self.rows:
+                row.line.set_products(self._products)
+        finally:
+            self._bulk = False
+        self.recalculate()
 
     def recalculate(self) -> None:
-        evaluation = evaluate_line(self.line.form())
+        if self._bulk:
+            return
+        evaluation = evaluate_transaction(
+            [row.line.form() for row in self.rows]
+        )
         self.evaluation = evaluation
-        self.line.set_feedback(evaluation.errors, evaluation.hints)
-        if evaluation.view is not None:
-            self.panel.show_view(evaluation.view)
-        elif evaluation.incomplete_only:
-            self.panel.show_message(
-                "Enter the product name and prices to see results."
-            )
-        else:
-            self.panel.show_message(
-                "Fix the highlighted fields to see results."
-            )
+        for row, line_eval in zip(self.rows, evaluation.lines, strict=True):
+            row.line.set_feedback(line_eval.errors, line_eval.hints)
+        self.panel.show_evaluation(evaluation)
         self.save_button.setEnabled(evaluation.valid)

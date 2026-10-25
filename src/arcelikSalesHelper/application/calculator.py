@@ -5,8 +5,7 @@ returned ``ResultView``.  All numbers shown come from ``LineResult``; nothing is
 recomputed here (only formatted).
 """
 
-from __future__ import annotations
-
+from collections.abc import Sequence
 from dataclasses import dataclass
 from decimal import Decimal
 
@@ -17,14 +16,21 @@ from arcelikSalesHelper.domain.formatting import (
 )
 from arcelikSalesHelper.domain.models import (
     POS_LABEL,
+    GiftOption,
     LineInput,
     LineResult,
     ManagerMode,
+    TotalValue,
+    TransactionResult,
+    WebsiteOption,
 )
 from arcelikSalesHelper.domain.money import parse_money_ex
-from arcelikSalesHelper.domain.pricing import calculate_line
+from arcelikSalesHelper.domain.pricing import (
+    build_options,
+    calculate_line,
+    calculate_transaction,
+)
 from arcelikSalesHelper.domain.result import Err, Ok
-
 # ---- input ----------------------------------------------------------------
 
 
@@ -87,10 +93,23 @@ class Section:
 
 
 @dataclass(frozen=True)
+class CardView:
+    """What one line's result card shows (the 10% and manager details live in the options)."""
+
+    prices: Section
+    website_option: Section
+    gift_option: (
+        Section | None
+    )  # None when the line has no gift selected or named
+    pos: Section
+
+
+@dataclass(frozen=True)
 class ResultView:
     sections: tuple[Section, ...]
     warnings: tuple[str, ...]
     explanation: tuple[str, ...]
+    card: CardView
 
 
 @dataclass(frozen=True)
@@ -141,7 +160,7 @@ def _need(read: MoneyRead) -> Decimal:
     return read.value
 
 
-def evaluate_line(form: LineForm) -> Evaluation:
+def evaluate_line(form: LineForm, line_index: int = 0) -> Evaluation:
     texts = {
         "regular_price": form.regular_price,
         "website_price": form.website_price,
@@ -187,7 +206,7 @@ def evaluate_line(form: LineForm) -> Evaluation:
         manager_mode=form.manager_mode if manager_value is not None else None,
         product_id=form.product_id,
     )
-    match calculate_line(line):
+    match calculate_line(line, line_index):
         case Ok(result):
             return Evaluation(
                 hints=hints,
@@ -287,6 +306,7 @@ def present_result(line: LineInput, r: LineResult) -> ResultView:
             ),
         )
 
+    pos_rows: tuple[Row, ...]
     if r.pos_amount is None or r.manager_line_total is None:
         pos_rows = (Row("Result", "n/a: enter a manager value"),)
     else:
@@ -305,10 +325,23 @@ def present_result(line: LineInput, r: LineResult) -> ResultView:
         ),
     )
 
+    website_opt, gift_opt = build_options(line, r)
+    has_manager = r.manager_line_total is not None
+    card = CardView(
+        prices=prices,
+        website_option=_website_section(website_opt, has_manager),
+        gift_option=(
+            None
+            if gift_opt is None
+            else _gift_section(gift_opt, line, has_manager)
+        ),
+        pos=pos,
+    )
     return ResultView(
         sections=(prices, ten, *manager, pos),
         warnings=tuple(w.message for w in r.warnings),
         explanation=_explain(line, r),
+        card=card,
     )
 
 
@@ -350,3 +383,175 @@ def _explain(line: LineInput, r: LineResult) -> tuple[str, ...]:
                 "  (normal website total; the coupon is not used)"
             )
     return tuple(steps)
+
+
+# ---- option panels --------------------------------------------------------
+
+_MANAGER_NOTE = (
+    "Manager value used exactly as entered. Not converted to a percentage."
+)
+
+
+def _option_manager(
+    mode: ManagerMode | None,
+    unit: Decimal | None,
+    total: Decimal | None,
+    has_manager: bool,
+) -> tuple[tuple[Row, ...], str | None]:
+    """The manager value is shown on exactly one option, never on both."""
+    if mode is not None and unit is not None and total is not None:
+        is_line = mode is ManagerMode.LINE
+        rows: tuple[Row, ...] = (
+            Row(
+                "Manager value mode",
+                "Total line price" if is_line else "Unit price",
+            ),
+            _money_row("Manager line total", total),
+            _money_row(
+                "Manager unit value (derived, display only)"
+                if is_line
+                else "Manager unit value",
+                unit,
+            ),
+        )
+        return rows, _MANAGER_NOTE
+    if has_manager:
+        return (
+            Row("Manager-provided value", "Shown on the other option"),
+        ), None
+    return (), None
+
+
+def _website_section(w: WebsiteOption, has_manager: bool) -> Section:
+    manager_rows, note = _option_manager(
+        w.manager_mode, w.manager_unit, w.manager_line_total, has_manager
+    )
+    return Section(
+        "Website discount option",
+        (
+            _money_row("Website discounted total", w.website_total),
+            _money_row("Coupon total", w.coupon_total),
+            _money_row("Effective website price (unit)", w.effective_unit),
+            _money_row("Effective website total", w.effective_total),
+            Row("10% base", "Effective website price"),
+            _money_row("10% base (unit)", w.ten_pct_base),
+            _money_row("10% discount (unit)", w.ten_pct_discount_unit),
+            _money_row("10% unit price", w.ten_pct_unit),
+            _money_row("10% line total", w.ten_pct_total),
+            *manager_rows,
+        ),
+        note=note,
+    )
+
+
+def _gift_section(
+    g: GiftOption, line: LineInput, has_manager: bool
+) -> Section:
+    manager_rows, manager_note = _option_manager(
+        g.manager_mode, g.manager_unit, g.manager_line_total, has_manager
+    )
+    notes = (
+        []
+        if line.gift_selected
+        else ["Gift is not selected on this line; shown for comparison."]
+    )
+    if manager_note:
+        notes.append(manager_note)
+    return Section(
+        "Gift option",
+        (
+            Row("Gift", g.gift_name or "(no gift name)"),
+            _money_row("Regular total", g.regular_total),
+            Row("10% base", "Regular price"),
+            _money_row("10% base (unit)", g.ten_pct_base),
+            _money_row("10% discount (unit)", g.ten_pct_discount_unit),
+            _money_row("10% unit price", g.ten_pct_unit),
+            _money_row("10% line total", g.ten_pct_total),
+            *manager_rows,
+        ),
+        note=" ".join(notes) or None,
+    )
+
+
+# ---- transaction ----------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class TransactionEvaluation:
+    lines: tuple[Evaluation, ...]
+    forms: tuple[LineForm, ...] = ()
+    result: TransactionResult | None = None
+    totals_sections: tuple[Section, ...] = ()
+    pending_reason: str | None = None
+
+    @property
+    def valid(self) -> bool:
+        return self.result is not None
+
+
+def _total_row(label: str, total: TotalValue, what: str) -> Row:
+    if total.value is not None:
+        return _money_row(label, total.value)
+    numbers = ", ".join(str(i + 1) for i in total.missing_lines)
+    noun = "line" if len(total.missing_lines) == 1 else "lines"
+    return Row(label, f"n/a: missing {what} on {noun} {numbers}")
+
+
+def present_totals(result: TransactionResult) -> tuple[Section, ...]:
+    t = result.totals
+    main = Section(
+        "Transaction totals",
+        (
+            Row("Lines", str(len(result.lines))),
+            _total_row("Regular total", t.regular, "regular price"),
+            _total_row("Website discounted total", t.website, "website price"),
+            _total_row(
+                "Effective website total", t.effective_website, "website price"
+            ),
+            _total_row("Standard 10% scenario total", t.ten_pct, "price"),
+            _total_row("Manager-provided total", t.manager, "manager value"),
+        ),
+        note=(
+            "Each line uses its own 10% base: regular price for gift lines, "
+            "effective website price for no-gift lines."
+        ),
+    )
+    pos = Section(
+        POS_LABEL,
+        (_total_row("POS-entry total", t.pos, "manager value"),),
+        note=(
+            "Sum of the per-line POS-entry amounts. Informational only. "
+            "Not an official or manager-approved POS instruction."
+        ),
+    )
+    return main, pos
+
+
+def evaluate_transaction(forms: Sequence[LineForm]) -> TransactionEvaluation:
+    kept = tuple(forms)
+    evals = tuple(evaluate_line(f, i) for i, f in enumerate(kept))
+    if not evals:
+        return TransactionEvaluation(
+            evals, kept, pending_reason="Add at least one product line."
+        )
+    bad = [str(i + 1) for i, e in enumerate(evals) if not e.valid]
+    if bad:
+        return TransactionEvaluation(
+            evals,
+            kept,
+            pending_reason=(
+                "Totals are shown when every line is valid. "
+                f"Lines to complete or fix: {', '.join(bad)}."
+            ),
+        )
+    inputs = [e.line for e in evals if e.line is not None]
+    match calculate_transaction(inputs):
+        case Ok(result):
+            return TransactionEvaluation(
+                evals, kept, result, present_totals(result)
+            )
+        case Err(problems):
+            return TransactionEvaluation(
+                evals, kept, pending_reason=problems[0].message
+            )
+    raise AssertionError("unreachable")  # pragma: no cover
