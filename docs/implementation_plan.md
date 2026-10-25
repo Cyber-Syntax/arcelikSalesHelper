@@ -194,6 +194,19 @@ calculation_lines(id, snapshot_id FK ON DELETE RESTRICT, line_index,
 - If any row has errors: block Apply by default. Offer "Import valid rows only" as an explicit choice, and state this in the summary. Decide this when building the UI; default is **block**, because the PRD says "validate every row" and "apply a valid import".
 - A pre-import backup is recommended (the PRD only requires pre-migration/destructive). Take one, since bulk updates are effectively destructive.
 
+**Scope change**
+
+Quantity tracking contradicts the PRD (non-goals: “stock availability claims”; CSV: “exactly three columns, no optional fields”). I implemented it as a manual count log, not as stock tracking. Please bump the PRD to v0.4 so the documents agree. What that means in practice:
+
+A quantity is a number someone typed or imported, with a timestamp and source (“counted qty, as of ...”). It never changes by itself. Saving a calculation does not decrement it.
+It never appears in the calculator and never feeds a calculation.
+Every change is appended to an immutable stock_history table with the previous value, the source (manual or csv) and an optional note, so you can later answer “what did we think we had on date X”.
+NULL means “never counted”, which is different from 0.
+
+| Format | Header | Use |
+| Price list | product_name,regular_price,website_discounted_price with optional ,quantity  | Your scraper output. A blank quantity cell leaves the stored quantity alone.
+| Stock counts | product_name,quantity (either order) | Warehouse counts you transcribe from their photos. Never creates products. |
+
 **`ui` import dialog:** file picker, preview table (status, row #, name, old vs new prices, error), a per-conflict Update/Skip combo, and a summary dialog (created / updated / skipped / unchanged / errors).
 
 **Tests:** both numeric styles, BOM, bad header, extra columns, blank lines, duplicates in file, row-specific errors, conflict update vs skip, rollback on a forced mid-apply failure, archived-product collision handling (define: an archived match is treated as a conflict with the option to update and restore, and confirm this in the UI text).
