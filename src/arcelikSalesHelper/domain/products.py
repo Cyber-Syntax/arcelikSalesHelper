@@ -29,6 +29,8 @@ class Product:
     archived: bool
     created_at: str  # UTC ISO-8601, e.g. 2026-10-24T09:30:00Z
     updated_at: str
+    quantity: int | None = None  # manually counted; None = never counted
+    quantity_updated_at: str | None = None
 
 
 def name_key(name: str) -> str:
@@ -65,23 +67,33 @@ def validate_draft(draft: ProductDraft) -> tuple[ValidationError, ...]:
     """Expects a normalised draft."""
     errors: list[ValidationError] = []
     if not draft.name:
-        errors.append(ValidationError("name_required", "name", "Product name is required."))
+        errors.append(
+            ValidationError(
+                "name_required", "name", "Product name is required."
+            )
+        )
     elif len(draft.name) > MAX_NAME_LENGTH:
         errors.append(
             ValidationError(
-                "name_too_long", "name", f"Name must be at most {MAX_NAME_LENGTH} characters."
+                "name_too_long",
+                "name",
+                f"Name must be at most {MAX_NAME_LENGTH} characters.",
             )
         )
     if _bad_money(draft.regular_price):
         errors.append(
             ValidationError(
-                "regular_price_invalid", "regular_price", "Regular price must be zero or more."
+                "regular_price_invalid",
+                "regular_price",
+                "Regular price must be zero or more.",
             )
         )
     if _bad_money(draft.website_price):
         errors.append(
             ValidationError(
-                "website_price_invalid", "website_price", "Website price must be zero or more."
+                "website_price_invalid",
+                "website_price",
+                "Website price must be zero or more.",
             )
         )
     return tuple(errors)

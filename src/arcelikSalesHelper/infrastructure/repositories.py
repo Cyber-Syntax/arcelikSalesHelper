@@ -15,13 +15,14 @@ from arcelikSalesHelper.domain.products import (
     validate_draft,
 )
 from arcelikSalesHelper.domain.result import Err, Ok, Result
+from arcelikSalesHelper.domain.stock import StockSource, validate_quantity
 from arcelikSalesHelper.domain.validation import ValidationError
 
 from .database import transaction
 
 _COLUMNS = (
     "id, name, regular_price, website_price, default_gift_name, notes, "
-    "archived, created_at, updated_at"
+    "archived, created_at, updated_at, quantity, quantity_updated_at"
 )
 
 
@@ -51,6 +52,8 @@ def _to_product(row: sqlite3.Row) -> Product:
         archived=bool(row["archived"]),
         created_at=row["created_at"],
         updated_at=row["updated_at"],
+        quantity=None if row["quantity"] is None else int(row["quantity"]),
+        quantity_updated_at=row["quantity_updated_at"],
     )
 
 
@@ -183,6 +186,55 @@ class ProductRepository:
 
     def restore(self, product_id: int) -> Result[Product, RepoError]:
         return self._set_archived(product_id, archived=False)
+
+    def set_quantity(
+        self,
+        product_id: int,
+        quantity: int,
+        source: StockSource,
+        note: str | None = None,
+    ) -> Result[Product, RepoError]:
+        """Record a counted quantity. Prices, name and updated_at are not touched.
+
+        Setting the same number again is recorded too: it confirms the count
+        and refreshes the 'as of' time.
+        """
+        problem = validate_quantity(quantity)
+        if problem is not None:
+            return Err(
+                RepoError(
+                    "invalid",
+                    problem,
+                    (
+                        ValidationError(
+                            "quantity_invalid", "quantity", problem
+                        ),
+                    ),
+                )
+            )
+        clean_note = (note or "").strip() or None
+        with transaction(self._conn):
+            current = self.get(product_id)
+            if current is None:
+                return Err(_not_found(product_id))
+            now = _iso(self._clock())
+            self._conn.execute(
+                "UPDATE products SET quantity = ?, quantity_updated_at = ? WHERE id = ?",
+                (quantity, now, product_id),
+            )
+            self._conn.execute(
+                "INSERT INTO stock_history (product_id, quantity, previous_quantity, source, "
+                "note, changed_at) VALUES (?, ?, ?, ?, ?, ?)",
+                (
+                    product_id,
+                    quantity,
+                    current.quantity,
+                    source.value,
+                    clean_note,
+                    now,
+                ),
+            )
+            return Ok(self._require(product_id))
 
     # ---- internals -------------------------------------------------------
 

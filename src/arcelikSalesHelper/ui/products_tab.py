@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import sqlite3
+
 from PySide6.QtCore import (
     QAbstractTableModel,
     QModelIndex,
@@ -30,12 +32,15 @@ from arcelikSalesHelper.application.calculator import read_money
 from arcelikSalesHelper.domain.formatting import format_money_input, format_try
 from arcelikSalesHelper.domain.products import Product, ProductDraft
 from arcelikSalesHelper.domain.result import Err, Ok
+from arcelikSalesHelper.domain.stock import StockSource, parse_quantity
+from arcelikSalesHelper.infrastructure.backups import BackupManager
 from arcelikSalesHelper.infrastructure.repositories import (
     ProductRepository,
     RepoError,
 )
 
 from .common import ERROR_STYLE, FieldBlock, format_local_timestamp
+from .import_dialog import ImportDialog
 
 _ROOT = QModelIndex()
 _Index = QModelIndex | QPersistentModelIndex
@@ -43,13 +48,9 @@ _Index = QModelIndex | QPersistentModelIndex
 
 class ProductTableModel(QAbstractTableModel):
     HEADERS = (
-        "Name",
-        "Regular price",
-        "Website price",
-        "Default gift",
-        "Notes",
-        "Last updated",
-    )
+        "Name", "Regular price", "Website price", "Default gift", "Notes", "Last updated",
+        "Counted qty", "Counted as of",
+    )  # fmt: skip
 
     def __init__(self, parent: QObject | None = None) -> None:
         super().__init__(parent)
@@ -94,14 +95,20 @@ class ProductTableModel(QAbstractTableModel):
             return None
         product = self._rows[index.row()]
         col = index.column()
+
         if role == Qt.ItemDataRole.DisplayRole:
             return self._display(product, col)
-        if role == Qt.ItemDataRole.TextAlignmentRole and col in (1, 2):
+        if role == Qt.ItemDataRole.TextAlignmentRole and col in (1, 2, 6):
             return Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
         if role == Qt.ItemDataRole.ForegroundRole and product.archived:
             return QBrush(QColor(128, 128, 128))
         if role == Qt.ItemDataRole.ToolTipRole and col == 4:
             return product.notes
+        if role == Qt.ItemDataRole.ToolTipRole and col in (6, 7):
+            return (
+                "Entered by hand or imported from a warehouse count. It does not change by "
+                "itself and is not an official stock figure."
+            )
         return None
 
     @staticmethod
@@ -119,8 +126,20 @@ class ProductTableModel(QAbstractTableModel):
                 return product.default_gift_name or ""
             case 4:
                 return " ".join((product.notes or "").split())
-            case _:
+            case 5:
                 return format_local_timestamp(product.updated_at)
+            case 6:
+                return (
+                    "—"
+                    if product.quantity is None
+                    else f"{product.quantity:,}".replace(",", ".")
+                )
+            case _:
+                return (
+                    ""
+                    if product.quantity_updated_at is None
+                    else format_local_timestamp(product.quantity_updated_at)
+                )
 
 
 class ProductDialog(QDialog):
@@ -256,14 +275,96 @@ class ProductDialog(QDialog):
             self._general.show()
 
 
-class ProductsTab(QWidget):
-    products_changed = Signal()
+class StockDialog(QDialog):
+    """Record a counted quantity for one product. Inline errors; stays open on failure."""
 
     def __init__(
-        self, repo: ProductRepository, parent: QWidget | None = None
+        self,
+        repo: ProductRepository,
+        product: Product,
+        parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
         self._repo = repo
+        self._product = product
+        self.saved: Product | None = None
+        self.setWindowTitle(f"Update quantity: {product.name}")
+        self.setMinimumWidth(440)
+
+        self.quantity_edit = QLineEdit()
+        self.quantity_edit.setPlaceholderText("whole number, for example 12")
+        self.note_edit = QLineEdit()
+        self.note_edit.setPlaceholderText(
+            "optional, for example: warehouse photo 24 Oct"
+        )
+        self.block = FieldBlock(self.quantity_edit)
+
+        if product.quantity is None or product.quantity_updated_at is None:
+            current = "No count has been recorded for this product yet."
+        else:
+            current = (
+                f"Currently {product.quantity} "
+                f"(counted {format_local_timestamp(product.quantity_updated_at)})."
+            )
+            self.quantity_edit.setText(str(product.quantity))
+        info = QLabel(
+            f"{current}\nEnter the number reported by the warehouse. This is a manual "
+            "record, not live or official stock."
+        )
+        info.setWordWrap(True)
+
+        form = QFormLayout()
+        form.addRow("Counted quantity", self.block)
+        form.addRow("Note", self.note_edit)
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Save
+            | QDialogButtonBox.StandardButton.Cancel
+        )
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        layout = QVBoxLayout(self)
+        layout.addWidget(info)
+        layout.addLayout(form)
+        layout.addWidget(buttons)
+
+    def accept(self) -> None:
+        self.block.set_error(None)
+        match parse_quantity(self.quantity_edit.text()):
+            case Err(message):
+                self.block.set_error(message)
+                return
+            case Ok(quantity):
+                outcome = self._repo.set_quantity(
+                    self._product.id,
+                    quantity,
+                    StockSource.MANUAL,
+                    self.note_edit.text(),
+                )
+        match outcome:
+            case Err(error):
+                self.block.set_error(error.message)
+            case Ok(saved):
+                self.saved = saved
+                super().accept()
+
+
+class ProductsTab(QWidget):
+    products_changed = Signal()
+    import_finished = (
+        Signal()
+    )  # the import dialog closed (a backup may have run)
+
+    def __init__(
+        self,
+        repo: ProductRepository,
+        conn: sqlite3.Connection | None = None,
+        backups: BackupManager | None = None,
+        parent: QWidget | None = None,
+    ) -> None:
+        super().__init__(parent)
+        self._repo = repo
+        self._conn = conn
+        self._backups = backups
 
         self.search_edit = QLineEdit()
         self.search_edit.setPlaceholderText("Search by product name")
@@ -288,6 +389,9 @@ class ProductsTab(QWidget):
         self.add_button = QPushButton("Add product")
         self.edit_button = QPushButton("Edit")
         self.archive_button = QPushButton("Archive")
+        self.stock_button = QPushButton("Update quantity")
+        self.import_button = QPushButton("Import from CSV")
+        self.import_button.setEnabled(conn is not None)
 
         top = QHBoxLayout()
         top.addWidget(self.search_edit, 1)
@@ -296,7 +400,9 @@ class ProductsTab(QWidget):
         bottom.addWidget(self.add_button)
         bottom.addWidget(self.edit_button)
         bottom.addWidget(self.archive_button)
+        bottom.addWidget(self.stock_button)
         bottom.addStretch(1)
+        bottom.addWidget(self.import_button)
         layout = QVBoxLayout(self)
         layout.addLayout(top)
         layout.addWidget(self.table, 1)
@@ -307,6 +413,8 @@ class ProductsTab(QWidget):
         self.add_button.clicked.connect(self._add)
         self.edit_button.clicked.connect(self._edit)
         self.archive_button.clicked.connect(self._toggle_archive)
+        self.stock_button.clicked.connect(lambda _c=False: self._update_stock())
+        self.import_button.clicked.connect(lambda _c=False: self._import_csv())
         self.table.doubleClicked.connect(lambda _i: self._edit())
         self.table.selectionModel().selectionChanged.connect(
             lambda _s, _d: self._update_buttons()
@@ -338,11 +446,32 @@ class ProductsTab(QWidget):
         product = self.selected_product()
         self.edit_button.setEnabled(product is not None)
         self.archive_button.setEnabled(product is not None)
+        self.stock_button.setEnabled(product is not None)
         self.archive_button.setText(
             "Restore"
             if product is not None and product.archived
             else "Archive"
         )
+        self.add_button.setEnabled(product is None or not product.archived)
+
+    def _update_stock(self) -> None:
+        product = self.selected_product()
+        if product is None:
+            return
+        dialog = StockDialog(self._repo, product, parent=self)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            self.reload()
+            self._select_id(product.id)
+
+    def _import_csv(self) -> None:
+        if self._conn is None:
+            return
+        dialog = ImportDialog(self._repo, self._conn, self._backups, parent=self)
+        dialog.exec()
+        self.reload()
+        if dialog.summary is not None:
+            self.products_changed.emit()
+        self.import_finished.emit()
 
     def _add(self) -> None:
         dialog = ProductDialog(self._repo, parent=self)

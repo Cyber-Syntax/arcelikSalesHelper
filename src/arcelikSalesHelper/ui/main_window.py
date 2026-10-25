@@ -55,7 +55,7 @@ class MainWindow(QMainWindow):
         self._backups = backups
         repo = ProductRepository(conn)
         self._history_repo = HistoryRepository(conn)
-        self.products_tab = ProductsTab(repo)
+        self.products_tab = ProductsTab(repo, conn, backups)
         self.calculator_tab = CalculatorTab(repo)
         self.history_tab = HistoryTab(self._history_repo)
         self.settings_tab = SettingsTab(paths, backups)
@@ -90,6 +90,8 @@ class MainWindow(QMainWindow):
         self.tabs.currentChanged.connect(
             lambda _i: self.settings_tab.refresh()
         )
+        self.products_tab.import_finished.connect(self.refresh_backup_banner)
+        self.products_tab.import_finished.connect(self.settings_tab.refresh)
         self.refresh_backup_banner()
 
     # ---- backups ---------------------------------------------------------
