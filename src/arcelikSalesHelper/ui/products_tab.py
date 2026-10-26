@@ -122,7 +122,11 @@ class ProductTableModel(QAbstractTableModel):
             case 1:
                 return format_try(product.regular_price)
             case 2:
-                return format_try(product.website_price)
+                return (
+                    T.NO_WEBSITE_DISCOUNT
+                    if product.website_price == 0
+                    else format_try(product.website_price)
+                )
             case 3:
                 return product.default_gift_name or ""
             case 4:

@@ -113,6 +113,7 @@ LBL_REGULAR_TOTAL = "Normal fiyat toplamı"
 LBL_WEBSITE_TOTAL = "Web sitesi indirimli toplam"
 LBL_WEBSITE_DISCOUNTED_UNIT = "Web sitesi indirimli fiyatı (birim)"
 LBL_WEBSITE_DISCOUNTED_TOTAL = "Web sitesi indirimli toplam"
+NO_WEBSITE_DISCOUNT = "YOK"
 LBL_GIFT = "Hediye"
 NO_GIFT_NAME = "(hediye adı yok)"
 

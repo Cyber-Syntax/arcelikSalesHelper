@@ -228,14 +228,26 @@ def _money_row(label: str, amount: Decimal) -> Row:
 
 
 def present_result(line: LineInput, r: LineResult) -> ResultView:
+    website_unit = (
+        Row(T.LBL_WEBSITE_UNIT, T.NO_WEBSITE_DISCOUNT)
+        if line.website_discounted_price == 0
+        else _money_row(T.LBL_WEBSITE_UNIT, effective_website_price(line))
+    )
+    website_total = (
+        Row(T.LBL_WEBSITE_DISCOUNTED_TOTAL, T.NO_WEBSITE_DISCOUNT)
+        if line.website_discounted_price == 0
+        else _money_row(
+            T.LBL_WEBSITE_DISCOUNTED_TOTAL, r.website_discounted_total
+        )
+    )
     prices = Section(
         T.SEC_PRICES,
         (
             Row(T.LBL_QUANTITY, str(r.quantity)),
             _money_row(T.LBL_REGULAR_UNIT, line.regular_price),
-            _money_row(T.LBL_WEBSITE_UNIT, effective_website_price(line)),
+            website_unit,
             _money_row(T.LBL_REGULAR_TOTAL, r.regular_total),
-            _money_row(T.LBL_WEBSITE_DISCOUNTED_TOTAL, r.website_discounted_total),
+            website_total,
             *(
                 (_money_row(T.LBL_MANAGER_LINE_TOTAL, r.manager_line_total),)
                 if r.manager_line_total is not None
@@ -256,7 +268,10 @@ def present_result(line: LineInput, r: LineResult) -> ResultView:
     website_opt, gift_opt = build_options(line, r)
     card = CardView(
         prices=prices,
-        website_option=_website_section(website_opt),
+        website_option=_website_section(
+            website_opt,
+            no_website_discount=line.website_discounted_price == 0,
+        ),
         gift_option=(
             None
             if gift_opt is None
@@ -273,11 +288,20 @@ def present_result(line: LineInput, r: LineResult) -> ResultView:
 
 # ---- option panels --------------------------------------------------------
 
-def _website_section(w: WebsiteOption) -> Section:
+def _website_section(
+    w: WebsiteOption, *, no_website_discount: bool
+) -> Section:
     return Section(
         T.SEC_WEBSITE_OPTION,
         (
-            _money_row(T.LBL_WEBSITE_DISCOUNTED_TOTAL, w.website_discounted_total),
+            (
+                Row(T.LBL_WEBSITE_DISCOUNTED_TOTAL, T.NO_WEBSITE_DISCOUNT)
+                if no_website_discount
+                else _money_row(
+                    T.LBL_WEBSITE_DISCOUNTED_TOTAL,
+                    w.website_discounted_total,
+                )
+            ),
             _money_row(T.LBL_WEBSITE_OFFER_TOTAL, w.ten_pct_total),
         ),
     )
