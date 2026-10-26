@@ -121,7 +121,7 @@ SEC_WEBSITE_OPTION = "Web sitesi indirim seçeneği"
 SEC_GIFT_OPTION = "Hediye seçeneği"
 SEC_TOTALS = "İşlem toplamları"
 
-LBL_WEBSITE_OFFER_TOTAL = "İndirimli teklif toplamı"
+LBL_WEBSITE_OFFER_TOTAL = "%10 İndirim"
 LBL_GIFT_OFFER_TOTAL = "Hediyeli teklif toplamı"
 
 LBL_MANAGER_LINE_TOTAL = "Yönetici toplamı"

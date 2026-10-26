@@ -26,6 +26,7 @@ from arcelikSalesHelper.domain.pricing import (
     build_options,
     calculate_line,
     calculate_transaction,
+    effective_website_price,
 )
 from arcelikSalesHelper.domain.result import Err, Ok
 
@@ -232,7 +233,7 @@ def present_result(line: LineInput, r: LineResult) -> ResultView:
         (
             Row(T.LBL_QUANTITY, str(r.quantity)),
             _money_row(T.LBL_REGULAR_UNIT, line.regular_price),
-            _money_row(T.LBL_WEBSITE_UNIT, line.website_discounted_price),
+            _money_row(T.LBL_WEBSITE_UNIT, effective_website_price(line)),
             _money_row(T.LBL_REGULAR_TOTAL, r.regular_total),
             _money_row(T.LBL_WEBSITE_DISCOUNTED_TOTAL, r.website_discounted_total),
             *(

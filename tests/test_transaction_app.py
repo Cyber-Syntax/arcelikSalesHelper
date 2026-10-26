@@ -68,6 +68,20 @@ def test_missing_manager_value_gives_explicit_na_with_line_numbers() -> None:
     assert t[T.LBL_TOTAL_POS] == "Yok: yönetici değeri eksik (satır 3)"
 
 
+def test_zero_website_price_has_no_discount_in_transaction_pos():
+    line = form(
+        regular_price="38.299,00",
+        website_discounted_price="0,00",
+        manager_value="32.000,00",
+    )
+    ev = evaluate_transaction([line])
+    assert ev.result is not None
+    assert ev.result.totals.discount_amount.value == D("0")
+    assert ev.result.totals.pos.value == D("32000")
+    assert totals(ev)[T.LBL_TOTAL_DISCOUNT] == "0,00 TL"
+    assert totals(ev)[T.LBL_TOTAL_POS] == "32.000,00 TL"
+
+
 def test_na_lists_every_missing_line() -> None:
     forms = [form(), form(manager_value="3.000,00"), form()]
     assert totals(evaluate_transaction(forms))[T.LBL_TOTAL_POS] == (
@@ -114,7 +128,7 @@ def test_no_gift_line_shows_only_final_website_offer_amounts() -> (
     card = ev.lines[0].view.card
     assert card.gift_option is None
     assert val(card.website_option, "Web sitesi indirimli toplam") == "4.000,00 TL"
-    assert val(card.website_option, "İndirimli teklif toplamı") == "3.600,00 TL"
+    assert val(card.website_option, T.LBL_WEBSITE_OFFER_TOTAL) == "3.600,00 TL"
     assert val(card.prices, "Yönetici toplamı") == "3.000,00 TL"
     assert all("baz" not in row.label.lower() for row in card.website_option.rows)
 
@@ -130,9 +144,17 @@ def test_gift_line_compares_both_final_offer_amounts() -> (
     assert val(gift, "Normal fiyat toplamı") == "18.000,00 TL"
     assert val(gift, "Hediyeli teklif toplamı") == "16.200,00 TL"
     assert val(site, "Web sitesi indirimli toplam") == "15.000,00 TL"
-    assert val(site, "İndirimli teklif toplamı") == "13.500,00 TL"
+    assert val(site, T.LBL_WEBSITE_OFFER_TOTAL) == "13.500,00 TL"
     assert val(view.card.prices, "Yönetici toplamı") == "13.500,00 TL"
-    assert all("%10" not in row.label for row in (*site.rows, *gift.rows))
+    assert [row.label for row in site.rows] == [
+        T.LBL_WEBSITE_DISCOUNTED_TOTAL,
+        T.LBL_WEBSITE_OFFER_TOTAL,
+    ]
+    assert [row.label for row in gift.rows] == [
+        T.LBL_GIFT,
+        T.LBL_REGULAR_TOTAL,
+        T.LBL_GIFT_OFFER_TOTAL,
+    ]
 
 
 def test_named_but_unselected_gift_shows_only_final_amounts() -> None:

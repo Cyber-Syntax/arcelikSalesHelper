@@ -3,7 +3,7 @@ from decimal import Decimal as D
 import pytest
 
 from arcelikSalesHelper.domain.models import LineInput, ManagerMode
-from arcelikSalesHelper.domain.pricing import build_options, calculate_line, calculate_transaction, manager_totals, pos_amount, ten_percent
+from arcelikSalesHelper.domain.pricing import build_options, calculate_line, calculate_transaction, effective_website_price, manager_totals, pos_amount
 from arcelikSalesHelper.domain.result import Err, Ok
 
 
@@ -36,6 +36,36 @@ def test_gift_and_no_gift_ten_percent_bases():
     assert gift.ten_pct_base == D("5000")
     assert gift.ten_pct_discount_unit == D("500")
     assert gift.ten_pct_unit == D("4500")
+
+
+def test_zero_website_price_uses_regular_price_for_no_discount_line():
+    line = make(
+        regular_price=D("38299"),
+        website_discounted_price=D("0"),
+        manager_value=D("32000"),
+        manager_mode=ManagerMode.UNIT,
+    )
+    result = calc(line)
+    assert effective_website_price(line) == D("38299")
+    assert result.website_discounted_total == D("38299")
+    assert result.discount_amount == D("0")
+    assert result.pos_amount == D("32000")
+    assert result.ten_pct_base == D("38299")
+    assert result.ten_pct_unit == D("34469.10")
+
+
+def test_zero_website_price_keeps_gift_scenario_on_regular_price():
+    line = make(
+        regular_price=D("38299"),
+        website_discounted_price=D("0"),
+        gift_selected=True,
+    )
+    result = calc(line)
+    website, gift = build_options(line, result)
+    assert result.ten_pct_base == D("38299")
+    assert website.ten_pct_base == D("38299")
+    assert gift is not None and gift.ten_pct_base == D("38299")
+    assert result.discount_amount == D("0")
 
 
 def test_manager_unit_and_authoritative_line_modes_with_quantity():

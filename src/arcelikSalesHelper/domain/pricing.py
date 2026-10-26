@@ -20,7 +20,20 @@ def ten_percent(base: Decimal) -> tuple[Decimal, Decimal]:
 
 
 def discount_base(line: LineInput) -> Decimal:
-    return line.regular_price if line.gift_selected else line.website_discounted_price
+    return (
+        line.regular_price
+        if line.gift_selected
+        else effective_website_price(line)
+    )
+
+
+def effective_website_price(line: LineInput) -> Decimal:
+    """Use the regular price when zero means the site has no discount."""
+    return (
+        line.regular_price
+        if line.website_discounted_price == ZERO
+        else line.website_discounted_price
+    )
 
 
 def manager_totals(value: Decimal, mode: ManagerMode, quantity: int) -> tuple[Decimal, Decimal]:
@@ -37,7 +50,8 @@ def pos_amount(regular_total: Decimal, website_discounted_total: Decimal, manage
 def _compute_line(line: LineInput, line_index: int) -> LineResult:
     qty = line.quantity
     regular_total = mul_qty(line.regular_price, qty)
-    website_total = mul_qty(line.website_discounted_price, qty)
+    website_price = effective_website_price(line)
+    website_total = mul_qty(website_price, qty)
     base = discount_base(line)
     discount, ten_unit = ten_percent(base)
     unit: Decimal | None = None
@@ -93,12 +107,13 @@ def calculate_transaction(lines: Sequence[LineInput]) -> Result[TransactionResul
 
 def build_options(line: LineInput, result: LineResult) -> tuple[WebsiteOption, GiftOption | None]:
     qty = result.quantity
-    site_discount, site_unit = ten_percent(line.website_discounted_price)
+    website_price = effective_website_price(line)
+    site_discount, site_unit = ten_percent(website_price)
     manager = (result.manager_mode, result.manager_unit, result.manager_line_total)
     empty = (None, None, None)
     website = WebsiteOption(
         website_discounted_total=result.website_discounted_total,
-        ten_pct_base=line.website_discounted_price,
+        ten_pct_base=website_price,
         ten_pct_discount_unit=site_discount, ten_pct_unit=site_unit,
         ten_pct_total=mul_qty(site_unit, qty),
         manager_mode=(empty if line.gift_selected else manager)[0],
