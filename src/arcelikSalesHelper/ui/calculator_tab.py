@@ -64,8 +64,6 @@ class CalculatorLineWidget(QWidget):
         self.regular_edit.setPlaceholderText(T.PH_REGULAR)
         self.website_edit = QLineEdit()
         self.website_edit.setPlaceholderText(T.PH_WEBSITE)
-        self.coupon_edit = QLineEdit()
-        self.coupon_edit.setPlaceholderText(T.PH_COUPON)
         self.gift_check = QCheckBox(T.CHK_GIFT)
         self.gift_name_edit = QLineEdit()
         self.manager_edit = QLineEdit()
@@ -85,8 +83,7 @@ class CalculatorLineWidget(QWidget):
             "product_name": FieldBlock(self.name_edit),
             "quantity": FieldBlock(self.quantity_spin),
             "regular_price": FieldBlock(self.regular_edit),
-            "website_price": FieldBlock(self.website_edit),
-            "coupon": FieldBlock(self.coupon_edit),
+            "website_discounted_price": FieldBlock(self.website_edit),
             "manager_value": FieldBlock(self.manager_edit),
             "manager_mode": FieldBlock(mode_box),
         }
@@ -99,9 +96,8 @@ class CalculatorLineWidget(QWidget):
             T.FORM_REGULAR, self.blocks["regular_price"]
         )
         form.addRow(
-            T.FORM_WEBSITE, self.blocks["website_price"]
+            T.FORM_WEBSITE, self.blocks["website_discounted_price"]
         )
-        form.addRow(T.FORM_COUPON, self.blocks["coupon"])
         form.addRow("", self.gift_check)
         form.addRow(T.FORM_GIFT_NAME, self.gift_name_edit)
         form.addRow(T.FORM_MANAGER_VALUE, self.blocks["manager_value"])
@@ -111,7 +107,6 @@ class CalculatorLineWidget(QWidget):
             self.name_edit,
             self.regular_edit,
             self.website_edit,
-            self.coupon_edit,
             self.gift_name_edit,
             self.manager_edit,
         ):
@@ -139,8 +134,7 @@ class CalculatorLineWidget(QWidget):
             product_name=self.name_edit.text(),
             quantity=self.quantity_spin.value(),
             regular_price=self.regular_edit.text(),
-            website_price=self.website_edit.text(),
-            coupon=self.coupon_edit.text(),
+            website_discounted_price=self.website_edit.text(),
             gift_selected=self.gift_check.isChecked(),
             gift_name=self.gift_name_edit.text(),
             manager_value=self.manager_edit.text(),

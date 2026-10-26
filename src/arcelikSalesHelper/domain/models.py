@@ -10,8 +10,6 @@ POS_LABEL = T.POS_LABEL
 
 
 class ConfirmationState(Enum):
-    """What the UI told the user about the result when it was saved."""
-
     POS_UNVERIFIED = "pos_unverified"
 
 
@@ -25,8 +23,7 @@ class LineInput:
     product_name: str
     quantity: int
     regular_price: Decimal
-    website_price: Decimal
-    coupon: Decimal = Decimal(0)
+    website_discounted_price: Decimal
     gift_selected: bool = False
     gift_name: str | None = None
     manager_value: Decimal | None = None
@@ -38,36 +35,27 @@ class LineInput:
 class LineWarning:
     code: str
     message: str
-    line_index: int  # 0-based; the UI displays +1
+    line_index: int
 
 
 @dataclass(frozen=True)
 class LineResult:
     quantity: int
     regular_total: Decimal
-    website_total: Decimal
-    coupon_total: Decimal
-    effective_website_unit: Decimal
-    effective_website_total: Decimal
+    website_discounted_total: Decimal
     ten_pct_base: Decimal
     ten_pct_discount_unit: Decimal
     ten_pct_unit: Decimal
     ten_pct_total: Decimal
     manager_mode: ManagerMode | None
-    manager_unit: Decimal | None  # derived for display when mode is LINE
-    manager_line_total: Decimal | None  # authoritative
+    manager_unit: Decimal | None
+    manager_line_total: Decimal | None
     pos_amount: Decimal | None
     warnings: tuple[LineWarning, ...]
 
 
 @dataclass(frozen=True)
 class TotalValue:
-    """A transaction total, or the reason it is unavailable.
-
-    ``value`` is None when any line lacks the input; ``missing_lines`` then lists
-    the 0-based indices so the UI can say "n/a: missing manager value on line N".
-    """
-
     value: Decimal | None
     missing_lines: tuple[int, ...] = ()
 
@@ -75,8 +63,7 @@ class TotalValue:
 @dataclass(frozen=True)
 class TransactionTotals:
     regular: TotalValue
-    website: TotalValue
-    effective_website: TotalValue
+    website_discounted: TotalValue
     ten_pct: TotalValue
     manager: TotalValue
     pos: TotalValue
@@ -90,10 +77,7 @@ class TransactionResult:
 
 @dataclass(frozen=True)
 class WebsiteOption:
-    website_total: Decimal
-    coupon_total: Decimal
-    effective_unit: Decimal
-    effective_total: Decimal
+    website_discounted_total: Decimal
     ten_pct_base: Decimal
     ten_pct_discount_unit: Decimal
     ten_pct_unit: Decimal

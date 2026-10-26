@@ -19,14 +19,12 @@ def fill(
     gift: str | None = None,
     manager: str | None = None,
     total_mode: bool = False,
-    coupon: str = "",
 ) -> None:
     line = row.line
     line.name_edit.setText(name)
     line.regular_edit.setText(regular)
     line.website_edit.setText(website)
     line.quantity_spin.setValue(qty)
-    line.coupon_edit.setText(coupon)
     if gift is not None:
         line.gift_check.setChecked(True)
         line.gift_name_edit.setText(gift)
@@ -74,7 +72,7 @@ def test_fresh_calculator_has_one_incomplete_line_and_no_save(
     assert len(tab.rows) == 1
     assert not tab.save_button.isEnabled()
     assert not tab.rows[0].remove_button.isEnabled()
-    assert titles(tab) == ["Line 1"]
+    assert titles(tab) == ["Satır 1"]
     assert all(b.error_text == "" for b in tab.rows[0].line.blocks.values())
 
 
@@ -83,7 +81,7 @@ def test_add_and_remove_lines_keep_at_least_one(qtbot, repo) -> None:  # type: i
     qtbot.addWidget(tab)
     tab.add_button.click()
     assert len(tab.rows) == 2
-    assert [r.title() for r in tab.rows] == ["Line 1", "Line 2"]
+    assert [r.title() for r in tab.rows] == ["Satır 1", "Satır 2"]
     assert tab.rows[0].remove_button.isEnabled()
     tab.rows[1].remove_button.click()
     assert len(tab.rows) == 1
@@ -152,7 +150,7 @@ def test_reordering_moves_the_state_with_the_line(qtbot, repo) -> None:  # type:
         and first.gift_name_edit.text() == "Vacuum"
     )
     assert first.manager_edit.text() == "4.500,00"
-    assert [r.title() for r in tab.rows] == ["Line 1", "Line 2"]
+    assert [r.title() for r in tab.rows] == ["Satır 1", "Satır 2"]
     after = tab.evaluation.result
     assert after is not None and after.totals == before.totals
 
@@ -166,21 +164,19 @@ def test_invalid_line_hides_totals_but_keeps_the_valid_card(
     tab = CalculatorTab(repo)
     qtbot.addWidget(tab)
     fill_two(tab)
-    tab.rows[1].line.coupon_edit.setText(
-        "99.999,00"
-    )  # more than the website price
+    tab.rows[1].line.website_edit.setText("invalid")
     assert not tab.evaluation.valid and not tab.save_button.isEnabled()
-    assert tab.rows[1].line.blocks["coupon"].error_text != ""
+    assert tab.rows[1].line.blocks["website_discounted_price"].error_text != ""
     shown = titles(tab)
-    assert "Line 1: Fridge" in shown and POS_LABEL in shown
-    assert "Transaction totals" not in shown
+    assert "Satır 1: Fridge" in shown and POS_LABEL in shown
+    assert "İşlem toplamları" not in shown
     assert any(
-        "Lines to complete or fix: 2" in lb.text()
+        "Tamamlanacak veya düzeltilecek satırlar: 2" in lb.text()
         for lb in tab.panel.findChildren(QLabel)
     )
 
-    tab.rows[1].line.coupon_edit.setText("")
-    assert tab.evaluation.valid and "Transaction totals" in titles(tab)
+    tab.rows[1].line.website_edit.setText("5.000,00")
+    assert tab.evaluation.valid and "İşlem toplamları" in titles(tab)
 
 
 # ---- comparison -----------------------------------------------------------
@@ -194,16 +190,16 @@ def test_options_are_side_by_side_only_for_lines_with_a_gift(
     fill(tab.rows[0], "Fridge", "5.000,00", "4.000,00")
     shown = titles(tab)
     assert (
-        shown.count("Website discount option") == 1
-        and "Gift option" not in shown
+        shown.count("Web sitesi indirim seçeneği") == 1
+        and "Hediye seçeneği" not in shown
     )
 
     tab.add_line()
     fill(tab.rows[1], "Washer", "6.000,00", "5.000,00", gift="Vacuum")
     shown = titles(tab)
     assert (
-        shown.count("Website discount option") == 2
-        and shown.count("Gift option") == 1
+        shown.count("Web sitesi indirim seçeneği") == 2
+        and shown.count("Hediye seçeneği") == 1
     )
 
 
@@ -235,7 +231,6 @@ def test_selecting_a_saved_product_copies_values_and_never_writes_back(
     )
     assert tab.evaluation.valid
 
-    line.coupon_edit.setText("100")
     line.gift_name_edit.setText("Toaster")
     line.manager_edit.setText("3.000,00")
     assert repo.get(product.id) == product

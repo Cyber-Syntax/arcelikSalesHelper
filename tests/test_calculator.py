@@ -19,8 +19,7 @@ def test_mixed_gift_and_no_gift_totals() -> None:
     assert isinstance(r, Ok)
     t = r.value.totals
     assert t.regular.value == D(23000)  # 5000 + 18000
-    assert t.website.value == D(19000)  # 4000 + 15000
-    assert t.effective_website.value == D(19000)
+    assert t.website_discounted.value == D(19000)  # 4000 + 15000
     assert t.ten_pct.value == D(19800)  # 3600 + (5400 * 3)
     assert t.manager.value == D(16500)  # 3000 + 13500
     assert t.pos.value == D(20500)  # 4000 + 16500

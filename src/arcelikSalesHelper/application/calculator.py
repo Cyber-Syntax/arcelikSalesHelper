@@ -10,7 +10,6 @@ from dataclasses import dataclass
 from decimal import Decimal
 
 from arcelikSalesHelper import strings as T
-from arcelikSalesHelper.domain.arith import ZERO
 from arcelikSalesHelper.domain.formatting import (
     format_decimal_exact,
     format_try,
@@ -43,8 +42,7 @@ class LineForm:
     product_name: str
     quantity: int = 1
     regular_price: str = ""
-    website_price: str = ""
-    coupon: str = ""
+    website_discounted_price: str = ""
     gift_selected: bool = False
     gift_name: str = ""
     manager_value: str = ""
@@ -149,8 +147,7 @@ class Evaluation:
 
 _MONEY_FIELDS = (
     ("regular_price", True),
-    ("website_price", True),
-    ("coupon", False),
+    ("website_discounted_price", True),
     ("manager_value", False),
 )
 
@@ -164,8 +161,7 @@ def _need(read: MoneyRead) -> Decimal:
 def evaluate_line(form: LineForm, line_index: int = 0) -> Evaluation:
     texts = {
         "regular_price": form.regular_price,
-        "website_price": form.website_price,
-        "coupon": form.coupon,
+        "website_discounted_price": form.website_discounted_price,
         "manager_value": form.manager_value,
     }
     reads = {field: read_money(texts[field]) for field, _ in _MONEY_FIELDS}
@@ -199,8 +195,7 @@ def evaluate_line(form: LineForm, line_index: int = 0) -> Evaluation:
         product_name=name,
         quantity=form.quantity,
         regular_price=_need(reads["regular_price"]),
-        website_price=_need(reads["website_price"]),
-        coupon=ZERO if reads["coupon"].empty else _need(reads["coupon"]),
+        website_discounted_price=_need(reads["website_discounted_price"]),
         gift_selected=form.gift_selected,
         gift_name=form.gift_name.strip() or None,
         manager_value=manager_value,
@@ -241,13 +236,9 @@ def present_result(line: LineInput, r: LineResult) -> ResultView:
         (
             Row(T.LBL_QUANTITY, str(r.quantity)),
             _money_row(T.LBL_REGULAR_UNIT, line.regular_price),
-            _money_row(T.LBL_WEBSITE_UNIT, line.website_price),
-            _money_row(T.LBL_COUPON_UNIT, line.coupon),
-            _money_row(T.LBL_EFFECTIVE_WEBSITE_UNIT, r.effective_website_unit),
+            _money_row(T.LBL_WEBSITE_UNIT, line.website_discounted_price),
             _money_row(T.LBL_REGULAR_TOTAL, r.regular_total),
-            _money_row(T.LBL_WEBSITE_TOTAL, r.website_total),
-            _money_row(T.LBL_COUPON_TOTAL, r.coupon_total),
-            _money_row(T.LBL_EFFECTIVE_WEBSITE_TOTAL, r.effective_website_total),
+            _money_row(T.LBL_WEBSITE_DISCOUNTED_TOTAL, r.website_discounted_total),
         ),
     )
 
@@ -264,7 +255,7 @@ def present_result(line: LineInput, r: LineResult) -> ResultView:
                 T.LBL_DISCOUNT_BASE,
                 T.VAL_BASE_REGULAR_GIFT
                 if line.gift_selected
-                else T.VAL_BASE_EFFECTIVE_NOGIFT,
+                else T.VAL_BASE_WEBSITE_NOGIFT,
             ),
             _money_row(T.LBL_BASE_UNIT, r.ten_pct_base),
             _money_row(T.LBL_TEN_DISCOUNT_UNIT, r.ten_pct_discount_unit),
@@ -306,7 +297,7 @@ def present_result(line: LineInput, r: LineResult) -> ResultView:
     else:
         pos_rows = (
             _money_row(T.LBL_REGULAR_TOTAL, r.regular_total),
-            _money_row(T.LBL_POS_NORMAL_WEBSITE_TOTAL, r.website_total),
+            _money_row(T.LBL_POS_NORMAL_WEBSITE_TOTAL, r.website_discounted_total),
             _money_row(T.LBL_MANAGER_LINE_TOTAL, r.manager_line_total),
             _money_row(T.LBL_POS_AMOUNT, r.pos_amount),
         )
@@ -338,12 +329,9 @@ def _explain(line: LineInput, r: LineResult) -> tuple[str, ...]:
     base_name = (
         T.EXPLAIN_BASE_REGULAR_GIFT
         if line.gift_selected
-        else T.EXPLAIN_BASE_EFFECTIVE_NOGIFT
+        else T.EXPLAIN_BASE_WEBSITE_NOGIFT
     )
     steps = [
-        T.explain_effective(
-            t(line.website_price), t(line.coupon), t(r.effective_website_unit)
-        ),
         T.explain_ten_base(base_name, t(r.ten_pct_base)),
         T.explain_ten_discount(t(r.ten_pct_base), t(r.ten_pct_discount_unit)),
         T.explain_scenario_unit(
@@ -369,7 +357,7 @@ def _explain(line: LineInput, r: LineResult) -> tuple[str, ...]:
             steps.append(
                 T.explain_pos(
                     t(r.regular_total),
-                    t(r.website_total),
+                    t(r.website_discounted_total),
                     t(r.manager_line_total),
                     t(r.pos_amount),
                 )
@@ -412,11 +400,8 @@ def _website_section(w: WebsiteOption, has_manager: bool) -> Section:
     return Section(
         T.SEC_WEBSITE_OPTION,
         (
-            _money_row(T.LBL_WEBSITE_TOTAL, w.website_total),
-            _money_row(T.LBL_COUPON_TOTAL, w.coupon_total),
-            _money_row(T.LBL_EFFECTIVE_WEBSITE_UNIT, w.effective_unit),
-            _money_row(T.LBL_EFFECTIVE_WEBSITE_TOTAL, w.effective_total),
-            Row(T.LBL_TEN_BASE, T.VAL_BASE_EFFECTIVE),
+            _money_row(T.LBL_WEBSITE_DISCOUNTED_TOTAL, w.website_discounted_total),
+            Row(T.LBL_TEN_BASE, T.VAL_BASE_WEBSITE),
             _money_row(T.LBL_TEN_BASE_UNIT, w.ten_pct_base),
             _money_row(T.LBL_TEN_DISCOUNT_UNIT, w.ten_pct_discount_unit),
             _money_row(T.LBL_TEN_UNIT_PRICE, w.ten_pct_unit),
@@ -484,10 +469,7 @@ def present_totals(result: TransactionResult) -> tuple[Section, ...]:
         (
             Row(T.LBL_LINES, str(len(result.lines))),
             _total_row(T.LBL_TOTAL_REGULAR, t.regular, T.MISSING_REGULAR),
-            _total_row(T.LBL_TOTAL_WEBSITE, t.website, T.MISSING_WEBSITE),
-            _total_row(
-                T.LBL_TOTAL_EFFECTIVE, t.effective_website, T.MISSING_WEBSITE
-            ),
+            _total_row(T.LBL_TOTAL_WEBSITE, t.website_discounted, T.MISSING_WEBSITE),
             _total_row(T.LBL_TOTAL_TEN, t.ten_pct, T.MISSING_PRICE),
             _total_row(T.LBL_TOTAL_MANAGER, t.manager, T.MISSING_MANAGER),
         ),

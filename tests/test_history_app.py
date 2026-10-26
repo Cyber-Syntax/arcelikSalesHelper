@@ -62,10 +62,9 @@ def test_snapshot_columns_hold_normalized_values_and_entered_text() -> None:
         "Fridge",
         1,
     )
-    assert D(first.regular_price) == D(5000) and D(first.website_price) == D(
+    assert D(first.regular_price) == D(5000) and D(first.website_discounted_price) == D(
         4000
     )
-    assert D(first.effective_website_unit) == D(4000)
     assert (
         first.manager_value_entered == "3.000,00"
         and first.manager_mode == "unit"
@@ -115,7 +114,7 @@ def test_line_mode_unit_value_is_stored_exactly_not_rounded() -> None:
 def test_only_valid_evaluations_can_be_saved() -> None:
     for forms in (
         [],
-        [form(coupon="9.000,00")],
+        [form(website_discounted_price="bad")],
         [form(), form(regular_price="")],
     ):
         ev = evaluate_transaction(forms)
@@ -151,9 +150,8 @@ def test_entered_section_shows_text_as_typed() -> None:
     parsed = parse_snapshot(replace(rec, id=1))
     assert isinstance(parsed, Ok)
     rows = {r.label: r.value for r in parsed.value.lines[0].entered.rows}
-    assert rows["Regular price"] == "5.000,00"
-    assert rows["Additional coupon"] == "(empty)"
-    assert rows["Manager value mode"] == "Unit price"
+    assert rows["Normal fiyat"] == "5.000,00"
+    assert rows["Yönetici değer modu"] == "Birim fiyat"
 
 
 def test_stored_warnings_roundtrip() -> None:

@@ -57,8 +57,6 @@ def money_ambiguous_hint(read_as: str) -> str:
 VAL_QUANTITY = "Adet, en az 1 olan bir tam sayı olmalıdır."
 VAL_REGULAR_PRICE = "Normal fiyat sıfır veya daha büyük olmalıdır."
 VAL_WEBSITE_PRICE = "Web sitesi fiyatı sıfır veya daha büyük olmalıdır."
-VAL_COUPON_NEGATIVE = "Kupon tutarı sıfır veya daha büyük olmalıdır."
-VAL_COUPON_EXCEEDS = "Kupon tutarı web sitesi indirimli fiyatını aşamaz."
 VAL_MANAGER_VALUE = "Yönetici değeri sıfır veya daha büyük olmalıdır."
 VAL_MANAGER_MODE_REQUIRED = "Birim fiyat veya satır toplam fiyatı seçin."
 VAL_MANAGER_MODE_WITHOUT_VALUE = (
@@ -111,12 +109,10 @@ def exact_value_tooltip(exact: str) -> str:
 LBL_QUANTITY = "Adet"
 LBL_REGULAR_UNIT = "Normal fiyat (birim)"
 LBL_WEBSITE_UNIT = "Web sitesi indirimli fiyatı (birim)"
-LBL_COUPON_UNIT = "Ek kupon (birim)"
-LBL_EFFECTIVE_WEBSITE_UNIT = "Etkin web sitesi fiyatı (birim)"
 LBL_REGULAR_TOTAL = "Normal fiyat toplamı"
 LBL_WEBSITE_TOTAL = "Web sitesi indirimli toplam"
-LBL_COUPON_TOTAL = "Kupon toplamı"
-LBL_EFFECTIVE_WEBSITE_TOTAL = "Etkin web sitesi toplamı"
+LBL_WEBSITE_DISCOUNTED_UNIT = "Web sitesi indirimli fiyatı (birim)"
+LBL_WEBSITE_DISCOUNTED_TOTAL = "Web sitesi indirimli toplam"
 LBL_GIFT = "Hediye"
 NO_GIFT_NAME = "(hediye adı yok)"
 
@@ -129,9 +125,7 @@ SEC_TOTALS = "İşlem toplamları"
 
 LBL_DISCOUNT_BASE = "İndirim bazı"
 VAL_BASE_REGULAR_GIFT = "Normal fiyat (hediye seçili)"
-VAL_BASE_EFFECTIVE_NOGIFT = "Etkin web sitesi fiyatı (hediyesiz)"
 VAL_BASE_REGULAR = "Normal fiyat"
-VAL_BASE_EFFECTIVE = "Etkin web sitesi fiyatı"
 LBL_BASE_UNIT = "Baz (birim)"
 LBL_TEN_DISCOUNT_UNIT = "%10 indirim (birim)"
 LBL_TEN_RESULT_UNIT = "Sonuç birim fiyat"
@@ -171,15 +165,13 @@ POS_MISSING_MANAGER = "Yok: yönetici değeri girin"
 LBL_POS_NORMAL_WEBSITE_TOTAL = "Normal web sitesi indirimli toplamı"
 LBL_POS_AMOUNT = "POS giriş tutarı"
 NOTE_POS = (
-    "Yalnızca bilgilendirme amaçlıdır. Resmî veya yönetici onaylı bir POS talimatı "
-    "değildir. Ek kupon bu formüle dahil değildir."
+    "Yalnızca bilgilendirme amaçlıdır. Resmî veya yönetici onaylı bir POS talimatı değildir."
 )
 
 # transaction totals
 LBL_LINES = "Satırlar"
 LBL_TOTAL_REGULAR = "Normal fiyat toplamı"
 LBL_TOTAL_WEBSITE = "Web sitesi indirimli toplam"
-LBL_TOTAL_EFFECTIVE = "Etkin web sitesi toplamı"
 LBL_TOTAL_TEN = "Standart %10 senaryosu toplamı"
 LBL_TOTAL_MANAGER = "Yönetici tarafından verilen toplam"
 LBL_TOTAL_POS = "POS giriş toplamı"
@@ -189,7 +181,7 @@ MISSING_PRICE = "fiyat"
 MISSING_MANAGER = "yönetici değeri"
 NOTE_TOTALS = (
     "Her satır kendi %10 bazını kullanır: hediyeli satırlarda normal fiyat, "
-    "hediyesiz satırlarda etkin web sitesi fiyatı."
+    "hediyesiz satırlarda web sitesi indirimli fiyatı."
 )
 NOTE_TOTAL_POS = (
     "Satır bazındaki POS giriş tutarlarının toplamıdır. Yalnızca bilgilendirme "
@@ -214,11 +206,13 @@ def pending_lines(numbers: str) -> str:
 
 # formula explanation (every line is generated from the LineResult)
 EXPLAIN_BASE_REGULAR_GIFT = "normal fiyat (hediye seçili)"
-EXPLAIN_BASE_EFFECTIVE_NOGIFT = "etkin web sitesi fiyatı (hediyesiz)"
+EXPLAIN_BASE_WEBSITE_NOGIFT = "web sitesi indirimli fiyatı (hediyesiz)"
+VAL_BASE_WEBSITE_NOGIFT = "Web sitesi indirimli fiyatı (hediye yok)"
+VAL_BASE_WEBSITE = "Web sitesi indirimli fiyatı"
 
 
-def explain_effective(website: str, coupon: str, effective: str) -> str:
-    return f"Etkin web sitesi fiyatı = {website} − {coupon} = {effective}"
+def explain_effective(website: str) -> str:
+    return f"Web sitesi indirimli fiyatı = {website}"
 
 
 def explain_ten_base(name: str, base: str) -> str:
@@ -246,7 +240,7 @@ def explain_manager_unit_derived(
 ) -> str:
     return (
         f"Yönetici birim değeri = {line_total} ÷ {quantity} = {unit} "
-        "(türetilmiş; yalnızca gösterim için yuvarlanmıştır)"
+        "(türetilmiştir; hesaplamalarda satır toplamı kullanılır)"
     )
 
 
@@ -257,7 +251,6 @@ def explain_manager_unit(unit: str, quantity: int, line_total: str) -> str:
 def explain_pos(regular: str, website: str, manager: str, pos: str) -> str:
     return (
         f"POS giriş tutarı = ({regular} − {website}) + {manager} = {pos}"
-        "  (normal web sitesi toplamı; kupon kullanılmaz)"
     )
 
 
@@ -278,7 +271,6 @@ NOTE_AS_ENTERED = (
 LBL_ENTERED_QUANTITY = "Adet"
 LBL_ENTERED_REGULAR = "Normal fiyat"
 LBL_ENTERED_WEBSITE = "Web sitesi indirimli fiyatı"
-LBL_ENTERED_COUPON = "Ek kupon"
 LBL_ENTERED_MANAGER = "Yönetici tarafından verilen değer"
 LBL_ENTERED_MANAGER_MODE = "Yönetici değer modu"
 
@@ -331,7 +323,6 @@ def history_footer(shown: int, total: int) -> str:
 ONE_OFF_LABEL = "Tek seferlik ürün (aşağıya yazın)"
 PH_REGULAR = "örneğin 5.000,00"
 PH_WEBSITE = "örneğin 4.000,00"
-PH_COUPON = "0,00"
 PH_OPTIONAL = "isteğe bağlı"
 CHK_GIFT = "Hediye dahil"
 RADIO_UNIT = "Birim fiyat"
@@ -342,7 +333,6 @@ FORM_NAME = "Ad"
 FORM_QUANTITY = "Adet"
 FORM_REGULAR = "Normal / ilk fiyat (birim)"
 FORM_WEBSITE = "Web sitesi indirimli fiyatı (birim)"
-FORM_COUPON = "Ek kupon (birim başına)"
 FORM_GIFT_NAME = "Hediye adı"
 FORM_MANAGER_VALUE = "Yönetici tarafından verilen değer"
 FORM_MANAGER_MODE = "Yönetici değeri şudur"

@@ -47,9 +47,7 @@ class LineRecord:
     product_name: str
     quantity: int
     regular_price: str
-    website_price: str
-    coupon: str
-    effective_website_unit: str
+    website_discounted_price: str
     gift_selected: bool
     gift_name: str | None
     manager_value_entered: str | None  # text exactly as typed
@@ -133,8 +131,7 @@ def _line_record(
         "product_name": form.product_name,
         "quantity": form.quantity,
         "regular_price": form.regular_price,
-        "website_price": form.website_price,
-        "coupon": form.coupon,
+        "website_discounted_price": form.website_discounted_price,
         "gift_selected": form.gift_selected,
         "gift_name": form.gift_name,
         "manager_value": form.manager_value,
@@ -159,11 +156,7 @@ def _line_record(
         product_name=line.product_name,
         quantity=line.quantity,
         regular_price=format_decimal_exact(line.regular_price),
-        website_price=format_decimal_exact(line.website_price),
-        coupon=format_decimal_exact(line.coupon),
-        effective_website_unit=format_decimal_exact(
-            result.effective_website_unit
-        ),
+        website_discounted_price=format_decimal_exact(line.website_discounted_price),
         gift_selected=line.gift_selected,
         gift_name=line.gift_name,
         manager_value_entered=(form.manager_value.strip() or None)
@@ -292,8 +285,7 @@ def _section(data: Any) -> Section:
 _ENTERED_LABELS = (
     ("quantity", T.LBL_ENTERED_QUANTITY),
     ("regular_price", T.LBL_ENTERED_REGULAR),
-    ("website_price", T.LBL_ENTERED_WEBSITE),
-    ("coupon", T.LBL_ENTERED_COUPON),
+    ("website_discounted_price", T.LBL_ENTERED_WEBSITE),
     ("manager_value", T.LBL_ENTERED_MANAGER),
 )
 
