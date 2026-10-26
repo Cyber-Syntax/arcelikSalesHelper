@@ -94,6 +94,7 @@ def stock_too_large(limit: int) -> str:
 # ======================================================================
 
 POS_LABEL = "POS giriş hesaplaması (kullanmadan önce doğrulayın)"
+SEC_POS_DETAILS = "POS hesaplama ayrıntıları"
 
 # ======================================================================
 # Calculator presentation (application/calculator.py)
@@ -361,7 +362,7 @@ def line_title_named(number: int, name: str) -> str:
 # ======================================================================
 
 PRODUCT_HEADERS = (
-    "Ad", "Normal fiyat", "Web sitesi fiyatı", "Varsayılan hediye", "Notlar",
+    "Ad", "Normal fiyat", "Web sitesi indirimli fiyatı", "Varsayılan hediye", "Notlar",
     "Son güncelleme", "Sayılan adet", "Sayım zamanı",
 )  # fmt: skip
 TIP_COUNTED = (

@@ -3,10 +3,13 @@ from __future__ import annotations
 from collections.abc import Sequence
 
 from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QResizeEvent
 from PySide6.QtWidgets import (
+    QBoxLayout,
     QCheckBox,
     QComboBox,
     QFormLayout,
+    QFrame,
     QGridLayout,
     QGroupBox,
     QHBoxLayout,
@@ -34,7 +37,7 @@ from arcelikSalesHelper.application.calculator import (
     evaluate_transaction,
 )
 from arcelikSalesHelper.domain.formatting import format_money_input
-from arcelikSalesHelper.domain.models import ManagerMode
+from arcelikSalesHelper.domain.models import POS_LABEL, ManagerMode
 from arcelikSalesHelper.domain.products import Product
 from arcelikSalesHelper.infrastructure.repositories import ProductRepository
 
@@ -253,15 +256,21 @@ def _clear(layout: QLayout) -> None:
             widget.deleteLater()
 
 
-def section_box(section: Section) -> QGroupBox:
+def section_box(section: Section, *, role: str | None = None) -> QGroupBox:
     box = QGroupBox(section.title)
+    if role is not None:
+        box.setProperty("visualRole", role)
     grid = QGridLayout(box)
     grid.setColumnStretch(0, 1)
     for i, row in enumerate(section.rows):
         label = QLabel(row.label)
         label.setWordWrap(True)
         value = QLabel(row.value)
-        value.setAlignment(Qt.AlignmentFlag.AlignRight)
+        value.setAlignment(
+            Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+        )
+        if row.label in (T.LBL_TEN_LINE_TOTAL, T.LBL_MANAGER_LINE_TOTAL):
+            value.setProperty("amountRole", "emphasis")
         value.setTextInteractionFlags(
             Qt.TextInteractionFlag.TextSelectableByMouse
         )
@@ -326,13 +335,16 @@ class LineRow(QGroupBox):
 class TransactionPanel(QWidget):
     """Renders a TransactionEvaluation. Contains no calculations."""
 
+    OPTION_STACK_BREAKPOINT = 760
+
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self._cards = QVBoxLayout()
         self._totals = QVBoxLayout()
+        self._option_layouts: list[QBoxLayout] = []
         layout = QVBoxLayout(self)
-        layout.addLayout(self._cards)
         layout.addLayout(self._totals)
+        layout.addLayout(self._cards)
         layout.addStretch(1)
 
     @staticmethod
@@ -345,15 +357,49 @@ class TransactionPanel(QWidget):
     def show_evaluation(self, evaluation: TransactionEvaluation) -> None:
         _clear(self._cards)
         _clear(self._totals)
-        for index, line_eval in enumerate(evaluation.lines):
-            self._cards.addWidget(self._line_card(index, line_eval))
+        self._option_layouts.clear()
         if evaluation.totals_sections:
-            for section in evaluation.totals_sections:
-                self._totals.addWidget(section_box(section))
+            sections = sorted(
+                evaluation.totals_sections,
+                key=lambda section: section.title != POS_LABEL,
+            )
+            for section in sections:
+                if section.title == POS_LABEL:
+                    summary, details = _pos_summary_boxes(section)
+                    self._totals.addWidget(summary)
+                    if details is not None:
+                        self._totals.addWidget(details)
+                else:
+                    self._totals.addWidget(section_box(section))
         elif evaluation.pending_reason:
             self._totals.addWidget(self._note(evaluation.pending_reason))
+        multiple_lines = len(evaluation.lines) > 1
+        for index, line_eval in enumerate(evaluation.lines):
+            self._cards.addWidget(
+                self._line_card(index, line_eval, show_pos_summary=multiple_lines)
+            )
+        self._update_option_directions()
 
-    def _line_card(self, index: int, evaluation: Evaluation) -> QGroupBox:
+    def resizeEvent(self, event: QResizeEvent) -> None:  # noqa: N802
+        super().resizeEvent(event)
+        self._update_option_directions()
+
+    def _update_option_directions(self) -> None:
+        direction = (
+            QBoxLayout.Direction.LeftToRight
+            if self.width() >= self.OPTION_STACK_BREAKPOINT
+            else QBoxLayout.Direction.TopToBottom
+        )
+        for layout in self._option_layouts:
+            layout.setDirection(direction)
+
+    def _line_card(
+        self,
+        index: int,
+        evaluation: Evaluation,
+        *,
+        show_pos_summary: bool,
+    ) -> QGroupBox:
         name = (
             evaluation.line.product_name if evaluation.line is not None else ""
         )
@@ -372,13 +418,18 @@ class TransactionPanel(QWidget):
             return box
 
         card = view.card
+        pos_summary, pos_details = _pos_summary_boxes(card.pos)
+        if show_pos_summary:
+            layout.addWidget(pos_summary)
         layout.addWidget(section_box(card.prices))
-        options = QHBoxLayout()  # same order and weight: no option is favoured
-        options.addWidget(section_box(card.website_option), 1)
+        options = QBoxLayout(QBoxLayout.Direction.LeftToRight)
+        options.addWidget(section_box(card.website_option, role="option"), 1)
         if card.gift_option is not None:
-            options.addWidget(section_box(card.gift_option), 1)
+            options.addWidget(section_box(card.gift_option, role="option"), 1)
+        self._option_layouts.append(options)
         layout.addLayout(options)
-        layout.addWidget(section_box(card.pos))
+        if pos_details is not None:
+            layout.addWidget(pos_details)
         if view.warnings:
             layout.addWidget(
                 self._note(
@@ -389,6 +440,50 @@ class TransactionPanel(QWidget):
         explain.set_lines(view.explanation)
         layout.addWidget(explain)
         return box
+
+
+def _pos_summary_boxes(section: Section) -> tuple[QFrame, QGroupBox | None]:
+    """Separate the final POS amount from its supporting calculation rows."""
+    amount_labels = {T.LBL_POS_AMOUNT, T.LBL_TOTAL_POS}
+    amount = next(
+        (row for row in section.rows if row.label in amount_labels),
+        section.rows[0] if section.rows else None,
+    )
+    hero = QFrame()
+    hero.setObjectName("posHero")
+    hero.setFrameShape(QFrame.Shape.StyledPanel)
+    hero.setMinimumHeight(104)
+    hero_layout = QVBoxLayout(hero)
+    caption = QLabel(section.title)
+    caption.setObjectName("posCaption")
+    hero_layout.addWidget(caption)
+    if amount is not None:
+        value = QLabel(amount.value)
+        value.setObjectName("posAmount")
+        value.setWordWrap(True)
+        value.setTextInteractionFlags(
+            Qt.TextInteractionFlag.TextSelectableByMouse
+        )
+        is_amount = amount.label in amount_labels
+        is_missing = amount.value == T.NOT_AVAILABLE or amount.value.startswith(
+            f"{T.NOT_AVAILABLE}:"
+        )
+        value.setProperty("missing", not is_amount or is_missing)
+        if amount.tooltip:
+            value.setToolTip(amount.tooltip)
+        hero_layout.addWidget(value)
+
+    details_rows = tuple(
+        row for row in section.rows if row is not amount
+    )
+    details = (
+        None
+        if not details_rows and section.note is None
+        else section_box(
+            Section(T.SEC_POS_DETAILS, details_rows, section.note)
+        )
+    )
+    return hero, details
 
 
 class CalculatorTab(QWidget):
@@ -441,7 +536,7 @@ class CalculatorTab(QWidget):
         splitter = QSplitter(Qt.Orientation.Horizontal)
         splitter.addWidget(left)
         splitter.addWidget(right)
-        splitter.setSizes([430, 620])
+        splitter.setSizes([470, 790])
         layout = QVBoxLayout(self)
         layout.addWidget(splitter)
 

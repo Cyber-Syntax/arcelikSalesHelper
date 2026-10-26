@@ -1,11 +1,13 @@
 from decimal import Decimal as D
 from typing import Any
 
-from PySide6.QtWidgets import QGroupBox, QLabel
+from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QApplication, QBoxLayout, QGroupBox, QLabel
 
 from arcelikSalesHelper.application.calculator import TransactionEvaluation
 from arcelikSalesHelper.domain.models import POS_LABEL
 from arcelikSalesHelper.ui.calculator_tab import CalculatorTab
+from arcelikSalesHelper.ui.theme import MATERIAL_THEME, install_material_theme
 
 from .test_ui import add_product
 
@@ -168,7 +170,7 @@ def test_invalid_line_hides_totals_but_keeps_the_valid_card(
     assert not tab.evaluation.valid and not tab.save_button.isEnabled()
     assert tab.rows[1].line.blocks["website_discounted_price"].error_text != ""
     shown = titles(tab)
-    assert "Satır 1: Fridge" in shown and POS_LABEL in shown
+    assert "Satır 1: Fridge" in shown and "POS hesaplama ayrıntıları" in shown
     assert "İşlem toplamları" not in shown
     assert any(
         "Tamamlanacak veya düzeltilecek satırlar: 2" in lb.text()
@@ -211,6 +213,49 @@ def test_panel_never_recommends_an_option(qtbot, repo) -> None:  # type: ignore[
     assert (
         "recommend" not in text and "best" not in text and "winner" not in text
     )
+
+
+def test_pos_result_is_prominent_selectable_and_first(qtbot, repo) -> None:  # type: ignore[no-untyped-def]
+    tab = CalculatorTab(repo)
+    qtbot.addWidget(tab)
+    fill(tab.rows[0], "Fridge", "5.000,00", "4.000,00", manager="3.000,00")
+
+    amount = tab.panel.findChild(QLabel, "posAmount")
+    assert amount is not None and amount.text() == "4.000,00 TL"
+    assert amount.textInteractionFlags() & Qt.TextInteractionFlag.TextSelectableByMouse
+    assert tab.panel._totals.itemAt(0).widget().objectName() == "posHero"
+
+
+def test_transaction_pos_total_precedes_multi_line_details(qtbot, repo) -> None:  # type: ignore[no-untyped-def]
+    tab = CalculatorTab(repo)
+    qtbot.addWidget(tab)
+    fill_two(tab)
+
+    amounts = [label.text() for label in tab.panel.findChildren(QLabel, "posAmount")]
+    assert amounts == ["20.500,00 TL", "4.000,00 TL", "16.500,00 TL"]
+    assert tab.panel._totals.itemAt(0).widget().objectName() == "posHero"
+
+
+def test_option_cards_stack_at_narrow_width_and_return_to_columns(qtbot, repo) -> None:  # type: ignore[no-untyped-def]
+    tab = CalculatorTab(repo)
+    qtbot.addWidget(tab)
+    fill(tab.rows[0], "Washer", "6.000,00", "5.000,00", gift="Vacuum")
+    tab.panel.resize(700, 900)
+    tab.panel._update_option_directions()
+    assert tab.panel._option_layouts[0].direction() == QBoxLayout.Direction.TopToBottom
+
+    tab.panel.resize(900, 900)
+    tab.panel._update_option_directions()
+    assert tab.panel._option_layouts[0].direction() == QBoxLayout.Direction.LeftToRight
+
+
+def test_light_blue_material_theme_and_result_styles_are_installed(qtbot) -> None:  # type: ignore[no-untyped-def]
+    app = QApplication.instance()
+    assert app is not None
+    install_material_theme(app)
+    assert MATERIAL_THEME == "light_blue.xml"
+    assert "QFrame#posHero" in app.styleSheet()
+    assert "QLabel#posAmount" in app.styleSheet()
 
 
 # ---- products and save ----------------------------------------------------

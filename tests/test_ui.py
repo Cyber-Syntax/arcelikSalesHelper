@@ -1,6 +1,8 @@
 from decimal import Decimal as D
 from typing import Any
 
+from PySide6.QtWidgets import QHeaderView
+
 from arcelikSalesHelper.domain.products import ProductDraft
 from arcelikSalesHelper.domain.result import Ok
 from arcelikSalesHelper.infrastructure.repositories import ProductRepository
@@ -56,7 +58,7 @@ def test_dialog_reports_duplicate_names(qtbot, repo) -> None:  # type: ignore[no
     dialog.website_edit.setText("1")
     dialog.accept()
     assert dialog.saved is None
-    assert "already exists" in dialog.blocks["name"].error_text
+    assert "zaten var" in dialog.blocks["name"].error_text
 
 
 def test_edit_dialog_prefills_without_rounding(qtbot, repo) -> None:  # type: ignore[no-untyped-def]
@@ -74,6 +76,14 @@ def test_products_tab_lists_filters_and_archives(qtbot, repo) -> None:  # type: 
     tab = ProductsTab(repo)
     qtbot.addWidget(tab)
     assert tab.table_model.rowCount() == 2
+    assert tab.table.alternatingRowColors()
+    assert not tab.table.showGrid()
+    assert tab.table.verticalHeader().defaultSectionSize() == 40
+    assert tab.table.horizontalHeader().minimumSectionSize() == 110
+    assert (
+        tab.table.horizontalHeader().sectionResizeMode(0)
+        == QHeaderView.ResizeMode.Interactive
+    )
 
     tab.search_edit.setText("wash")
     assert tab.table_model.rowCount() == 1
@@ -87,7 +97,7 @@ def test_products_tab_lists_filters_and_archives(qtbot, repo) -> None:  # type: 
     tab.show_archived.setChecked(True)
     assert tab.table_model.rowCount() == 1
     tab.table.selectRow(0)
-    assert tab.archive_button.text() == "Restore"
+    assert tab.archive_button.text() == "Geri yükle"
     with qtbot.waitSignal(tab.products_changed):
         tab.archive_button.click()
     assert [

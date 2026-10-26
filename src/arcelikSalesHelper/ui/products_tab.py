@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
     QFormLayout,
+    QHeaderView,
     QHBoxLayout,
     QLabel,
     QLineEdit,
@@ -370,7 +371,10 @@ class ProductsTab(QWidget):
 
         self.table_model = ProductTableModel(self)
         self.table = QTableView()
+        self.table.setObjectName("productsTable")
         self.table.setModel(self.table_model)
+        self.table.setAlternatingRowColors(True)
+        self.table.setShowGrid(False)
         self.table.setSelectionBehavior(
             QAbstractItemView.SelectionBehavior.SelectRows
         )
@@ -381,7 +385,14 @@ class ProductsTab(QWidget):
             QAbstractItemView.EditTrigger.NoEditTriggers
         )
         self.table.verticalHeader().hide()
-        self.table.horizontalHeader().setStretchLastSection(True)
+        self.table.verticalHeader().setDefaultSectionSize(40)
+        header = self.table.horizontalHeader()
+        header.setMinimumSectionSize(110)
+        header.setDefaultAlignment(
+            Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter
+        )
+        header.setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
+        header.setStretchLastSection(True)
 
         self.add_button = QPushButton(T.BTN_ADD_PRODUCT)
         self.edit_button = QPushButton(T.BTN_EDIT)

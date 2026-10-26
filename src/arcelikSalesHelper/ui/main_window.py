@@ -4,7 +4,7 @@ import logging
 import sqlite3
 
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QCloseEvent
+from PySide6.QtGui import QCloseEvent, QGuiApplication
 from PySide6.QtWidgets import (
     QLabel,
     QMainWindow,
@@ -50,7 +50,15 @@ class MainWindow(QMainWindow):
     ) -> None:
         super().__init__()
         self.setWindowTitle(DISPLAY_NAME)
-        self.resize(1100, 720)
+        screen = QGuiApplication.primaryScreen()
+        if screen is None:
+            self.resize(1280, 820)
+        else:
+            available = screen.availableGeometry()
+            self.resize(
+                min(1280, round(available.width() * 0.95)),
+                min(820, round(available.height() * 0.90)),
+            )
 
         self._conn = conn
         self._backups = backups

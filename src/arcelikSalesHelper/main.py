@@ -21,6 +21,7 @@ from .infrastructure.database import open_database
 from .paths import ensure_dirs, resolve_paths
 from .ui.common import install_qt_translations, show_critical
 from .ui.main_window import MainWindow
+from .ui.theme import install_material_theme
 
 
 def configure_logging(log_path: Path) -> None:
@@ -60,6 +61,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     app.setOrganizationName(COMPANY_NAME)
     app.setApplicationDisplayName(DISPLAY_NAME)
     install_qt_translations(app)
+    install_material_theme(app)
 
     try:
         paths = ensure_dirs(resolve_paths())

@@ -6,7 +6,11 @@ description = "Desktop sales helper for Arcelik product pricing and calculations
 keywords = ["arcelik", "sales", "pricing", "desktop"]
 requires-python = ">=3.11"
 authors = [{ name = "Cyber-Syntax" }]
-dependencies = ["PySide6>=6.8", "platformdirs>=4.3"]
+dependencies = [
+  "PySide6>=6.8",
+  "platformdirs>=4.3",
+  "qt-material>=2.17",
+]
 classifiers = [
   "Development Status :: 3 - Alpha",
   "Environment :: X11 Applications",
