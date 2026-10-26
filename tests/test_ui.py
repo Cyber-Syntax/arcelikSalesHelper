@@ -103,3 +103,12 @@ def test_products_tab_lists_filters_and_archives(qtbot, repo) -> None:  # type: 
     assert [
         p.archived for p in repo.search("wash", include_archived=True)
     ] == [False]
+
+
+def test_products_table_shows_yok_for_zero_website_price(qtbot, repo) -> None:  # type: ignore[no-untyped-def]
+    product = add_product(repo, "No website offer", regular="38299", website="0")
+    tab = ProductsTab(repo)
+    qtbot.addWidget(tab)
+
+    assert tab.table_model.data(tab.table_model.index(0, 2)) == "YOK"
+    assert repo.get(product.id).website_price == D(0)

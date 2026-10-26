@@ -71,6 +71,24 @@ def test_saving_from_the_calculator_lists_and_shows_the_snapshot(  # type: ignor
     )  # the calculator keeps its inputs
 
 
+def test_zero_website_price_is_saved_and_shown_as_yok_in_history(
+    qtbot, db: sqlite3.Connection, tmp_path: Path
+) -> None:  # type: ignore[no-untyped-def]
+    paths = resolve_paths({DATA_DIR_ENV_VAR: str(tmp_path / "data")})
+    window = MainWindow(db, paths)
+    qtbot.addWidget(window)
+    fill_two(window.calculator_tab)
+    first = window.calculator_tab.rows[0].line
+    first.regular_edit.setText("38.299,00")
+    first.website_edit.setText("0,00")
+    first.manager_edit.setText("32.000,00")
+    window.calculator_tab.save_button.click()
+
+    texts = detail_texts(window.history_tab)
+    assert T.NO_WEBSITE_DISCOUNT in texts
+    assert "34.469,10 TL" in texts
+
+
 def test_detail_is_rendered_from_stored_rows_without_recalculating(  # type: ignore[no-untyped-def]
     qtbot, db: sqlite3.Connection, monkeypatch
 ) -> None:

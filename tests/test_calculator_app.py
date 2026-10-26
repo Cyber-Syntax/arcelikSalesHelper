@@ -34,8 +34,10 @@ def test_zero_website_price_displays_regular_price_and_zero_discount():
     assert ev.result.pos_amount == D("32000")
     assert ev.result.ten_pct_unit == D("34469.10")
     prices = {row.label: row.value for row in ev.view.card.prices.rows}
-    assert prices[T.LBL_WEBSITE_UNIT] == "38.299,00 TL"
+    assert prices[T.LBL_WEBSITE_UNIT] == T.NO_WEBSITE_DISCOUNT
+    assert prices[T.LBL_WEBSITE_DISCOUNTED_TOTAL] == T.NO_WEBSITE_DISCOUNT
     options = {row.label: row.value for row in ev.view.card.website_option.rows}
+    assert options[T.LBL_WEBSITE_DISCOUNTED_TOTAL] == T.NO_WEBSITE_DISCOUNT
     assert options[T.LBL_WEBSITE_OFFER_TOTAL] == "34.469,10 TL"
 
 
