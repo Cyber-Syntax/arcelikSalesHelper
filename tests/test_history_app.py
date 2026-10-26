@@ -13,7 +13,6 @@ from arcelikSalesHelper.application.history import (
     summarize,
     to_jsonable,
 )
-from arcelikSalesHelper.domain.arith import div
 from arcelikSalesHelper.domain.models import POS_LABEL, ManagerMode
 from arcelikSalesHelper.domain.result import Err, Ok
 
@@ -78,7 +77,7 @@ def test_snapshot_columns_hold_normalized_values_and_entered_text() -> None:
     )
     assert D(second.manager_line_total or "") == D(13500)
     assert D(second.manager_unit or "") == D(4500)
-    assert json.loads(second.entered_json)["regular_price"] == "6.000,00"
+    assert json.loads(second.entered_json) == {}
 
 
 def test_snapshot_level_fields() -> None:
@@ -97,18 +96,6 @@ def test_warnings_are_stored_with_their_line_index() -> None:
     assert [(w["line_index"], w["code"]) for w in stored] == [
         (0, "manager_exceeds_website")
     ]
-
-
-def test_line_mode_unit_value_is_stored_exactly_not_rounded() -> None:
-    _, rec = snapshot(
-        [form(quantity=3, manager_value="10", manager_mode=ManagerMode.LINE)]
-    )
-    line = rec.lines[0]
-    assert D(line.manager_line_total or "") == D(10)
-    assert D(line.manager_unit or "") == div(D(10), D(3))
-    assert D(json.loads(line.result_json)["result"]["manager_unit"]) == div(
-        D(10), D(3)
-    )
 
 
 def test_only_valid_evaluations_can_be_saved() -> None:
@@ -140,18 +127,8 @@ def test_stored_view_equals_what_was_displayed() -> None:
         assert stored_line.website_option == card.website_option
         assert stored_line.gift_option == card.gift_option
         assert stored_line.pos == card.pos
-        assert stored_line.explanation == line_eval.view.explanation
     assert stored.lines[0].gift_option is None  # no gift on line 1
     assert stored.lines[1].gift_option is not None
-
-
-def test_entered_section_shows_text_as_typed() -> None:
-    _, rec = snapshot()
-    parsed = parse_snapshot(replace(rec, id=1))
-    assert isinstance(parsed, Ok)
-    rows = {r.label: r.value for r in parsed.value.lines[0].entered.rows}
-    assert rows["Normal fiyat"] == "5.000,00"
-    assert rows["Yönetici değer modu"] == "Birim fiyat"
 
 
 def test_stored_warnings_roundtrip() -> None:

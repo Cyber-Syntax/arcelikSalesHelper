@@ -217,39 +217,6 @@ class CalculatorLineWidget(QWidget):
                 block.set_hint(hint.message)
 
 
-class Collapsible(QWidget):
-    def __init__(self, title: str, parent: QWidget | None = None) -> None:
-        super().__init__(parent)
-        self.toggle_button = QToolButton()
-        self.toggle_button.setText(title)
-        self.toggle_button.setCheckable(True)
-        self.toggle_button.setStyleSheet("QToolButton { border: none; }")
-        self.toggle_button.setToolButtonStyle(
-            Qt.ToolButtonStyle.ToolButtonTextBesideIcon
-        )
-        self.toggle_button.setArrowType(Qt.ArrowType.RightArrow)
-        self.body = QLabel()
-        self.body.setWordWrap(True)
-        self.body.setTextInteractionFlags(
-            Qt.TextInteractionFlag.TextSelectableByMouse
-        )
-        self.body.hide()
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.addWidget(self.toggle_button)
-        layout.addWidget(self.body)
-        self.toggle_button.toggled.connect(self._on_toggled)
-
-    def _on_toggled(self, checked: bool) -> None:
-        self.toggle_button.setArrowType(
-            Qt.ArrowType.DownArrow if checked else Qt.ArrowType.RightArrow
-        )
-        self.body.setVisible(checked)
-
-    def set_lines(self, lines: Sequence[str]) -> None:
-        self.body.setText("\n".join(lines))
-
-
 def _clear(layout: QLayout) -> None:
     while (item := layout.takeAt(0)) is not None:
         widget = item.widget()
@@ -271,7 +238,11 @@ def section_box(section: Section, *, role: str | None = None) -> QGroupBox:
         value.setAlignment(
             Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
         )
-        if row.label in (T.LBL_TEN_LINE_TOTAL, T.LBL_MANAGER_LINE_TOTAL):
+        if row.label in (
+            T.LBL_WEBSITE_OFFER_TOTAL,
+            T.LBL_GIFT_OFFER_TOTAL,
+            T.LBL_MANAGER_LINE_TOTAL,
+        ):
             value.setProperty("amountRole", "emphasis")
         value.setTextInteractionFlags(
             Qt.TextInteractionFlag.TextSelectableByMouse
@@ -375,11 +346,8 @@ class TransactionPanel(QWidget):
                     self._totals.addWidget(section_box(section))
         elif evaluation.pending_reason:
             self._totals.addWidget(self._note(evaluation.pending_reason))
-        multiple_lines = len(evaluation.lines) > 1
         for index, line_eval in enumerate(evaluation.lines):
-            self._cards.addWidget(
-                self._line_card(index, line_eval, show_pos_summary=multiple_lines)
-            )
+            self._cards.addWidget(self._line_card(index, line_eval))
         self._update_option_directions()
 
     def resizeEvent(self, event: QResizeEvent) -> None:  # noqa: N802
@@ -410,8 +378,6 @@ class TransactionPanel(QWidget):
         self,
         index: int,
         evaluation: Evaluation,
-        *,
-        show_pos_summary: bool,
     ) -> QGroupBox:
         name = (
             evaluation.line.product_name if evaluation.line is not None else ""
@@ -432,8 +398,7 @@ class TransactionPanel(QWidget):
 
         card = view.card
         pos_summary, pos_details = _pos_summary_boxes(card.pos)
-        if show_pos_summary:
-            layout.addWidget(pos_summary)
+        layout.addWidget(pos_summary)
         layout.addWidget(section_box(card.prices))
         options = QBoxLayout(QBoxLayout.Direction.LeftToRight)
         options.addWidget(section_box(card.website_option, role="option"), 1)
@@ -449,13 +414,10 @@ class TransactionPanel(QWidget):
                     "\n".join(f"⚠ {w}" for w in view.warnings), WARNING_STYLE
                 )
             )
-        explain = Collapsible(T.EXPLAIN_TITLE)
-        explain.set_lines(view.explanation)
-        layout.addWidget(explain)
         return box
 
 
-def _pos_summary_boxes(section: Section) -> tuple[QFrame, QGroupBox | None]:
+def _pos_summary_boxes(section: Section) -> tuple[QFrame, QWidget | None]:
     """Separate the final POS amount from its supporting calculation rows."""
     amount_labels = {T.LBL_POS_AMOUNT, T.LBL_TOTAL_POS}
     amount = next(
@@ -489,13 +451,16 @@ def _pos_summary_boxes(section: Section) -> tuple[QFrame, QGroupBox | None]:
     details_rows = tuple(
         row for row in section.rows if row is not amount
     )
-    details = (
-        None
-        if not details_rows and section.note is None
-        else section_box(
-            Section(T.SEC_POS_DETAILS, details_rows, section.note)
+    details = None
+    if details_rows:
+        discount = details_rows[0]
+        details = QLabel(f"{discount.label}: {discount.value}")
+        details.setObjectName("discountAmount")
+        details.setTextInteractionFlags(
+            Qt.TextInteractionFlag.TextSelectableByMouse
         )
-    )
+        if discount.tooltip:
+            details.setToolTip(discount.tooltip)
     return hero, details
 
 

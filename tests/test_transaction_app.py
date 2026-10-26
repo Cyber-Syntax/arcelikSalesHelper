@@ -1,5 +1,6 @@
 from decimal import Decimal as D
 
+from arcelikSalesHelper import strings as T
 from arcelikSalesHelper.application.calculator import (
     LineForm,
     Section,
@@ -43,12 +44,12 @@ def test_mixed_gift_and_no_gift_totals_are_formatted() -> None:
     ev = evaluate_transaction(two_forms())
     assert ev.valid
     t = totals(ev)
-    assert t["Normal fiyat toplamı"] == "23.000,00 TL"
-    assert t["Web sitesi indirimli toplam"] == "19.000,00 TL"
-    assert t["Standart %10 senaryosu toplamı"] == "19.800,00 TL"
-    assert t["Yönetici tarafından verilen toplam"] == "16.500,00 TL"
-    assert t["POS giriş toplamı"] == "20.500,00 TL"
+    assert t[T.LBL_TOTAL_DISCOUNT] == "4.000,00 TL"
+    assert t[T.LBL_TOTAL_POS] == "20.500,00 TL"
     assert POS_LABEL in [s.title for s in ev.totals_sections]
+    assert ev.result is not None
+    assert [r.discount_amount for r in ev.result.lines] == [D(1000), D(3000)]
+    assert ev.result.totals.discount_amount.value == D(4000)
 
 
 def test_missing_manager_value_gives_explicit_na_with_line_numbers() -> None:
@@ -61,16 +62,15 @@ def test_missing_manager_value_gives_explicit_na_with_line_numbers() -> None:
         )
     )
     t = totals(evaluate_transaction(forms))
-    assert t["Normal fiyat toplamı"] == "25.000,00 TL"
     assert (
-        t["Yönetici tarafından verilen toplam"] == "Yok: yönetici değeri eksik (satır 3)"
+        t[T.LBL_TOTAL_DISCOUNT] == "4.500,00 TL"
     )
-    assert t["POS giriş toplamı"] == "Yok: yönetici değeri eksik (satır 3)"
+    assert t[T.LBL_TOTAL_POS] == "Yok: yönetici değeri eksik (satır 3)"
 
 
 def test_na_lists_every_missing_line() -> None:
     forms = [form(), form(manager_value="3.000,00"), form()]
-    assert totals(evaluate_transaction(forms))["POS giriş toplamı"] == (
+    assert totals(evaluate_transaction(forms))[T.LBL_TOTAL_POS] == (
         "Yok: yönetici değeri eksik (satırlar 1, 3)"
     )
 
@@ -106,18 +106,20 @@ def test_warning_carries_its_line_index() -> None:
 # ---- options --------------------------------------------------------------
 
 
-def test_no_gift_line_has_only_the_website_option_with_the_manager_value() -> (
+def test_no_gift_line_shows_only_final_website_offer_amounts() -> (
     None
 ):
     ev = evaluate_transaction([form(manager_value="3.000,00")])
     assert ev.lines[0].view is not None
     card = ev.lines[0].view.card
     assert card.gift_option is None
-    assert val(card.website_option, "Yönetici satır toplamı") == "3.000,00 TL"
-    assert val(card.website_option, "%10 baz (birim)") == "4.000,00 TL"
+    assert val(card.website_option, "Web sitesi indirimli toplam") == "4.000,00 TL"
+    assert val(card.website_option, "İndirimli teklif toplamı") == "3.600,00 TL"
+    assert val(card.prices, "Yönetici toplamı") == "3.000,00 TL"
+    assert all("baz" not in row.label.lower() for row in card.website_option.rows)
 
 
-def test_gift_line_compares_both_options_and_puts_the_manager_value_on_the_gift() -> (
+def test_gift_line_compares_both_final_offer_amounts() -> (
     None
 ):
     ev = evaluate_transaction(two_forms())
@@ -126,31 +128,25 @@ def test_gift_line_compares_both_options_and_puts_the_manager_value_on_the_gift(
     site, gift = view.card.website_option, view.card.gift_option
     assert val(gift, "Hediye") == "Vacuum"
     assert val(gift, "Normal fiyat toplamı") == "18.000,00 TL"
-    assert val(gift, "%10 baz (birim)") == "6.000,00 TL"
-    assert val(gift, "%10 birim fiyat") == "5.400,00 TL"
-    assert val(gift, "%10 satır toplamı") == "16.200,00 TL"
-    assert val(gift, "Yönetici satır toplamı") == "13.500,00 TL"
+    assert val(gift, "Hediyeli teklif toplamı") == "16.200,00 TL"
     assert val(site, "Web sitesi indirimli toplam") == "15.000,00 TL"
-    assert val(site, "%10 baz (birim)") == "5.000,00 TL"
-    assert val(site, "Yönetici tarafından verilen değer") == "Diğer seçenekte gösteriliyor"
+    assert val(site, "İndirimli teklif toplamı") == "13.500,00 TL"
+    assert val(view.card.prices, "Yönetici toplamı") == "13.500,00 TL"
+    assert all("%10" not in row.label for row in (*site.rows, *gift.rows))
 
 
-def test_named_but_unselected_gift_is_shown_for_comparison_only() -> None:
+def test_named_but_unselected_gift_shows_only_final_amounts() -> None:
     ev = evaluate_transaction(
         [form(gift_name="Vacuum", manager_value="3.000,00")]
     )
     view = ev.lines[0].view
     assert view is not None and view.card.gift_option is not None
-    assert (
-        val(view.card.gift_option, "Yönetici tarafından verilen değer")
-        == "Diğer seçenekte gösteriliyor"
-    )
-    assert val(view.card.website_option, "Yönetici satır toplamı") == "3.000,00 TL"
-    assert view.card.gift_option.note is not None
-    assert "hediye seçili değil" in view.card.gift_option.note
+    assert val(view.card.gift_option, "Hediyeli teklif toplamı") == "4.500,00 TL"
+    assert val(view.card.prices, "Yönetici toplamı") == "3.000,00 TL"
+    assert view.card.gift_option.note is None
 
 
-def test_total_line_mode_is_labelled_in_the_option() -> None:
+def test_total_line_mode_shows_the_final_manager_total_only() -> None:
     ev = evaluate_transaction(
         [
             form(
@@ -162,13 +158,7 @@ def test_total_line_mode_is_labelled_in_the_option() -> None:
     )
     view = ev.lines[0].view
     assert view is not None
-    site = view.card.website_option
-    assert val(site, "Yönetici değer modu") == "Satır toplam fiyatı"
-    assert val(site, "Yönetici satır toplamı") == "12.000,00 TL"
-    assert (
-        val(site, "Yönetici birim değeri (türetilmiş, yalnızca gösterim)")
-        == "4.000,00 TL"
-    )
+    assert val(view.card.prices, "Yönetici toplamı") == "12.000,00 TL"
 
 
 def test_option_panels_never_rank_or_recommend() -> None:

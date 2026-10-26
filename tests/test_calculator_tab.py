@@ -173,7 +173,10 @@ def test_invalid_line_hides_totals_but_keeps_the_valid_card(
     assert not tab.evaluation.valid and not tab.save_button.isEnabled()
     assert tab.rows[1].line.blocks["website_discounted_price"].error_text != ""
     shown = titles(tab)
-    assert "Satır 1: Fridge" in shown and "POS hesaplama ayrıntıları" in shown
+    assert "Satır 1: Fridge" in shown
+    assert "POS hesaplama ayrıntıları" not in shown
+    line_pos = tab.panel.findChildren(QLabel, "posAmount")
+    assert len(line_pos) == 1 and line_pos[0].text() == "4.000,00 TL"
     assert "İşlem toplamları" not in shown
     assert any(
         "Tamamlanacak veya düzeltilecek satırlar: 2" in lb.text()
@@ -227,6 +230,8 @@ def test_pos_result_is_prominent_selectable_and_first(qtbot, repo) -> None:  # t
     assert amount is not None and amount.text() == "4.000,00 TL"
     assert amount.textInteractionFlags() & Qt.TextInteractionFlag.TextSelectableByMouse
     assert tab.panel._totals.itemAt(0).widget().objectName() == "posHero"
+    discount = tab.panel.findChild(QLabel, "discountAmount")
+    assert discount is not None and discount.text() == "İndirim tutarı: 1.000,00 TL"
 
 
 def test_transaction_pos_total_precedes_multi_line_details(qtbot, repo) -> None:  # type: ignore[no-untyped-def]
@@ -236,6 +241,16 @@ def test_transaction_pos_total_precedes_multi_line_details(qtbot, repo) -> None:
 
     amounts = [label.text() for label in tab.panel.findChildren(QLabel, "posAmount")]
     assert amounts == ["20.500,00 TL", "4.000,00 TL", "16.500,00 TL"]
+    discounts = [label.text() for label in tab.panel.findChildren(QLabel, "discountAmount")]
+    assert discounts == [
+        "İndirim tutarı: 1.000,00 TL",
+        "İndirim tutarı: 3.000,00 TL",
+    ]
+    labels = " ".join(label.text() for label in tab.panel.findChildren(QLabel))
+    assert "%10 bazı" not in labels
+    assert "Her satır kendi" not in labels
+    assert "bilgilendirme amaçlıdır" not in labels
+    assert "Bu nasıl hesaplandı" not in labels
     assert tab.panel._totals.itemAt(0).widget().objectName() == "posHero"
 
 

@@ -126,7 +126,11 @@ def test_calculator_with_valid_input_is_turkish(env) -> None:  # type: ignore[no
     assert english(texts) == []
     assert POS_LABEL in texts
     assert T.SEC_WEBSITE_OPTION in texts and T.SEC_GIFT_OPTION in texts
-    assert T.EXPLAIN_TITLE in texts
+    assert any(text.startswith(T.LBL_DISCOUNT_AMOUNT) for text in texts)
+    assert T.LBL_TOTAL_DISCOUNT in texts
+    assert "Bu nasıl hesaplandı" not in texts
+    assert "%10 bazı" not in texts
+    assert "bilgilendirme amaçlıdır" not in texts
     assert window.calculator_tab.save_button.text() == T.BTN_SAVE_CALCULATION
 
 
@@ -149,7 +153,10 @@ def test_history_tab_shows_a_saved_calculation_in_turkish(env) -> None:  # type:
     window.history_tab.reload(select_id=outcome.value)
     texts = collect_texts(window.history_tab)
     assert english(texts) == []
-    assert T.SEC_AS_ENTERED in texts
+    assert T.LBL_DISCOUNT_AMOUNT in texts
+    assert T.LBL_TOTAL_DISCOUNT in texts
+    assert "Bu nasıl hesaplandı" not in texts
+    assert "%10 bazı" not in texts
     assert T.NOTE_HISTORY_FROZEN in texts
 
 

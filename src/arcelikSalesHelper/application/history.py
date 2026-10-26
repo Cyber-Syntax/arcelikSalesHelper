@@ -127,26 +127,13 @@ def _line_record(
     view: ResultView,
 ) -> LineRecord:
     card = view.card
-    entered = {
-        "product_name": form.product_name,
-        "quantity": form.quantity,
-        "regular_price": form.regular_price,
-        "website_discounted_price": form.website_discounted_price,
-        "gift_selected": form.gift_selected,
-        "gift_name": form.gift_name,
-        "manager_value": form.manager_value,
-        "manager_mode": form.manager_mode,
-    }
     body = {
-        "input": line,
-        "result": result,
         "view": {
             "prices": card.prices,
             "website_option": card.website_option,
             "gift_option": card.gift_option,
             "pos": card.pos,
             "warnings": view.warnings,
-            "explanation": view.explanation,
         },
     }
     has_manager = line.manager_value is not None
@@ -176,7 +163,7 @@ def _line_record(
             else format_decimal_exact(result.manager_unit)
         ),
         result_json=_dumps(body),
-        entered_json=_dumps(entered),
+        entered_json="{}",
     )
 
 
@@ -203,7 +190,6 @@ def build_snapshot(
         warnings.extend(ev.result.warnings)
 
     totals = {
-        "totals": result.totals,
         "sections": evaluation.totals_sections,
         "pos_total_text": _pos_total_text(evaluation.totals_sections),
     }
@@ -237,13 +223,11 @@ class StoredLine:
     quantity: int
     gift_selected: bool
     gift_name: str | None
-    entered: Section
     prices: Section
     website_option: Section
     gift_option: Section | None
     pos: Section
     warnings: tuple[str, ...]
-    explanation: tuple[str, ...]
 
 
 @dataclass(frozen=True)
@@ -282,37 +266,8 @@ def _section(data: Any) -> Section:
     )
 
 
-_ENTERED_LABELS = (
-    ("quantity", T.LBL_ENTERED_QUANTITY),
-    ("regular_price", T.LBL_ENTERED_REGULAR),
-    ("website_discounted_price", T.LBL_ENTERED_WEBSITE),
-    ("manager_value", T.LBL_ENTERED_MANAGER),
-)
-
-
-def _entered_section(entered: Mapping[str, Any]) -> Section:
-    rows = [
-        Row(label, str(entered.get(key, "")).strip() or T.EMPTY_VALUE)
-        for key, label in _ENTERED_LABELS
-    ]
-    if str(entered.get("manager_value", "")).strip():
-        is_line = entered.get("manager_mode") == "line"
-        rows.append(
-            Row(
-                T.LBL_ENTERED_MANAGER_MODE,
-                T.MODE_LINE if is_line else T.MODE_UNIT,
-            )
-        )
-    return Section(
-        T.SEC_AS_ENTERED,
-        tuple(rows),
-        note=T.NOTE_AS_ENTERED,
-    )
-
-
 def _parse_line(record: LineRecord) -> StoredLine:
     body = json.loads(record.result_json)
-    entered = json.loads(record.entered_json)
     view = body["view"]
     gift = view["gift_option"]
     return StoredLine(
@@ -321,13 +276,11 @@ def _parse_line(record: LineRecord) -> StoredLine:
         quantity=record.quantity,
         gift_selected=record.gift_selected,
         gift_name=record.gift_name,
-        entered=_entered_section(entered),
         prices=_section(view["prices"]),
         website_option=_section(view["website_option"]),
         gift_option=None if gift is None else _section(gift),
         pos=_section(view["pos"]),
         warnings=tuple(str(w) for w in view["warnings"]),
-        explanation=tuple(str(x) for x in view["explanation"]),
     )
 
 

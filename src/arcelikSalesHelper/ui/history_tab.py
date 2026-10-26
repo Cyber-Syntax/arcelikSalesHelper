@@ -29,7 +29,7 @@ from arcelikSalesHelper.infrastructure.history_repository import (
     HistoryRepository,
 )
 
-from .calculator_tab import Collapsible, section_box
+from .calculator_tab import section_box
 from .common import HINT_STYLE, WARNING_STYLE, format_local_timestamp
 
 _COLUMNS = T.HISTORY_COLUMNS
@@ -82,7 +82,6 @@ class SnapshotDetail(QWidget):
             T.line_title_named(line.line_index + 1, line.product_name)
         )
         layout = QVBoxLayout(box)
-        layout.addWidget(section_box(line.entered))
         layout.addWidget(section_box(line.prices))
         options = QHBoxLayout()  # same weight for both: no option is favoured
         options.addWidget(section_box(line.website_option), 1)
@@ -96,9 +95,6 @@ class SnapshotDetail(QWidget):
                     "\n".join(f"⚠ {w}" for w in line.warnings), WARNING_STYLE
                 )
             )
-        explain = Collapsible(T.EXPLAIN_TITLE)
-        explain.set_lines(line.explanation)
-        layout.addWidget(explain)
         return box
 
 

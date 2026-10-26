@@ -10,10 +10,7 @@ from dataclasses import dataclass
 from decimal import Decimal
 
 from arcelikSalesHelper import strings as T
-from arcelikSalesHelper.domain.formatting import (
-    format_decimal_exact,
-    format_try,
-)
+from arcelikSalesHelper.domain.formatting import format_decimal_exact, format_try
 from arcelikSalesHelper.domain.models import (
     POS_LABEL,
     GiftOption,
@@ -107,7 +104,6 @@ class CardView:
 class ResultView:
     sections: tuple[Section, ...]
     warnings: tuple[str, ...]
-    explanation: tuple[str, ...]
     card: CardView
 
 
@@ -239,201 +235,61 @@ def present_result(line: LineInput, r: LineResult) -> ResultView:
             _money_row(T.LBL_WEBSITE_UNIT, line.website_discounted_price),
             _money_row(T.LBL_REGULAR_TOTAL, r.regular_total),
             _money_row(T.LBL_WEBSITE_DISCOUNTED_TOTAL, r.website_discounted_total),
+            *(
+                (_money_row(T.LBL_MANAGER_LINE_TOTAL, r.manager_line_total),)
+                if r.manager_line_total is not None
+                else ()
+            ),
         ),
     )
 
-    gift_rows = (
-        (Row(T.LBL_GIFT, line.gift_name or T.NO_GIFT_NAME),)
-        if line.gift_selected
-        else ()
+    pos_rows: tuple[Row, ...] = (
+        _money_row(T.LBL_DISCOUNT_AMOUNT, r.discount_amount),
     )
-    ten = Section(
-        T.SEC_TEN,
-        (
-            *gift_rows,
-            Row(
-                T.LBL_DISCOUNT_BASE,
-                T.VAL_BASE_REGULAR_GIFT
-                if line.gift_selected
-                else T.VAL_BASE_WEBSITE_NOGIFT,
-            ),
-            _money_row(T.LBL_BASE_UNIT, r.ten_pct_base),
-            _money_row(T.LBL_TEN_DISCOUNT_UNIT, r.ten_pct_discount_unit),
-            _money_row(T.LBL_TEN_RESULT_UNIT, r.ten_pct_unit),
-            Row(T.LBL_QUANTITY, str(r.quantity)),
-            _money_row(T.LBL_TEN_RESULT_TOTAL, r.ten_pct_total),
-        ),
-    )
-
-    manager: tuple[Section, ...] = ()
-    if (
-        r.manager_line_total is not None
-        and r.manager_unit is not None
-        and r.manager_mode is not None
-    ):
-        is_line = r.manager_mode is ManagerMode.LINE
-        manager = (
-            Section(
-                T.SEC_MANAGER,
-                (
-                    Row(T.LBL_VALUE_MODE, T.MODE_LINE if is_line else T.MODE_UNIT),
-                    _money_row(
-                        T.LBL_ENTERED_VALUE,
-                        r.manager_line_total if is_line else r.manager_unit,
-                    ),
-                    _money_row(T.LBL_LINE_TOTAL, r.manager_line_total),
-                    _money_row(
-                        T.LBL_UNIT_VALUE_DERIVED if is_line else T.LBL_UNIT_VALUE,
-                        r.manager_unit,
-                    ),
-                ),
-                note=T.NOTE_MANAGER_SECTION,
-            ),
-        )
-
-    pos_rows: tuple[Row, ...]
     if r.pos_amount is None or r.manager_line_total is None:
-        pos_rows = (Row(T.LBL_RESULT, T.POS_MISSING_MANAGER),)
+        pos_rows += (Row(T.LBL_POS_AMOUNT, T.POS_MISSING_MANAGER),)
     else:
-        pos_rows = (
-            _money_row(T.LBL_REGULAR_TOTAL, r.regular_total),
-            _money_row(T.LBL_POS_NORMAL_WEBSITE_TOTAL, r.website_discounted_total),
-            _money_row(T.LBL_MANAGER_LINE_TOTAL, r.manager_line_total),
-            _money_row(T.LBL_POS_AMOUNT, r.pos_amount),
-        )
-    pos = Section(POS_LABEL, pos_rows, note=T.NOTE_POS)
+        pos_rows += (_money_row(T.LBL_POS_AMOUNT, r.pos_amount),)
+    pos = Section(POS_LABEL, pos_rows)
 
     website_opt, gift_opt = build_options(line, r)
-    has_manager = r.manager_line_total is not None
     card = CardView(
         prices=prices,
-        website_option=_website_section(website_opt, has_manager),
+        website_option=_website_section(website_opt),
         gift_option=(
             None
             if gift_opt is None
-            else _gift_section(gift_opt, line, has_manager)
+            else _gift_section(gift_opt)
         ),
         pos=pos,
     )
     return ResultView(
-        sections=(prices, ten, *manager, pos),
+        sections=(prices, pos),
         warnings=tuple(w.message for w in r.warnings),
-        explanation=_explain(line, r),
         card=card,
     )
 
 
-def _explain(line: LineInput, r: LineResult) -> tuple[str, ...]:
-    t = format_try
-    q = r.quantity
-    base_name = (
-        T.EXPLAIN_BASE_REGULAR_GIFT
-        if line.gift_selected
-        else T.EXPLAIN_BASE_WEBSITE_NOGIFT
-    )
-    steps = [
-        T.explain_ten_base(base_name, t(r.ten_pct_base)),
-        T.explain_ten_discount(t(r.ten_pct_base), t(r.ten_pct_discount_unit)),
-        T.explain_scenario_unit(
-            t(r.ten_pct_base), t(r.ten_pct_discount_unit), t(r.ten_pct_unit)
-        ),
-        T.explain_scenario_total(t(r.ten_pct_unit), q, t(r.ten_pct_total)),
-    ]
-    if r.manager_line_total is not None and r.manager_unit is not None:
-        if r.manager_mode is ManagerMode.LINE:
-            steps.append(T.explain_manager_line(t(r.manager_line_total)))
-            steps.append(
-                T.explain_manager_unit_derived(
-                    t(r.manager_line_total), q, t(r.manager_unit)
-                )
-            )
-        else:
-            steps.append(
-                T.explain_manager_unit(
-                    t(r.manager_unit), q, t(r.manager_line_total)
-                )
-            )
-        if r.pos_amount is not None:
-            steps.append(
-                T.explain_pos(
-                    t(r.regular_total),
-                    t(r.website_discounted_total),
-                    t(r.manager_line_total),
-                    t(r.pos_amount),
-                )
-            )
-    return tuple(steps)
-
-
 # ---- option panels --------------------------------------------------------
 
-def _option_manager(
-    mode: ManagerMode | None,
-    unit: Decimal | None,
-    total: Decimal | None,
-    has_manager: bool,
-) -> tuple[tuple[Row, ...], str | None]:
-    """The manager value is shown on exactly one option, never on both."""
-    if mode is not None and unit is not None and total is not None:
-        is_line = mode is ManagerMode.LINE
-        rows = (
-            Row(
-                T.LBL_MANAGER_MODE,
-                T.MODE_LINE if is_line else T.MODE_UNIT,
-            ),
-            _money_row(T.LBL_MANAGER_LINE_TOTAL, total),
-            _money_row(
-                T.LBL_MANAGER_UNIT_DERIVED if is_line else T.LBL_MANAGER_UNIT,
-                unit,
-            ),
-        )
-        return rows, T.NOTE_MANAGER_OPTION
-    if has_manager:
-        return (Row(T.LBL_MANAGER_VALUE, T.VAL_SHOWN_ON_OTHER),), None
-    return (), None
-
-
-def _website_section(w: WebsiteOption, has_manager: bool) -> Section:
-    manager_rows, note = _option_manager(
-        w.manager_mode, w.manager_unit, w.manager_line_total, has_manager
-    )
+def _website_section(w: WebsiteOption) -> Section:
     return Section(
         T.SEC_WEBSITE_OPTION,
         (
             _money_row(T.LBL_WEBSITE_DISCOUNTED_TOTAL, w.website_discounted_total),
-            Row(T.LBL_TEN_BASE, T.VAL_BASE_WEBSITE),
-            _money_row(T.LBL_TEN_BASE_UNIT, w.ten_pct_base),
-            _money_row(T.LBL_TEN_DISCOUNT_UNIT, w.ten_pct_discount_unit),
-            _money_row(T.LBL_TEN_UNIT_PRICE, w.ten_pct_unit),
-            _money_row(T.LBL_TEN_LINE_TOTAL, w.ten_pct_total),
-            *manager_rows,
+            _money_row(T.LBL_WEBSITE_OFFER_TOTAL, w.ten_pct_total),
         ),
-        note=note,
     )
 
 
-def _gift_section(
-    g: GiftOption, line: LineInput, has_manager: bool
-) -> Section:
-    manager_rows, manager_note = _option_manager(
-        g.manager_mode, g.manager_unit, g.manager_line_total, has_manager
-    )
-    notes = [] if line.gift_selected else [T.NOTE_GIFT_NOT_SELECTED]
-    if manager_note:
-        notes.append(manager_note)
+def _gift_section(g: GiftOption) -> Section:
     return Section(
         T.SEC_GIFT_OPTION,
         (
             Row(T.LBL_GIFT, g.gift_name or T.NO_GIFT_NAME),
             _money_row(T.LBL_REGULAR_TOTAL, g.regular_total),
-            Row(T.LBL_TEN_BASE, T.VAL_BASE_REGULAR),
-            _money_row(T.LBL_TEN_BASE_UNIT, g.ten_pct_base),
-            _money_row(T.LBL_TEN_DISCOUNT_UNIT, g.ten_pct_discount_unit),
-            _money_row(T.LBL_TEN_UNIT_PRICE, g.ten_pct_unit),
-            _money_row(T.LBL_TEN_LINE_TOTAL, g.ten_pct_total),
-            *manager_rows,
+            _money_row(T.LBL_GIFT_OFFER_TOTAL, g.ten_pct_total),
         ),
-        note=" ".join(notes) or None,
     )
 
 
@@ -464,21 +320,13 @@ def _total_row(label: str, total: TotalValue, what: str) -> Row:
 
 def present_totals(result: TransactionResult) -> tuple[Section, ...]:
     t = result.totals
-    main = Section(
-        T.SEC_TOTALS,
-        (
-            Row(T.LBL_LINES, str(len(result.lines))),
-            _total_row(T.LBL_TOTAL_REGULAR, t.regular, T.MISSING_REGULAR),
-            _total_row(T.LBL_TOTAL_WEBSITE, t.website_discounted, T.MISSING_WEBSITE),
-            _total_row(T.LBL_TOTAL_TEN, t.ten_pct, T.MISSING_PRICE),
-            _total_row(T.LBL_TOTAL_MANAGER, t.manager, T.MISSING_MANAGER),
-        ),
-        note=T.NOTE_TOTALS,
-    )
+    main = Section(T.SEC_TOTALS, (
+        Row(T.LBL_LINES, str(len(result.lines))),
+        _total_row(T.LBL_TOTAL_DISCOUNT, t.discount_amount, T.MISSING_PRICE),
+    ))
     pos = Section(
         POS_LABEL,
         (_total_row(T.LBL_TOTAL_POS, t.pos, T.MISSING_MANAGER),),
-        note=T.NOTE_TOTAL_POS,
     )
     return (main, pos)
 

@@ -4,6 +4,7 @@ from pathlib import Path
 
 from PySide6.QtWidgets import QGroupBox, QLabel
 
+from arcelikSalesHelper import strings as T
 from arcelikSalesHelper.constants import DATA_DIR_ENV_VAR
 from arcelikSalesHelper.domain.models import POS_LABEL
 from arcelikSalesHelper.infrastructure.history_repository import (
@@ -33,7 +34,7 @@ def test_empty_history_shows_a_hint(qtbot, db: sqlite3.Connection) -> None:  # t
     tab = HistoryTab(HistoryRepository(db))
     qtbot.addWidget(tab)
     assert tab.table.rowCount() == 0
-    assert tab.count_label.text() == "No saved calculations yet."
+    assert tab.count_label.text() == T.HISTORY_NONE_YET
     assert not tab.load_more_button.isEnabled()
     assert isinstance(tab.detail_scroll.widget(), QLabel)
 
@@ -55,12 +56,16 @@ def test_saving_from_the_calculator_lists_and_shows_the_snapshot(  # type: ignor
     assert tab.selected_id() == 1
     titles = detail_titles(tab)
     assert {
-        "Line 1: Fridge",
-        "Line 2: Washer",
-        "Transaction totals",
+        T.line_title_named(1, "Fridge"),
+        T.line_title_named(2, "Washer"),
+        T.SEC_TOTALS,
         POS_LABEL,
     } <= set(titles)
-    assert "saved" in window.statusBar().currentMessage()
+    texts = " ".join(detail_texts(tab))
+    assert "4.000,00 TL" in texts
+    assert "Açıklama" not in texts and "Bu nasıl hesaplandı" not in texts
+    assert "%10 bazı" not in texts
+    assert "saved" not in window.statusBar().currentMessage().lower()
     assert (
         window.calculator_tab.evaluation.valid
     )  # the calculator keeps its inputs
@@ -97,7 +102,7 @@ def test_corrupt_snapshot_shows_a_message_instead_of_crashing(  # type: ignore[n
     qtbot.addWidget(tab)
     tab.table.selectRow(0)
     widget = tab.detail_scroll.widget()
-    assert isinstance(widget, QLabel) and "could not be read" in widget.text()
+    assert isinstance(widget, QLabel) and widget.text() == T.HISTORY_CORRUPT
 
 
 def test_load_older_pages_through_the_list(

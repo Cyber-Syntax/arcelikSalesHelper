@@ -49,6 +49,7 @@ def _compute_line(line: LineInput, line_index: int) -> LineResult:
     return LineResult(
         quantity=qty, regular_total=regular_total,
         website_discounted_total=website_total,
+        discount_amount=sub(regular_total, website_total),
         ten_pct_base=base, ten_pct_discount_unit=discount,
         ten_pct_unit=ten_unit, ten_pct_total=mul_qty(ten_unit, qty),
         manager_mode=line.manager_mode if total is not None else None,
@@ -73,6 +74,7 @@ def _totals(results: Sequence[LineResult]) -> TransactionTotals:
     return TransactionTotals(
         regular=_total([r.regular_total for r in results]),
         website_discounted=_total([r.website_discounted_total for r in results]),
+        discount_amount=_total([r.discount_amount for r in results]),
         ten_pct=_total([r.ten_pct_total for r in results]),
         manager=_total([r.manager_line_total for r in results]),
         pos=_total([r.pos_amount for r in results]),

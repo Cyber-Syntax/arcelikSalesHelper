@@ -309,7 +309,8 @@ POS without gift = 38.000,00 + 8.000,00 = 46.000,00 TL
 POS gifted = 48.000,00 TL
 ```
 
-The calculator must display `TKM 9961`, `14.539,00 TL`, and `12.399,00 TL` as gift information, while keeping the boss gifted price (`48.000,00 TL`) and boss discounted price (`38.000,00 TL`) as separate sale inputs.
+The calculator must display `TKM 9961`, `14.539,00 TL`, and `12.399,00 TL` as gift information, 
+while keeping the boss gifted price (`48.000,00 TL`) and boss discounted price (`38.000,00 TL`) as separate sale inputs.
 
 ## 7. Main screens
 

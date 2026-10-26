@@ -39,6 +39,12 @@ QLabel#posAmount {{
     font-weight: 700;
     padding: 5px 0;
 }}
+QLabel#discountAmount {{
+    color: #163a66;
+    font-size: {emphasized_size}pt;
+    font-weight: 600;
+    padding: 3px 0;
+}}
 QLabel#posAmount[missing="true"] {{
     color: #7a3e00;
     font-size: {missing_size}pt;

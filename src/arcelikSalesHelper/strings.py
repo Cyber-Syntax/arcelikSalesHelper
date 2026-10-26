@@ -93,8 +93,7 @@ def stock_too_large(limit: int) -> str:
 # POS block
 # ======================================================================
 
-POS_LABEL = "POS giriş hesaplaması (kullanmadan önce doğrulayın)"
-SEC_POS_DETAILS = "POS hesaplama ayrıntıları"
+POS_LABEL = "POS giriş tutarı"
 
 # ======================================================================
 # Calculator presentation (application/calculator.py)
@@ -118,76 +117,25 @@ LBL_GIFT = "Hediye"
 NO_GIFT_NAME = "(hediye adı yok)"
 
 SEC_PRICES = "Fiyatlar"
-SEC_TEN = "Standart %10 senaryosu"
-SEC_MANAGER = "Yönetici tarafından verilen değer"
 SEC_WEBSITE_OPTION = "Web sitesi indirim seçeneği"
 SEC_GIFT_OPTION = "Hediye seçeneği"
 SEC_TOTALS = "İşlem toplamları"
 
-LBL_DISCOUNT_BASE = "İndirim bazı"
-VAL_BASE_REGULAR_GIFT = "Normal fiyat (hediye seçili)"
-VAL_BASE_REGULAR = "Normal fiyat"
-LBL_BASE_UNIT = "Baz (birim)"
-LBL_TEN_DISCOUNT_UNIT = "%10 indirim (birim)"
-LBL_TEN_RESULT_UNIT = "Sonuç birim fiyat"
-LBL_TEN_RESULT_TOTAL = "Sonuç satır toplamı"
+LBL_WEBSITE_OFFER_TOTAL = "İndirimli teklif toplamı"
+LBL_GIFT_OFFER_TOTAL = "Hediyeli teklif toplamı"
 
-LBL_TEN_BASE = "%10 bazı"
-LBL_TEN_BASE_UNIT = "%10 baz (birim)"
-LBL_TEN_UNIT_PRICE = "%10 birim fiyat"
-LBL_TEN_LINE_TOTAL = "%10 satır toplamı"
+LBL_MANAGER_LINE_TOTAL = "Yönetici toplamı"
 
-LBL_VALUE_MODE = "Değer modu"
-MODE_LINE = "Satır toplam fiyatı"
-MODE_UNIT = "Birim fiyat"
-LBL_ENTERED_VALUE = "Girilen değer"
-LBL_LINE_TOTAL = "Satır toplamı"
-LBL_UNIT_VALUE = "Birim değer"
-LBL_UNIT_VALUE_DERIVED = "Birim değer (türetilmiş, yalnızca gösterim)"
-NOTE_MANAGER_SECTION = "Girildiği gibi kullanılır. Yüzdeye çevrilmez."
-
-LBL_MANAGER_MODE = "Yönetici değer modu"
-LBL_MANAGER_LINE_TOTAL = "Yönetici satır toplamı"
-LBL_MANAGER_UNIT = "Yönetici birim değeri"
-LBL_MANAGER_UNIT_DERIVED = (
-    "Yönetici birim değeri (türetilmiş, yalnızca gösterim)"
-)
-LBL_MANAGER_VALUE = "Yönetici tarafından verilen değer"
-VAL_SHOWN_ON_OTHER = "Diğer seçenekte gösteriliyor"
-NOTE_MANAGER_OPTION = (
-    "Yönetici değeri girildiği gibi kullanılır. Yüzdeye çevrilmez."
-)
-NOTE_GIFT_NOT_SELECTED = (
-    "Bu satırda hediye seçili değil; karşılaştırma için gösteriliyor."
-)
-
-LBL_RESULT = "Sonuç"
 POS_MISSING_MANAGER = "Yok: yönetici değeri girin"
-LBL_POS_NORMAL_WEBSITE_TOTAL = "Normal web sitesi indirimli toplamı"
 LBL_POS_AMOUNT = "POS giriş tutarı"
-NOTE_POS = (
-    "Yalnızca bilgilendirme amaçlıdır. Resmî veya yönetici onaylı bir POS talimatı değildir."
-)
+LBL_DISCOUNT_AMOUNT = "İndirim tutarı"
 
 # transaction totals
 LBL_LINES = "Satırlar"
-LBL_TOTAL_REGULAR = "Normal fiyat toplamı"
-LBL_TOTAL_WEBSITE = "Web sitesi indirimli toplam"
-LBL_TOTAL_TEN = "Standart %10 senaryosu toplamı"
-LBL_TOTAL_MANAGER = "Yönetici tarafından verilen toplam"
 LBL_TOTAL_POS = "POS giriş toplamı"
-MISSING_REGULAR = "normal fiyat"
-MISSING_WEBSITE = "web sitesi fiyatı"
+LBL_TOTAL_DISCOUNT = "Toplam indirim tutarı"
 MISSING_PRICE = "fiyat"
 MISSING_MANAGER = "yönetici değeri"
-NOTE_TOTALS = (
-    "Her satır kendi %10 bazını kullanır: hediyeli satırlarda normal fiyat, "
-    "hediyesiz satırlarda web sitesi indirimli fiyatı."
-)
-NOTE_TOTAL_POS = (
-    "Satır bazındaki POS giriş tutarlarının toplamıdır. Yalnızca bilgilendirme "
-    "amaçlıdır. Resmî veya yönetici onaylı bir POS talimatı değildir."
-)
 
 
 def total_missing(what: str, line_numbers: str, several: bool) -> str:
@@ -205,56 +153,6 @@ def pending_lines(numbers: str) -> str:
     )
 
 
-# formula explanation (every line is generated from the LineResult)
-EXPLAIN_BASE_REGULAR_GIFT = "normal fiyat (hediye seçili)"
-EXPLAIN_BASE_WEBSITE_NOGIFT = "web sitesi indirimli fiyatı (hediyesiz)"
-VAL_BASE_WEBSITE_NOGIFT = "Web sitesi indirimli fiyatı (hediye yok)"
-VAL_BASE_WEBSITE = "Web sitesi indirimli fiyatı"
-
-
-def explain_effective(website: str) -> str:
-    return f"Web sitesi indirimli fiyatı = {website}"
-
-
-def explain_ten_base(name: str, base: str) -> str:
-    return f"%10 bazı = {name} = {base}"
-
-
-def explain_ten_discount(base: str, discount: str) -> str:
-    return f"%10 indirim = {base} × %10 = {discount}"
-
-
-def explain_scenario_unit(base: str, discount: str, unit: str) -> str:
-    return f"Senaryo birim fiyatı = {base} − {discount} = {unit}"
-
-
-def explain_scenario_total(unit: str, quantity: int, total: str) -> str:
-    return f"Senaryo satır toplamı = {unit} × {quantity} = {total}"
-
-
-def explain_manager_line(line_total: str) -> str:
-    return f"Yönetici satır toplamı = {line_total} (tüm satır için toplam olarak girildi)"
-
-
-def explain_manager_unit_derived(
-    line_total: str, quantity: int, unit: str
-) -> str:
-    return (
-        f"Yönetici birim değeri = {line_total} ÷ {quantity} = {unit} "
-        "(türetilmiştir; hesaplamalarda satır toplamı kullanılır)"
-    )
-
-
-def explain_manager_unit(unit: str, quantity: int, line_total: str) -> str:
-    return f"Yönetici satır toplamı = {unit} × {quantity} = {line_total}"
-
-
-def explain_pos(regular: str, website: str, manager: str, pos: str) -> str:
-    return (
-        f"POS giriş tutarı = ({regular} − {website}) + {manager} = {pos}"
-    )
-
-
 # ======================================================================
 # History (application/history.py, ui/history_tab.py)
 # ======================================================================
@@ -264,22 +162,9 @@ HISTORY_ONLY_COMPLETE = (
     "Yalnızca eksiksiz ve geçerli bir hesaplama kaydedilebilir."
 )
 
-SEC_AS_ENTERED = "Girildiği gibi"
-NOTE_AS_ENTERED = (
-    "Metin, yazıldığı gibi saklanır. Hesaplamada, başka yerde gösterilen "
-    "normalleştirilmiş değerler kullanıldı."
-)
-LBL_ENTERED_QUANTITY = "Adet"
-LBL_ENTERED_REGULAR = "Normal fiyat"
-LBL_ENTERED_WEBSITE = "Web sitesi indirimli fiyatı"
-LBL_ENTERED_MANAGER = "Yönetici tarafından verilen değer"
-LBL_ENTERED_MANAGER_MODE = "Yönetici değer modu"
-
-
 def confirmation_pos_unverified() -> str:
     return (
-        f"{POS_LABEL}: bu hesaplama kaydedildiğinde POS giriş tutarları "
-        "doğrulanmamış olarak gösterilmişti."
+        f"Bu hesaplama kaydedildiğinde {POS_LABEL} doğrulanmamıştı."
     )
 
 
@@ -301,9 +186,6 @@ NOTE_HISTORY_FROZEN = (
     "Hesaplandığı ve kaydedildiği gibi gösterilir. Ürünlerde, fiyatlarda veya "
     "hediyelerde sonradan yapılan değişiklikler bunu etkilemez."
 )
-EXPLAIN_TITLE = "Bu nasıl hesaplandı"
-
-
 def history_header(
     snapshot_id: int, saved_at: str, app_version: str, schema: int
 ) -> str:

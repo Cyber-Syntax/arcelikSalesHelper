@@ -43,6 +43,7 @@ class LineResult:
     quantity: int
     regular_total: Decimal
     website_discounted_total: Decimal
+    discount_amount: Decimal
     ten_pct_base: Decimal
     ten_pct_discount_unit: Decimal
     ten_pct_unit: Decimal
@@ -64,6 +65,7 @@ class TotalValue:
 class TransactionTotals:
     regular: TotalValue
     website_discounted: TotalValue
+    discount_amount: TotalValue
     ten_pct: TotalValue
     manager: TotalValue
     pos: TotalValue
