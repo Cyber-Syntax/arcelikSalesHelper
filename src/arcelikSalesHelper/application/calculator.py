@@ -256,9 +256,7 @@ def present_result(line: LineInput, r: LineResult) -> ResultView:
         ),
     )
 
-    pos_rows: tuple[Row, ...] = (
-        _money_row(T.LBL_DISCOUNT_AMOUNT, r.discount_amount),
-    )
+    pos_rows: tuple[Row, ...] = ()
     if r.pos_amount is None or r.manager_line_total is None:
         pos_rows += (Row(T.LBL_POS_AMOUNT, T.POS_MISSING_MANAGER),)
     else:
@@ -271,6 +269,7 @@ def present_result(line: LineInput, r: LineResult) -> ResultView:
         website_option=_website_section(
             website_opt,
             no_website_discount=line.website_discounted_price == 0,
+            discount_amount=r.discount_amount,
         ),
         gift_option=(
             None
@@ -289,8 +288,16 @@ def present_result(line: LineInput, r: LineResult) -> ResultView:
 # ---- option panels --------------------------------------------------------
 
 def _website_section(
-    w: WebsiteOption, *, no_website_discount: bool
+    w: WebsiteOption,
+    *,
+    no_website_discount: bool,
+    discount_amount: Decimal,
 ) -> Section:
+    offer_label = (
+        T.LBL_FIRST_PRICE_TEN_PERCENT
+        if no_website_discount
+        else T.LBL_WEBSITE_OFFER_TOTAL
+    )
     return Section(
         T.SEC_WEBSITE_OPTION,
         (
@@ -302,7 +309,8 @@ def _website_section(
                     w.website_discounted_total,
                 )
             ),
-            _money_row(T.LBL_WEBSITE_OFFER_TOTAL, w.ten_pct_total),
+            _money_row(T.LBL_DISCOUNT_AMOUNT, discount_amount),
+            _money_row(offer_label, w.ten_pct_total),
         ),
     )
 
@@ -313,7 +321,7 @@ def _gift_section(g: GiftOption) -> Section:
         (
             Row(T.LBL_GIFT, g.gift_name or T.NO_GIFT_NAME),
             _money_row(T.LBL_REGULAR_TOTAL, g.regular_total),
-            _money_row(T.LBL_GIFT_OFFER_TOTAL, g.ten_pct_total),
+            _money_row(T.LBL_FIRST_PRICE_TEN_PERCENT, g.ten_pct_total),
         ),
     )
 

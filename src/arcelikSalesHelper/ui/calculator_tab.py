@@ -235,12 +235,18 @@ def section_box(section: Section, *, role: str | None = None) -> QGroupBox:
         label = QLabel(row.label)
         label.setWordWrap(True)
         value = QLabel(row.value)
+        if row.label == T.LBL_DISCOUNT_AMOUNT:
+            label.setObjectName("discountAmountLabel")
+            value.setObjectName("discountAmountValue")
+        if role == "line-prices" and row.label == T.LBL_QUANTITY:
+            label.setObjectName("lineQuantityLabel")
+            value.setObjectName("lineQuantityValue")
         value.setAlignment(
             Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
         )
         if row.label in (
             T.LBL_WEBSITE_OFFER_TOTAL,
-            T.LBL_GIFT_OFFER_TOTAL,
+            T.LBL_FIRST_PRICE_TEN_PERCENT,
             T.LBL_MANAGER_LINE_TOTAL,
         ):
             value.setProperty("amountRole", "emphasis")
@@ -338,10 +344,7 @@ class TransactionPanel(QWidget):
             )
             for section in sections:
                 if section.title == POS_LABEL:
-                    summary, details = _pos_summary_boxes(section)
-                    self._totals.addWidget(summary)
-                    if details is not None:
-                        self._totals.addWidget(details)
+                    self._totals.addWidget(_pos_summary_box(section))
                 else:
                     self._totals.addWidget(section_box(section))
         elif evaluation.pending_reason:
@@ -385,6 +388,7 @@ class TransactionPanel(QWidget):
         box = QGroupBox(
             T.line_title_named(index + 1, name) if name else T.line_title(index + 1)
         )
+        box.setObjectName("lineResultCard")
         layout = QVBoxLayout(box)
         view = evaluation.view
         if view is None:
@@ -397,17 +401,14 @@ class TransactionPanel(QWidget):
             return box
 
         card = view.card
-        pos_summary, pos_details = _pos_summary_boxes(card.pos)
-        layout.addWidget(pos_summary)
-        layout.addWidget(section_box(card.prices))
+        layout.addWidget(_pos_summary_box(card.pos))
+        layout.addWidget(section_box(card.prices, role="line-prices"))
         options = QBoxLayout(QBoxLayout.Direction.LeftToRight)
         options.addWidget(section_box(card.website_option, role="option"), 1)
         if card.gift_option is not None:
             options.addWidget(section_box(card.gift_option, role="option"), 1)
         self._option_layouts.append(options)
         layout.addLayout(options)
-        if pos_details is not None:
-            layout.addWidget(pos_details)
         if view.warnings:
             layout.addWidget(
                 self._note(
@@ -417,8 +418,8 @@ class TransactionPanel(QWidget):
         return box
 
 
-def _pos_summary_boxes(section: Section) -> tuple[QFrame, QWidget | None]:
-    """Separate the final POS amount from its supporting calculation rows."""
+def _pos_summary_box(section: Section) -> QFrame:
+    """Render the final POS amount as the section's prominent result."""
     amount_labels = {T.LBL_POS_AMOUNT, T.LBL_TOTAL_POS}
     amount = next(
         (row for row in section.rows if row.label in amount_labels),
@@ -427,7 +428,7 @@ def _pos_summary_boxes(section: Section) -> tuple[QFrame, QWidget | None]:
     hero = QFrame()
     hero.setObjectName("posHero")
     hero.setFrameShape(QFrame.Shape.StyledPanel)
-    hero.setMinimumHeight(104)
+    hero.setMinimumHeight(58)
     hero_layout = QVBoxLayout(hero)
     caption = QLabel(section.title)
     caption.setObjectName("posCaption")
@@ -448,20 +449,7 @@ def _pos_summary_boxes(section: Section) -> tuple[QFrame, QWidget | None]:
             value.setToolTip(amount.tooltip)
         hero_layout.addWidget(value)
 
-    details_rows = tuple(
-        row for row in section.rows if row is not amount
-    )
-    details = None
-    if details_rows:
-        discount = details_rows[0]
-        details = QLabel(f"{discount.label}: {discount.value}")
-        details.setObjectName("discountAmount")
-        details.setTextInteractionFlags(
-            Qt.TextInteractionFlag.TextSelectableByMouse
-        )
-        if discount.tooltip:
-            details.setToolTip(discount.tooltip)
-    return hero, details
+    return hero
 
 
 class CalculatorTab(QWidget):

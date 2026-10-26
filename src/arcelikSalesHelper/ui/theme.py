@@ -7,7 +7,7 @@ from qt_material import apply_stylesheet
 MATERIAL_THEME = "light_blue.xml"
 FONT_SCALE_KEY = "ui/font_scale_percent"
 FONT_SCALE_CHOICES = (100, 110, 120, 130, 140, 150)
-DEFAULT_FONT_SCALE = 120
+DEFAULT_FONT_SCALE = 100
 
 
 def load_font_scale(settings: QSettings) -> int:
@@ -18,10 +18,10 @@ def load_font_scale(settings: QSettings) -> int:
 
 def readability_styles(font_scale_percent: int) -> str:
     scale = font_scale_percent / 100
-    caption_size = 12 * scale
-    amount_size = 28 * scale
-    missing_size = 15 * scale
-    emphasized_size = 13 * scale
+    caption_size = 10 * scale
+    amount_size = 14 * scale
+    missing_size = 13 * scale
+    emphasized_size = 11 * scale
     return f"""
 QFrame#posHero {{
     background-color: #eaf2ff;
@@ -30,35 +30,39 @@ QFrame#posHero {{
 }}
 QLabel#posCaption {{
     color: #25364a;
-    font-size: {caption_size}pt;
+    font-size: {caption_size:g}pt;
     font-weight: 600;
 }}
 QLabel#posAmount {{
     color: #102c55;
-    font-size: {amount_size}pt;
+    font-size: {amount_size:g}pt;
     font-weight: 700;
     padding: 5px 0;
 }}
-QLabel#discountAmount {{
+QGroupBox#lineResultCard::title,
+QLabel#lineQuantityLabel,
+QLabel#lineQuantityValue,
+QLabel#discountAmountLabel,
+QLabel#discountAmountValue {{
     color: #163a66;
-    font-size: {emphasized_size}pt;
-    font-weight: 600;
+    font-size: {emphasized_size:g}pt;
+    font-weight: 700;
     padding: 3px 0;
 }}
 QLabel#posAmount[missing="true"] {{
     color: #7a3e00;
-    font-size: {missing_size}pt;
+    font-size: {missing_size:g}pt;
 }}
 QGroupBox[visualRole="option"] {{
     border: 1px solid #b6c8df;
     border-radius: 8px;
     margin-top: 12px;
-    padding-top: 8px;
+    padding-top: 19px;
 }}
 QLabel[amountRole="emphasis"] {{
     color: #163a66;
-    font-size: {emphasized_size}pt;
-    font-weight: 600;
+    font-size: {emphasized_size:g}pt;
+    font-weight: 700;
 }}
 QTableView#productsTable {{
     alternate-background-color: #f4f8fe;

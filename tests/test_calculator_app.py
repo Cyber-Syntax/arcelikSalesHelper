@@ -38,14 +38,19 @@ def test_zero_website_price_displays_regular_price_and_zero_discount():
     assert prices[T.LBL_WEBSITE_DISCOUNTED_TOTAL] == T.NO_WEBSITE_DISCOUNT
     options = {row.label: row.value for row in ev.view.card.website_option.rows}
     assert options[T.LBL_WEBSITE_DISCOUNTED_TOTAL] == T.NO_WEBSITE_DISCOUNT
-    assert options[T.LBL_WEBSITE_OFFER_TOTAL] == "34.469,10 TL"
+    assert options[T.LBL_DISCOUNT_AMOUNT] == "0,00 TL"
+    assert options[T.LBL_FIRST_PRICE_TEN_PERCENT] == "34.469,10 TL"
 
 
 def test_gift_uses_regular_price_for_ten_percent():
     ev = evaluate_line(form(gift_selected=True, gift_name="TKM 9961"))
-    assert ev.result is not None
+    assert ev.result is not None and ev.view is not None
     assert ev.result.ten_pct_base == D("145298")
     assert ev.result.ten_pct_unit == D("130768.20")
+    assert ev.view.card.gift_option is not None
+    gift_rows = {row.label: row.value for row in ev.view.card.gift_option.rows}
+    assert gift_rows[T.LBL_FIRST_PRICE_TEN_PERCENT] == "130.768,20 TL"
+    assert T.LBL_DISCOUNT_AMOUNT not in gift_rows
 
 
 def test_total_line_manager_value_remains_authoritative():

@@ -129,7 +129,9 @@ def test_no_gift_line_shows_only_final_website_offer_amounts() -> (
     assert card.gift_option is None
     assert val(card.website_option, "Web sitesi indirimli toplam") == "4.000,00 TL"
     assert val(card.website_option, T.LBL_WEBSITE_OFFER_TOTAL) == "3.600,00 TL"
+    assert val(card.website_option, T.LBL_DISCOUNT_AMOUNT) == "1.000,00 TL"
     assert val(card.prices, "Yönetici toplamı") == "3.000,00 TL"
+    assert [row.label for row in card.pos.rows] == [T.LBL_POS_AMOUNT]
     assert all("baz" not in row.label.lower() for row in card.website_option.rows)
 
 
@@ -142,19 +144,22 @@ def test_gift_line_compares_both_final_offer_amounts() -> (
     site, gift = view.card.website_option, view.card.gift_option
     assert val(gift, "Hediye") == "Vacuum"
     assert val(gift, "Normal fiyat toplamı") == "18.000,00 TL"
-    assert val(gift, "Hediyeli teklif toplamı") == "16.200,00 TL"
+    assert val(gift, T.LBL_FIRST_PRICE_TEN_PERCENT) == "16.200,00 TL"
     assert val(site, "Web sitesi indirimli toplam") == "15.000,00 TL"
     assert val(site, T.LBL_WEBSITE_OFFER_TOTAL) == "13.500,00 TL"
+    assert val(site, T.LBL_DISCOUNT_AMOUNT) == "3.000,00 TL"
     assert val(view.card.prices, "Yönetici toplamı") == "13.500,00 TL"
     assert [row.label for row in site.rows] == [
         T.LBL_WEBSITE_DISCOUNTED_TOTAL,
+        T.LBL_DISCOUNT_AMOUNT,
         T.LBL_WEBSITE_OFFER_TOTAL,
     ]
     assert [row.label for row in gift.rows] == [
         T.LBL_GIFT,
         T.LBL_REGULAR_TOTAL,
-        T.LBL_GIFT_OFFER_TOTAL,
+        T.LBL_FIRST_PRICE_TEN_PERCENT,
     ]
+    assert all(row.label != T.LBL_DISCOUNT_AMOUNT for row in gift.rows)
 
 
 def test_named_but_unselected_gift_shows_only_final_amounts() -> None:
@@ -163,7 +168,7 @@ def test_named_but_unselected_gift_shows_only_final_amounts() -> None:
     )
     view = ev.lines[0].view
     assert view is not None and view.card.gift_option is not None
-    assert val(view.card.gift_option, "Hediyeli teklif toplamı") == "4.500,00 TL"
+    assert val(view.card.gift_option, T.LBL_FIRST_PRICE_TEN_PERCENT) == "4.500,00 TL"
     assert val(view.card.prices, "Yönetici toplamı") == "3.000,00 TL"
     assert view.card.gift_option.note is None
 

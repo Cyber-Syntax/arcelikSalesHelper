@@ -10,6 +10,7 @@ from arcelikSalesHelper.ui.theme import (
     DEFAULT_FONT_SCALE,
     MATERIAL_THEME,
     install_material_theme,
+    readability_styles,
 )
 
 from .test_ui import add_product
@@ -230,8 +231,17 @@ def test_pos_result_is_prominent_selectable_and_first(qtbot, repo) -> None:  # t
     assert amount is not None and amount.text() == "4.000,00 TL"
     assert amount.textInteractionFlags() & Qt.TextInteractionFlag.TextSelectableByMouse
     assert tab.panel._totals.itemAt(0).widget().objectName() == "posHero"
-    discount = tab.panel.findChild(QLabel, "discountAmount")
-    assert discount is not None and discount.text() == "İndirim tutarı: 1.000,00 TL"
+    discount_label = tab.panel.findChild(QLabel, "discountAmountLabel")
+    discount_value = tab.panel.findChild(QLabel, "discountAmountValue")
+    assert discount_label is not None and discount_label.text() == "İndirim tutarı"
+    assert discount_value is not None and discount_value.text() == "1.000,00 TL"
+    assert discount_label.parentWidget().title() == "Web sitesi indirim seçeneği"
+    assert discount_value.parentWidget().title() == "Web sitesi indirim seçeneği"
+
+    result_card = tab.panel.findChild(QGroupBox, "lineResultCard")
+    assert result_card is not None and result_card.title() == "Satır 1: Fridge"
+    assert tab.panel.findChild(QLabel, "lineQuantityLabel").text() == "Adet"
+    assert tab.panel.findChild(QLabel, "lineQuantityValue").text() == "1"
 
 
 def test_transaction_pos_total_precedes_multi_line_details(qtbot, repo) -> None:  # type: ignore[no-untyped-def]
@@ -241,11 +251,8 @@ def test_transaction_pos_total_precedes_multi_line_details(qtbot, repo) -> None:
 
     amounts = [label.text() for label in tab.panel.findChildren(QLabel, "posAmount")]
     assert amounts == ["20.500,00 TL", "4.000,00 TL", "16.500,00 TL"]
-    discounts = [label.text() for label in tab.panel.findChildren(QLabel, "discountAmount")]
-    assert discounts == [
-        "İndirim tutarı: 1.000,00 TL",
-        "İndirim tutarı: 3.000,00 TL",
-    ]
+    discounts = [label.text() for label in tab.panel.findChildren(QLabel, "discountAmountValue")]
+    assert discounts == ["1.000,00 TL", "3.000,00 TL"]
     labels = " ".join(label.text() for label in tab.panel.findChildren(QLabel))
     assert "%10 bazı" not in labels
     assert "Her satır kendi" not in labels
@@ -288,6 +295,11 @@ def test_light_blue_material_theme_and_result_styles_are_installed(qtbot) -> Non
     assert MATERIAL_THEME == "light_blue.xml"
     assert "QFrame#posHero" in app.styleSheet()
     assert "QLabel#posAmount" in app.styleSheet()
+    assert "QGroupBox#lineResultCard::title" in app.styleSheet()
+    assert "QLabel#lineQuantityValue" in app.styleSheet()
+    assert "QLabel#discountAmountLabel" in app.styleSheet()
+    assert "font-size: 24pt" in readability_styles(100)
+    assert "font-size: 13pt;\n    font-weight: 700" in readability_styles(100)
     assert "QGroupBox::title" in app.styleSheet()
     assert "color: #26384a" in app.styleSheet()
 
