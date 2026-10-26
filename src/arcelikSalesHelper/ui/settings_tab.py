@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 
 from PySide6.QtCore import QUrl, Signal
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
     QFormLayout,
+    QComboBox,
     QHBoxLayout,
     QLabel,
     QLineEdit,
@@ -30,6 +32,7 @@ from .common import (
     SUCCESS_STYLE,
     format_local_timestamp,
 )
+from .theme import DEFAULT_FONT_SCALE, FONT_SCALE_CHOICES
 
 REASON_LABELS = T.BACKUP_REASON_LABELS
 
@@ -55,10 +58,23 @@ class SettingsTab(QWidget):
         paths: AppPaths,
         manager: BackupManager | None,
         parent: QWidget | None = None,
+        *,
+        font_scale: int = DEFAULT_FONT_SCALE,
+        on_font_scale_changed: Callable[[int], None] | None = None,
     ) -> None:
         super().__init__(parent)
         self._paths = paths
         self._manager = manager
+        self._on_font_scale_changed = on_font_scale_changed
+
+        self.font_scale_combo = QComboBox()
+        for percent in FONT_SCALE_CHOICES:
+            self.font_scale_combo.addItem(f"{percent}%", percent)
+        index = self.font_scale_combo.findData(font_scale)
+        self.font_scale_combo.setCurrentIndex(max(index, 0))
+        self.font_scale_note = QLabel(T.NOTE_UI_TEXT_SIZE)
+        self.font_scale_note.setWordWrap(True)
+        self.font_scale_note.setStyleSheet(HINT_STYLE)
 
         self.db_edit = self._path_edit(paths.db_path)
         self.backup_dir_edit = self._path_edit(paths.backup_dir)
@@ -88,6 +104,7 @@ class SettingsTab(QWidget):
             self._with_button(self.backup_dir_edit, self.open_backup_button),
         )
         form.addRow(T.LBL_LATEST_BACKUP, self.latest_label)
+        form.addRow(T.LBL_UI_TEXT_SIZE, self.font_scale_combo)
         buttons = QHBoxLayout()
         buttons.addWidget(self.backup_button)
         buttons.addStretch(1)
@@ -95,6 +112,7 @@ class SettingsTab(QWidget):
         layout = QVBoxLayout(self)
         layout.addLayout(form)
         layout.addWidget(self.count_label)
+        layout.addWidget(self.font_scale_note)
         layout.addWidget(self.failure_label)
         layout.addLayout(buttons)
         layout.addWidget(self.feedback)
@@ -108,7 +126,16 @@ class SettingsTab(QWidget):
             lambda _c=False: open_folder(paths.backup_dir)
         )
         self.backup_button.clicked.connect(lambda _c=False: self._backup_now())
+        if on_font_scale_changed is not None:
+            self.font_scale_combo.currentIndexChanged.connect(
+                self._change_font_scale
+            )
         self.refresh()
+
+    def _change_font_scale(self, index: int) -> None:
+        percent = self.font_scale_combo.itemData(index)
+        if isinstance(percent, int) and self._on_font_scale_changed is not None:
+            self._on_font_scale_changed(percent)
 
     @staticmethod
     def _path_edit(path: Path) -> QLineEdit:

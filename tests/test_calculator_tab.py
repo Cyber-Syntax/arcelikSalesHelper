@@ -5,9 +5,12 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QApplication, QBoxLayout, QGroupBox, QLabel
 
 from arcelikSalesHelper.application.calculator import TransactionEvaluation
-from arcelikSalesHelper.domain.models import POS_LABEL
 from arcelikSalesHelper.ui.calculator_tab import CalculatorTab
-from arcelikSalesHelper.ui.theme import MATERIAL_THEME, install_material_theme
+from arcelikSalesHelper.ui.theme import (
+    DEFAULT_FONT_SCALE,
+    MATERIAL_THEME,
+    install_material_theme,
+)
 
 from .test_ui import add_product
 
@@ -237,6 +240,9 @@ def test_transaction_pos_total_precedes_multi_line_details(qtbot, repo) -> None:
 
 
 def test_option_cards_stack_at_narrow_width_and_return_to_columns(qtbot, repo) -> None:  # type: ignore[no-untyped-def]
+    app = QApplication.instance()
+    assert app is not None
+    install_material_theme(app, DEFAULT_FONT_SCALE)
     tab = CalculatorTab(repo)
     qtbot.addWidget(tab)
     fill(tab.rows[0], "Washer", "6.000,00", "5.000,00", gift="Vacuum")
@@ -248,6 +254,17 @@ def test_option_cards_stack_at_narrow_width_and_return_to_columns(qtbot, repo) -
     tab.panel._update_option_directions()
     assert tab.panel._option_layouts[0].direction() == QBoxLayout.Direction.LeftToRight
 
+    install_material_theme(app, 150)
+    tab.panel.resize(900, 900)
+    tab.panel._update_option_directions()
+    assert tab.panel._option_layouts[0].direction() == QBoxLayout.Direction.TopToBottom
+
+    install_material_theme(app, 100)
+    tab.panel.resize(700, 900)
+    tab.panel._update_option_directions()
+    assert tab.panel._option_layouts[0].direction() == QBoxLayout.Direction.LeftToRight
+    install_material_theme(app, DEFAULT_FONT_SCALE)
+
 
 def test_light_blue_material_theme_and_result_styles_are_installed(qtbot) -> None:  # type: ignore[no-untyped-def]
     app = QApplication.instance()
@@ -256,6 +273,8 @@ def test_light_blue_material_theme_and_result_styles_are_installed(qtbot) -> Non
     assert MATERIAL_THEME == "light_blue.xml"
     assert "QFrame#posHero" in app.styleSheet()
     assert "QLabel#posAmount" in app.styleSheet()
+    assert "QGroupBox::title" in app.styleSheet()
+    assert "color: #26384a" in app.styleSheet()
 
 
 # ---- products and save ----------------------------------------------------

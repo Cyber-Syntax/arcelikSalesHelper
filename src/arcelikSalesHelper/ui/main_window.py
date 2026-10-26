@@ -3,9 +3,10 @@ from __future__ import annotations
 import logging
 import sqlite3
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QSettings, Qt
 from PySide6.QtGui import QCloseEvent, QGuiApplication
 from PySide6.QtWidgets import (
+    QApplication,
     QLabel,
     QMainWindow,
     QTabWidget,
@@ -35,6 +36,7 @@ from .history_tab import HistoryTab
 from .products_tab import ProductsTab
 from .common import show_warning
 from .settings_tab import SettingsTab, describe_failure
+from .theme import FONT_SCALE_KEY, install_material_theme, load_font_scale
 
 BANNER_STYLE = "background-color: #d32f2f; color: white; padding: 6px;"
 
@@ -47,17 +49,20 @@ class MainWindow(QMainWindow):
         conn: sqlite3.Connection,
         paths: AppPaths,
         backups: BackupManager | None = None,
+        settings: QSettings | None = None,
     ) -> None:
         super().__init__()
         self.setWindowTitle(DISPLAY_NAME)
+        self._settings = settings if settings is not None else QSettings()
+        self._font_scale = load_font_scale(self._settings)
         screen = QGuiApplication.primaryScreen()
         if screen is None:
             self.resize(1280, 820)
         else:
             available = screen.availableGeometry()
             self.resize(
-                min(1280, round(available.width() * 0.95)),
-                min(820, round(available.height() * 0.90)),
+                max(1, round(available.width() * 0.95)),
+                max(1, round(available.height() * 0.90)),
             )
 
         self._conn = conn
@@ -66,8 +71,14 @@ class MainWindow(QMainWindow):
         self._history_repo = HistoryRepository(conn)
         self.products_tab = ProductsTab(repo, conn, backups)
         self.calculator_tab = CalculatorTab(repo)
+        self.calculator_tab.set_font_scale(self._font_scale)
         self.history_tab = HistoryTab(self._history_repo)
-        self.settings_tab = SettingsTab(paths, backups)
+        self.settings_tab = SettingsTab(
+            paths,
+            backups,
+            font_scale=self._font_scale,
+            on_font_scale_changed=self._set_font_scale,
+        )
 
         self.tabs = QTabWidget()
         self.tabs.addTab(self.products_tab, T.TAB_PRODUCTS)
@@ -102,6 +113,15 @@ class MainWindow(QMainWindow):
         self.products_tab.import_finished.connect(self.refresh_backup_banner)
         self.products_tab.import_finished.connect(self.settings_tab.refresh)
         self.refresh_backup_banner()
+
+    def _set_font_scale(self, percent: int) -> None:
+        self._font_scale = percent
+        self._settings.setValue(FONT_SCALE_KEY, percent)
+        self._settings.sync()
+        app = QApplication.instance()
+        if app is not None:
+            install_material_theme(app, percent)
+        self.calculator_tab.set_font_scale(percent)
 
     # ---- backups ---------------------------------------------------------
 

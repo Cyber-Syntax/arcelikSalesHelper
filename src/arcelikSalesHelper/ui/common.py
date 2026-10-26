@@ -14,7 +14,7 @@ from PySide6.QtWidgets import (
 from arcelikSalesHelper import strings as T
 
 ERROR_STYLE = "color: #d32f2f;"
-HINT_STYLE = "color: gray;"
+HINT_STYLE = "color: #475569;"
 WARNING_STYLE = "color: #b26a00;"
 SUCCESS_STYLE = "color: #2e7d32;"
 

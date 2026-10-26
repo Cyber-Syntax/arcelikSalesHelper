@@ -5,6 +5,7 @@ from collections.abc import Sequence
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QResizeEvent
 from PySide6.QtWidgets import (
+    QApplication,
     QBoxLayout,
     QCheckBox,
     QComboBox,
@@ -42,6 +43,7 @@ from arcelikSalesHelper.domain.products import Product
 from arcelikSalesHelper.infrastructure.repositories import ProductRepository
 
 from .common import HINT_STYLE, WARNING_STYLE, FieldBlock
+from .theme import DEFAULT_FONT_SCALE
 
 ONE_OFF_LABEL = T.ONE_OFF_LABEL
 
@@ -385,9 +387,20 @@ class TransactionPanel(QWidget):
         self._update_option_directions()
 
     def _update_option_directions(self) -> None:
+        app = QApplication.instance()
+        scale = (
+            app.property("fontScalePercent")
+            if app is not None
+            else DEFAULT_FONT_SCALE
+        )
+        if not isinstance(scale, int):
+            scale = DEFAULT_FONT_SCALE
+        breakpoint = round(
+            self.OPTION_STACK_BREAKPOINT * scale / DEFAULT_FONT_SCALE
+        )
         direction = (
             QBoxLayout.Direction.LeftToRight
-            if self.width() >= self.OPTION_STACK_BREAKPOINT
+            if self.width() >= breakpoint
             else QBoxLayout.Direction.TopToBottom
         )
         for layout in self._option_layouts:
@@ -536,7 +549,8 @@ class CalculatorTab(QWidget):
         splitter = QSplitter(Qt.Orientation.Horizontal)
         splitter.addWidget(left)
         splitter.addWidget(right)
-        splitter.setSizes([470, 790])
+        self._splitter = splitter
+        self.set_font_scale(DEFAULT_FONT_SCALE)
         layout = QVBoxLayout(self)
         layout.addWidget(splitter)
 
@@ -601,6 +615,13 @@ class CalculatorTab(QWidget):
         finally:
             self._bulk = False
         self.recalculate()
+
+    def set_font_scale(self, percent: int) -> None:
+        """Give the input pane more room as text grows."""
+        left_ratio = max(0.40, min(0.48, 0.43 + (percent - 120) / 1000))
+        self._splitter.setSizes(
+            [round(1000 * left_ratio), round(1000 * (1 - left_ratio))]
+        )
 
     def recalculate(self) -> None:
         if self._bulk:

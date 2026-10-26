@@ -7,6 +7,7 @@ from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from types import TracebackType
 
+from PySide6.QtCore import QSettings
 from PySide6.QtWidgets import QApplication
 
 from . import strings as T
@@ -21,7 +22,7 @@ from .infrastructure.database import open_database
 from .paths import ensure_dirs, resolve_paths
 from .ui.common import install_qt_translations, show_critical
 from .ui.main_window import MainWindow
-from .ui.theme import install_material_theme
+from .ui.theme import install_material_theme, load_font_scale
 
 
 def configure_logging(log_path: Path) -> None:
@@ -60,8 +61,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     app.setApplicationName(APP_NAME)
     app.setOrganizationName(COMPANY_NAME)
     app.setApplicationDisplayName(DISPLAY_NAME)
+    settings = QSettings()
+    font_scale = load_font_scale(settings)
     install_qt_translations(app)
-    install_material_theme(app)
+    install_material_theme(app, font_scale)
 
     try:
         paths = ensure_dirs(resolve_paths())
@@ -90,7 +93,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             backups.run_startup_backup_if_needed()
         # A failed backup is recorded and shown as a banner; it never blocks startup.
 
-        window = MainWindow(conn, paths, backups)
+        window = MainWindow(conn, paths, backups, settings=settings)
         app.aboutToQuit.connect(
             lambda: window.shutdown_backup(interactive=False)
         )
