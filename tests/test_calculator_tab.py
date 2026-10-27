@@ -2,9 +2,17 @@ from decimal import Decimal as D
 from typing import Any
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QApplication, QBoxLayout, QGroupBox, QLabel
+from PySide6.QtWidgets import (
+    QApplication,
+    QBoxLayout,
+    QGroupBox,
+    QLabel,
+    QListWidgetItem,
+)
 
 from arcelikSalesHelper.application.calculator import TransactionEvaluation
+from arcelikSalesHelper.domain.products import ProductDraft
+from arcelikSalesHelper.domain.result import Ok
 from arcelikSalesHelper.ui.calculator_tab import CalculatorTab
 from arcelikSalesHelper.ui.theme import (
     DEFAULT_FONT_SCALE,
@@ -67,6 +75,16 @@ def pos_total(tab: CalculatorTab) -> D | None:
     return tab.evaluation.result.totals.pos.value
 
 
+def product_item(tab: CalculatorTab, name: str) -> QListWidgetItem:
+    for index in range(tab.product_list.count()):
+        item = tab.product_list.item(index)
+        product = item.data(Qt.ItemDataRole.UserRole)
+        if product is not None and product.name == name:
+            assert item.flags() & Qt.ItemFlag.ItemIsUserCheckable
+            return item
+    raise AssertionError(f"No calculator product item named {name!r}")
+
+
 # ---- lines ----------------------------------------------------------------
 
 
@@ -85,7 +103,7 @@ def test_fresh_calculator_has_one_incomplete_line_and_no_save(
 def test_add_and_remove_lines_keep_at_least_one(qtbot, repo) -> None:  # type: ignore[no-untyped-def]
     tab = CalculatorTab(repo)
     qtbot.addWidget(tab)
-    tab.add_button.click()
+    tab.add_line()
     assert len(tab.rows) == 2
     assert [r.title() for r in tab.rows] == ["Satır 1", "Satır 2"]
     assert tab.rows[0].remove_button.isEnabled()
@@ -314,7 +332,10 @@ def test_selecting_a_saved_product_copies_values_and_never_writes_back(
     tab = CalculatorTab(repo)
     qtbot.addWidget(tab)
     line = tab.rows[0].line
-    line.product_combo.setCurrentIndex(1)
+    item = product_item(tab, product.name)
+    item.setCheckState(Qt.CheckState.Checked)
+    assert "[✓]" in item.text()
+    tab.add_selected_button.click()
     assert line.name_edit.text() == "Fridge" and line.name_edit.isReadOnly()
     assert (
         line.regular_edit.text() == "5.000,00"
@@ -327,25 +348,120 @@ def test_selecting_a_saved_product_copies_values_and_never_writes_back(
     assert repo.get(product.id) == product
 
 
-def test_refresh_updates_every_row_and_keeps_entered_values(
+def test_batch_product_search_keeps_selection_across_queries_and_adds_in_order(
+    qtbot, repo
+) -> None:  # type: ignore[no-untyped-def]
+    fridge = add_product(repo, "Fridge")
+    washer = add_product(repo, "Washer")
+    tab = CalculatorTab(repo)
+    qtbot.addWidget(tab)
+    product_item(tab, fridge.name).setCheckState(Qt.CheckState.Checked)
+    tab.product_search.setText("Washer")
+    qtbot.waitUntil(
+        lambda: tab.product_list.count() == 1
+        and tab.product_list.item(0).text().endswith("Washer")
+    )
+    assert tab.product_list.item(0).text().endswith("Washer")
+    product_item(tab, washer.name).setCheckState(Qt.CheckState.Checked)
+    assert tab.add_selected_button.isEnabled()
+    assert tab.selection_count.text() == "2 ürün seçildi"
+
+    tab.add_selected_button.click()
+    assert [r.line.name_edit.text() for r in tab.rows] == ["Fridge", "Washer"]
+    assert [r.line.selected_product() for r in tab.rows] == [fridge, washer]
+    assert [r.line.regular_edit.text() for r in tab.rows] == [
+        "5.000,00",
+        "5.000,00",
+    ]
+    assert not tab.add_selected_button.isEnabled()
+    assert tab.selection_count.text() == "Seçilen ürün yok"
+
+
+def test_product_search_shows_no_results_message(qtbot, repo) -> None:  # type: ignore[no-untyped-def]
+    add_product(repo, "Fridge")
+    tab = CalculatorTab(repo)
+    qtbot.addWidget(tab)
+    tab.product_search.setText("no matching name")
+    qtbot.waitUntil(
+        lambda: tab.product_list.count() == 1
+        and tab.product_list.item(0).text()
+        == "Bu aramayla eşleşen ürün bulunamadı."
+    )
+    assert tab.product_list.count() == 1
+    assert tab.product_list.item(0).text() == (
+        "Bu aramayla eşleşen ürün bulunamadı."
+    )
+
+
+def test_product_checkbox_has_visible_high_contrast_state(
+    qtbot, repo
+) -> None:  # type: ignore[no-untyped-def]
+    product = add_product(repo, "Fridge")
+    tab = CalculatorTab(repo)
+    qtbot.addWidget(tab)
+    assert "width: 20px" in tab.product_list.styleSheet()
+    assert "border: 2px solid #52677d" in tab.product_list.styleSheet()
+    item = product_item(tab, product.name)
+    item.setCheckState(Qt.CheckState.Checked)
+    assert tab.selection_count.text() == "1 ürün seçildi"
+    assert "[✓]" in item.text()
+    assert item.background().color().name() == "#dceeff"
+
+
+def test_batch_add_uses_latest_saved_product_values(qtbot, repo) -> None:  # type: ignore[no-untyped-def]
+    product = add_product(repo, "Fridge")
+    tab = CalculatorTab(repo)
+    qtbot.addWidget(tab)
+    product_item(tab, product.name).setCheckState(Qt.CheckState.Checked)
+
+    updated = repo.update(
+        product.id,
+        ProductDraft(
+            name=product.name,
+            regular_price=D("6000"),
+            website_price=D("5000"),
+            default_gift_name="Updated gift",
+        ),
+    )
+    assert isinstance(updated, Ok)
+    tab.add_selected_button.click()
+
+    line = tab.rows[0].line
+    assert line.regular_edit.text() == "6.000,00"
+    assert line.website_edit.text() == "5.000,00"
+    assert line.gift_name_edit.text() == "Updated gift"
+
+
+def test_refresh_keeps_existing_line_snapshot_and_updates_catalog(
     qtbot, repo
 ) -> None:  # type: ignore[no-untyped-def]
     product = add_product(repo)
     tab = CalculatorTab(repo)
     qtbot.addWidget(tab)
-    tab.add_line()
-    for row in tab.rows:
-        row.line.product_combo.setCurrentIndex(1)
-    assert all(r.line.selected_product() is not None for r in tab.rows)
-
+    product_item(tab, product.name).setCheckState(Qt.CheckState.Checked)
+    tab.add_selected_button.click()
     repo.archive(product.id)
     add_product(repo, "Washer")
     tab.refresh_products()
-    for row in tab.rows:
-        assert row.line.product_combo.count() == 2  # one-off + Washer
-        assert row.line.product_combo.currentIndex() == 0
-        assert row.line.regular_edit.text() == "5.000,00"
+    assert tab.rows[0].line.selected_product() == product
+    assert tab.rows[0].line.regular_edit.text() == "5.000,00"
+    assert [
+        tab.product_list.item(i).text()
+        for i in range(tab.product_list.count())
+    ] == ["[ ]  Washer"]
     assert tab.evaluation.valid
+
+
+def test_one_off_action_reuses_blank_starter_then_adds_another_line(
+    qtbot, repo
+) -> None:  # type: ignore[no-untyped-def]
+    tab = CalculatorTab(repo)
+    qtbot.addWidget(tab)
+    first = tab.add_one_off_line()
+    assert len(tab.rows) == 1 and first.line.name_edit.isReadOnly() is False
+    first.line.name_edit.setText("Custom item")
+    second = tab.add_one_off_line()
+    assert len(tab.rows) == 2 and second.line.name_edit.text() == ""
 
 
 def test_ambiguous_price_shows_a_hint(qtbot, repo) -> None:  # type: ignore[no-untyped-def]

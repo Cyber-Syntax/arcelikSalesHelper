@@ -211,7 +211,19 @@ def history_footer(shown: int, total: int) -> str:
 # Calculator tab (ui/calculator_tab.py)
 # ======================================================================
 
-ONE_OFF_LABEL = "Tek seferlik ürün (aşağıya yazın)"
+CALCULATOR_PRODUCT_SELECTOR = "Ürün ekle"
+PH_CALCULATOR_PRODUCT_SEARCH = "Ürün adı yazın ve arayın"
+CALCULATOR_NO_PRODUCTS_FOUND = "Bu aramayla eşleşen ürün bulunamadı."
+BTN_ADD_SELECTED_PRODUCTS = "Seçilenleri ekle"
+BTN_ADD_ONE_OFF_LINE = "Tek seferlik ürün ekle"
+
+
+def calculator_selection_count(count: int) -> str:
+    if count == 0:
+        return "Seçilen ürün yok"
+    return f"{count} ürün seçildi"
+
+
 PH_REGULAR = "örneğin 5.000,00"
 PH_WEBSITE = "örneğin 4.000,00"
 PH_OPTIONAL = "isteğe bağlı"
@@ -219,7 +231,6 @@ CHK_GIFT = "Hediye dahil"
 RADIO_UNIT = "Birim fiyat"
 RADIO_LINE = "Satır toplam fiyatı"
 
-FORM_PRODUCT = "Ürün"
 FORM_NAME = "Ad"
 FORM_QUANTITY = "Adet"
 FORM_REGULAR = "Normal / ilk fiyat (birim)"
@@ -231,7 +242,6 @@ FORM_MANAGER_MODE = "Yönetici değeri şudur"
 TIP_MOVE_UP = "Satırı yukarı taşı"
 TIP_MOVE_DOWN = "Satırı aşağı taşı"
 TIP_REMOVE_LINE = "Satırı kaldır"
-BTN_ADD_LINE = "Satır ekle"
 BTN_SAVE_CALCULATION = "Hesaplamayı kaydet"
 CARD_INCOMPLETE = (
     "Bu satırın sonuçlarını görmek için ürün adını ve fiyatları girin."

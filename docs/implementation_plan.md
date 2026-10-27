@@ -156,18 +156,19 @@ calculation_lines(id, snapshot_id FK ON DELETE RESTRICT, line_index,
 
 - `main.py`: create `QApplication`, resolve paths, open DB (migrations), build `MainWindow` with 4 tabs (Products, Calculator, History, Settings). Set the app name and org via `QCoreApplication` before `platformdirs` calls.
 - `ui/products_tab.py`: search box, table (`QAbstractTableModel`), add/edit dialog using `parse_money` with inline error text, an archive/restore toggle, and a "show archived" checkbox.
-- `ui/calculator_tab.py` (single line first, structured so M4 reuses the row widget):
+- `ui/calculator_tab.py`:
   - `CalculatorLineWidget` emits a `changed` signal. A controller builds a `LineInput` and calls the pure `calculate_line`. **No formulas inside widgets.**
-  - Product picker (saved or "one-off"), quantity spinbox (≥1), gift checkbox, gift name (prefilled from the product default, editable), manager value plus mode radio (Unit/Total line).
+  - A top-of-pane searchable, checkable list of active saved products. Filtering uses `ProductRepository.search(query)`; checked products remain staged across queries. “Add selected” creates one line per selected product in selection order and then clears the selection.
+  - A “one-off product” action creates an editable line for a product outside the catalog. Calculator lines contain the copied name and prices, quantity spinbox (≥1), gift checkbox, gift name, manager value and mode (Unit/Total line), with no per-line product picker.
   - Result panel shows: regular, website discounted, 10% base/discount/unit/total, manager mode and totals, and the POS block labeled exactly `POS-entry calculation (verify before use)`.
   - Formulas are shown as a collapsible "How this was calculated" section, generated from the `LineResult`.
   - Errors are shown inline, and results are hidden (not stale) while the input is invalid.
-- Selecting a product copies values into the line. Edits to gift name or manager value never write back to the product.
+- Adding a saved product copies its name, prices, and default gift into the line. Later catalog edits or refreshes never change existing calculator lines; edits to gift name or manager value never write back to the product.
 - "Save calculation" is enabled only when the input is valid (history is wired in M5).
 
 ## 7. Milestone 6: Multi-line calculator and comparison
 
-- Line list with add/remove/reorder (move up/down buttons; drag-reorder is optional).
+- Lines created from the top multi-select catalog or one-off action; remove and reorder controls remain available (move up/down buttons; drag-reorder is optional).
 - Per-line gift state is independent. Per-line result card plus side-by-side **Website option | Gift option** panel (gift panel is visible only if the line has a gift selected or a gift name).
 - No "recommended" badge and no coloring that implies a winner.
 - Transaction totals panel (from `calculate_transaction`), with explicit "n/a" reasons.

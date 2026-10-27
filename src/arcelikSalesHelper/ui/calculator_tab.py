@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
-from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QResizeEvent
+from PySide6.QtCore import QSignalBlocker, QTimer, Qt, Signal
+from PySide6.QtGui import QColor, QResizeEvent
 from PySide6.QtWidgets import (
     QApplication,
     QBoxLayout,
@@ -17,6 +17,8 @@ from PySide6.QtWidgets import (
     QLabel,
     QLayout,
     QLineEdit,
+    QListWidget,
+    QListWidgetItem,
     QPushButton,
     QRadioButton,
     QScrollArea,
@@ -49,8 +51,6 @@ from arcelikSalesHelper.infrastructure.repositories import ProductRepository
 from .common import HINT_STYLE, WARNING_STYLE, FieldBlock
 from .theme import DEFAULT_FONT_SCALE
 
-ONE_OFF_LABEL = T.ONE_OFF_LABEL
-
 
 class CalculatorLineWidget(QWidget):
     """Inputs of one calculator line. Holds no formulas; emits ``changed``.
@@ -63,9 +63,7 @@ class CalculatorLineWidget(QWidget):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self._updating = False
-
-        self.product_combo = QComboBox()
-        self.product_combo.addItem(ONE_OFF_LABEL, None)
+        self._product: Product | None = None
         self.name_edit = QLineEdit()
         self.quantity_spin = QSpinBox()
         self.quantity_spin.setRange(1, 9999)
@@ -105,7 +103,6 @@ class CalculatorLineWidget(QWidget):
         }
 
         form = QFormLayout(self)
-        form.addRow(T.FORM_PRODUCT, self.product_combo)
         form.addRow(T.FORM_NAME, self.blocks["product_name"])
         form.addRow(T.FORM_QUANTITY, self.blocks["quantity"])
         form.addRow(
@@ -132,9 +129,6 @@ class CalculatorLineWidget(QWidget):
         self.gift_check.toggled.connect(self._emit)
         self.unit_radio.toggled.connect(self._emit)
         self.pos_mode_combo.currentIndexChanged.connect(self._emit)
-        self.product_combo.currentIndexChanged.connect(
-            self._on_product_changed
-        )
 
     # ---- state -----------------------------------------------------------
 
@@ -143,8 +137,7 @@ class CalculatorLineWidget(QWidget):
             self.changed.emit()
 
     def selected_product(self) -> Product | None:
-        data = self.product_combo.currentData()
-        return data if isinstance(data, Product) else None
+        return self._product
 
     def form(self) -> LineForm:
         product = self.selected_product()
@@ -169,54 +162,16 @@ class CalculatorLineWidget(QWidget):
             product_id=None if product is None else product.id,
         )
 
-    def set_products(self, products: Sequence[Product]) -> None:
-        """Reload the picker, keeping the selection when the product still exists.
-
-        Field values are never touched here, so a product that was archived or
-        edited meanwhile does not change what the user is looking at.
-        """
-        current = self.selected_product()
+    def set_product(self, product: Product) -> None:
+        """Copy a saved product into this line; never link editable values."""
         self._updating = True
         try:
-            self.product_combo.clear()
-            self.product_combo.addItem(ONE_OFF_LABEL, None)
-            for product in products:
-                self.product_combo.addItem(product.name, product)
-            index = next(
-                (
-                    i
-                    for i in range(1, self.product_combo.count())
-                    if current is not None
-                    and self.product_combo.itemData(i).id == current.id
-                ),
-                0,
-            )
-            self.product_combo.setCurrentIndex(index)
-            self._apply_name_lock()
-        finally:
-            self._updating = False
-        self.changed.emit()
-
-    def _apply_name_lock(self) -> None:
-        self.name_edit.setReadOnly(self.selected_product() is not None)
-
-    def _on_product_changed(self, _index: int) -> None:
-        if self._updating:
-            return
-        product = self.selected_product()
-        self._updating = True
-        try:
-            if product is not None:
-                # Copy, never link: later edits here do not write back to the product.
-                self.name_edit.setText(product.name)
-                self.regular_edit.setText(
-                    format_money_input(product.regular_price)
-                )
-                self.website_edit.setText(
-                    format_money_input(product.website_price)
-                )
-                self.gift_name_edit.setText(product.default_gift_name or "")
-            self._apply_name_lock()
+            self._product = product
+            self.name_edit.setText(product.name)
+            self.regular_edit.setText(format_money_input(product.regular_price))
+            self.website_edit.setText(format_money_input(product.website_price))
+            self.gift_name_edit.setText(product.default_gift_name or "")
+            self.name_edit.setReadOnly(True)
         finally:
             self._updating = False
         self.changed.emit()
@@ -484,7 +439,6 @@ class CalculatorTab(QWidget):
     ) -> None:
         super().__init__(parent)
         self._repo = repo
-        self._products: list[Product] = repo.search()
         self._bulk = (
             False  # suppress recalculation while all rows are updated at once
         )
@@ -492,9 +446,51 @@ class CalculatorTab(QWidget):
         self.evaluation = TransactionEvaluation(lines=())
 
         self.panel = TransactionPanel()
-        self.add_button = QPushButton(T.BTN_ADD_LINE)
+        self.product_search = QLineEdit()
+        self.product_search.setPlaceholderText(T.PH_CALCULATOR_PRODUCT_SEARCH)
+        self.product_search.setClearButtonEnabled(True)
+        self.product_list = QListWidget()
+        self.product_list.setObjectName("calculatorProductList")
+        self.product_list.setMaximumHeight(150)
+        self.product_list.setSelectionMode(
+            QListWidget.SelectionMode.NoSelection
+        )
+        self.product_list.setSpacing(3)
+        self.product_list.setStyleSheet(
+            "QListWidget#calculatorProductList {"
+            " background-color: #f8fafc; color: #26384a; }"
+            "QListWidget#calculatorProductList::indicator {"
+            " width: 20px; height: 20px; border: 2px solid #52677d;"
+            " border-radius: 3px; background-color: #ffffff; }"
+            "QListWidget#calculatorProductList::indicator:checked {"
+            " background-color: #1769aa; border-color: #104d80; }"
+            "QListWidget#calculatorProductList::indicator:unchecked:hover {"
+            " border-color: #1769aa; }"
+            "QListWidget#calculatorProductList::item {"
+            " padding: 5px; color: #26384a; }"
+        )
+        self.selection_count = QLabel(T.calculator_selection_count(0))
+        self.add_selected_button = QPushButton(T.BTN_ADD_SELECTED_PRODUCTS)
+        self.add_selected_button.setEnabled(False)
+        self.add_one_off_button = QPushButton(T.BTN_ADD_ONE_OFF_LINE)
         self.save_button = QPushButton(T.BTN_SAVE_CALCULATION)
         self.save_button.setEnabled(False)
+        self._staged_products: dict[int, Product] = {}
+        self._updating_product_list = False
+        self._search_timer = QTimer(self)
+        self._search_timer.setSingleShot(True)
+        self._search_timer.setInterval(120)
+        self._search_timer.timeout.connect(self._render_products)
+
+        selector = QGroupBox(T.CALCULATOR_PRODUCT_SELECTOR)
+        selector_layout = QVBoxLayout(selector)
+        selector_layout.addWidget(self.product_search)
+        selector_layout.addWidget(self.product_list)
+        selector_actions = QHBoxLayout()
+        selector_actions.addWidget(self.selection_count, 1)
+        selector_actions.addWidget(self.add_one_off_button)
+        selector_actions.addWidget(self.add_selected_button)
+        selector_layout.addLayout(selector_actions)
 
         self._rows_host = QWidget()
         self._rows_layout = QVBoxLayout(self._rows_host)
@@ -507,8 +503,8 @@ class CalculatorTab(QWidget):
         left = QWidget()
         left_layout = QVBoxLayout(left)
         left_layout.setContentsMargins(0, 0, 0, 0)
+        left_layout.addWidget(selector)
         left_layout.addWidget(rows_scroll, 1)
-        left_layout.addWidget(self.add_button)
 
         results_scroll = QScrollArea()
         results_scroll.setWidgetResizable(True)
@@ -527,19 +523,39 @@ class CalculatorTab(QWidget):
         layout = QVBoxLayout(self)
         layout.addWidget(splitter)
 
-        self.add_button.clicked.connect(lambda _c=False: self.add_line())
+        self.product_search.textChanged.connect(
+            lambda _text: self._search_timer.start()
+        )
+        self.product_search.returnPressed.connect(self._search_now)
+        self.product_list.itemChanged.connect(self._on_product_check_changed)
+        self.add_selected_button.clicked.connect(
+            lambda _c=False: self.add_selected_products()
+        )
+        self.add_one_off_button.clicked.connect(
+            lambda _c=False: self.add_one_off_line()
+        )
         self.save_button.clicked.connect(
             lambda _c=False: self.save_requested.emit(self.evaluation)
         )
+        self._render_products()
         self.add_line()
 
     # ---- rows ------------------------------------------------------------
 
-    def add_line(self) -> LineRow:
+    def add_line(self, product: Product | None = None) -> LineRow:
+        """Append a one-off line or a line copied from a saved product."""
+        # The initial blank row becomes the first selected product line, so a
+        # batch add never leaves an accidental incomplete line behind.
+        if product is not None and len(self.rows) == 1:
+            starter = self.rows[0]
+            if self._is_empty_line(starter.line):
+                starter.line.set_product(product)
+                if not self._bulk:
+                    self.recalculate()
+                return starter
         row = LineRow()
-        row.line.set_products(
-            self._products
-        )  # not connected yet: no recalculation
+        if product is not None:
+            row.line.set_product(product)
         row.line.changed.connect(self.recalculate)
         row.move_up.connect(lambda r: self._move(r, -1))
         row.move_down.connect(lambda r: self._move(r, +1))
@@ -549,6 +565,116 @@ class CalculatorTab(QWidget):
         self._renumber()
         self.recalculate()
         return row
+
+    @staticmethod
+    def _is_empty_line(line: CalculatorLineWidget) -> bool:
+        return (
+            not line.name_edit.text()
+            and not line.regular_edit.text()
+            and not line.website_edit.text()
+            and not line.gift_name_edit.text()
+            and not line.manager_edit.text()
+            and line.quantity_spin.value() == 1
+            and not line.gift_check.isChecked()
+        )
+
+    def add_one_off_line(self) -> LineRow:
+        """Focus the starter line or append a new editable one-off line."""
+        if len(self.rows) == 1 and self._is_empty_line(self.rows[0].line):
+            row = self.rows[0]
+            row.line.name_edit.setFocus()
+            return row
+        row = self.add_line()
+        row.line.name_edit.setFocus()
+        return row
+
+    def add_selected_products(self) -> None:
+        """Add checked products as lines in the order they were selected."""
+        active_products = {
+            product.id: product for product in self._repo.search()
+        }
+        products = [
+            active_products[product_id]
+            for product_id in self._staged_products
+            if product_id in active_products
+        ]
+        self._staged_products = {
+            product.id: product for product in products
+        }
+        if not products:
+            self._render_products()
+            return
+        self._bulk = True
+        try:
+            for product in products:
+                self.add_line(product)
+            self._staged_products.clear()
+            self._render_products()
+        finally:
+            self._bulk = False
+        self.recalculate()
+
+    def _render_products(self, _query: str | None = None) -> None:
+        products = self._repo.search(self.product_search.text())
+        blocker = QSignalBlocker(self.product_list)
+        self.product_list.clear()
+        for product in products:
+            selected = product.id in self._staged_products
+            item = QListWidgetItem(self._product_option_text(product, selected))
+            item.setData(Qt.ItemDataRole.UserRole, product)
+            item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
+            item.setCheckState(
+                Qt.CheckState.Checked if selected else Qt.CheckState.Unchecked
+            )
+            self._set_product_item_colors(item, selected)
+            self.product_list.addItem(item)
+        if not products:
+            item = QListWidgetItem(T.CALCULATOR_NO_PRODUCTS_FOUND)
+            item.setFlags(Qt.ItemFlag.NoItemFlags)
+            self.product_list.addItem(item)
+        blocker.unblock()
+        count = len(self._staged_products)
+        self.selection_count.setText(T.calculator_selection_count(count))
+        self.add_selected_button.setEnabled(count > 0)
+
+    @staticmethod
+    def _product_option_text(product: Product, selected: bool) -> str:
+        marker = "[✓]" if selected else "[ ]"
+        return f"{marker}  {product.name}"
+
+    @staticmethod
+    def _set_product_item_colors(
+        item: QListWidgetItem, selected: bool
+    ) -> None:
+        item.setBackground(
+            QColor("#dceeff") if selected else QColor("#ffffff")
+        )
+        item.setForeground(QColor("#123653" if selected else "#26384a"))
+
+    def _search_now(self) -> None:
+        self._search_timer.stop()
+        self._render_products()
+
+    def _on_product_check_changed(self, item: QListWidgetItem) -> None:
+        if self._updating_product_list:
+            return
+        product = item.data(Qt.ItemDataRole.UserRole)
+        if not isinstance(product, Product):
+            return
+        selected = item.checkState() == Qt.CheckState.Checked
+        if selected:
+            self._staged_products[product.id] = product
+        else:
+            self._staged_products.pop(product.id, None)
+        self._updating_product_list = True
+        blocker = QSignalBlocker(self.product_list)
+        item.setText(self._product_option_text(product, selected))
+        self._set_product_item_colors(item, selected)
+        blocker.unblock()
+        self._updating_product_list = False
+        count = len(self._staged_products)
+        self.selection_count.setText(T.calculator_selection_count(count))
+        self.add_selected_button.setEnabled(count > 0)
 
     def remove_line(self, row: LineRow) -> None:
         if len(self.rows) <= 1 or row not in self.rows:
@@ -580,14 +706,15 @@ class CalculatorTab(QWidget):
     # ---- data ------------------------------------------------------------
 
     def refresh_products(self) -> None:
-        self._products = self._repo.search()
-        self._bulk = True
-        try:
-            for row in self.rows:
-                row.line.set_products(self._products)
-        finally:
-            self._bulk = False
-        self.recalculate()
+        active_products = {
+            product.id: product for product in self._repo.search()
+        }
+        self._staged_products = {
+            product_id: active_products[product_id]
+            for product_id in self._staged_products
+            if product_id in active_products
+        }
+        self._render_products()
 
     def set_font_scale(self, percent: int) -> None:
         """Give the input pane more room as text grows."""

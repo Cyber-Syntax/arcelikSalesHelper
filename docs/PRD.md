@@ -95,7 +95,7 @@ Product codes are not required or modeled in the MVP.
 
 Each calculator line supports:
 
-- Product selection or one-off product name.
+- Saved product selection through a searchable multi-select catalog, or a one-off product name.
 - Quantity, defaulting to one.
 - Regular price used.
 - Website discounted price used.
@@ -515,6 +515,7 @@ Pricing, parsing, validation, formatting, and aggregation functions should be pu
 20. CSV import accepts both Turkish-style and plain numeric values and asks the user per conflict.
 21. Verified baseline, startup, clean-close, migration, manual, and retention backup behavior works as specified.
 22. Automated tests cover parsing, exact formatting, values with more than two fractional digits, carry behavior, gift/no-gift bases, quantity calculations, both manager value modes for both boss prices, the three real examples, option-specific POS calculations, multi-line totals, immutable snapshots, Turkish presentation, CSV conflicts, and backup verification/retention.
+23. Calculator users can search active products by name, select several across different queries, add them as lines in one action, and add one-off products without a per-line product dropdown.
 
 ## 12. Operational caution
 
