@@ -1,10 +1,6 @@
 from __future__ import annotations
 
-from decimal import ROUND_HALF_UP, Decimal
-
-from .arith import CTX
-
-_CENT = Decimal("0.01")
+from decimal import Decimal
 
 
 def format_money_input(amount: Decimal) -> str:
@@ -22,15 +18,21 @@ def format_money_input(amount: Decimal) -> str:
 
 
 def format_try(amount: Decimal) -> str:
-    """Turkish display format: 153.345,56 TL.  The only place values are rounded."""
+    """Format TRY without changing the Decimal value.
+
+    Trailing zeroes beyond kuruş precision are omitted, but significant
+    fractional digits are retained even when a value needs more than two.
+    """
     if not amount.is_finite():
         raise ValueError("cannot format a non-finite amount")
-    q = amount.quantize(_CENT, rounding=ROUND_HALF_UP, context=CTX)
-    negative = (
-        q < 0
-    )  # "-0.00" compares equal to zero, so no sign is shown for it
-    whole, frac = format(q.copy_abs(), "f").split(".")
+    exact = format(amount.copy_abs(), "f")
+    whole, dot, frac = exact.partition(".")
+    if not dot:
+        frac = "00"
+    else:
+        frac = frac.rstrip("0").ljust(2, "0")
     grouped = f"{int(whole):,}".replace(",", ".")
+    negative = amount.is_signed() and amount != 0
     return f"{'-' if negative else ''}{grouped},{frac} TL"
 
 
