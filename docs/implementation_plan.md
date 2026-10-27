@@ -12,7 +12,7 @@ Source: PRD v0.4. This file is the working contract. Do not start a milestone un
 | Decimal context | Module-level `localcontext` with `prec=60`, used for all arithmetic, so divisions such as `line / qty` stay effectively exact. |
 | Storage of money | SQLite `TEXT` holding `str(Decimal)`, never REAL. Reload with `Decimal(s)`. |
 | UI language | Turkish only for the first release; all user-visible text must be Turkish. Internal identifiers, database schema names, and source-code comments may remain English. A language selector is deferred to a later enhancement. |
-| CSV | Comma-delimited, UTF-8 (accept BOM via `utf-8-sig`), columns exactly `product_name,regular_price,website_discounted_price` |
+| CSV | Comma-delimited, UTF-8 (accept BOM via `utf-8-sig`), required columns `product_name,regular_price`; optional `website_discounted_price` (blank or absent means zero) |
 | CSV conflict key | `product_name.strip().casefold()` |
 | Packaging | PyInstaller (one-folder), Windows and Linux |
 | Style | Pure functions in `domain/`, with no imports from `PySide6`, `sqlite3`, or `infrastructure`. Frozen dataclasses for models. |

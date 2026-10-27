@@ -38,8 +38,8 @@ log = logging.getLogger(__name__)
 REQUIRED_COLUMNS = (
     "product_name",
     "regular_price",
-    "website_discounted_price",
 )
+WEBSITE_PRICE_COLUMN = "website_discounted_price"
 QUANTITY_COLUMN = "quantity"
 STOCK_ONLY_COLUMNS = ("product_name", QUANTITY_COLUMN)
 MAX_FILE_BYTES = 50 * 1024 * 1024
@@ -161,7 +161,9 @@ def _detect_format(header: Sequence[str]) -> Result[ImportFormat, str]:
     if present == set(STOCK_ONLY_COLUMNS):
         return Ok(ImportFormat.STOCK)
     missing = [c for c in REQUIRED_COLUMNS if c not in present]
-    unknown = sorted(present - set(REQUIRED_COLUMNS) - {QUANTITY_COLUMN})
+    unknown = sorted(
+        present - set(REQUIRED_COLUMNS) - {WEBSITE_PRICE_COLUMN, QUANTITY_COLUMN}
+    )
     if missing or unknown:
         return Err(T.csv_bad_header(missing, unknown))
     return Ok(ImportFormat.PRICES)
@@ -231,12 +233,11 @@ def _parse_row(
         regular = _price(
             line, "regular_price", get("regular_price"), errors, warnings
         )
-        website = _price(
-            line,
-            "website_discounted_price",
-            get("website_discounted_price"),
-            errors,
-            warnings,
+        website_text = get(WEBSITE_PRICE_COLUMN)
+        website = (
+            _price(line, WEBSITE_PRICE_COLUMN, website_text, errors, warnings)
+            if website_text
+            else Decimal("0")
         )
 
     quantity: int | None = None

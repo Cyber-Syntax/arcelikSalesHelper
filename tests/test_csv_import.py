@@ -59,6 +59,26 @@ def test_turkish_and_plain_numbers_are_both_accepted() -> None:
     ]
 
 
+@pytest.mark.parametrize(
+    "text",
+    [
+        "product_name,regular_price\nOven,100\n",
+        "product_name,regular_price,website_discounted_price\nOven,100,\n",
+    ],
+)
+def test_missing_website_price_defaults_to_zero(text: str) -> None:
+    row = parsed(text).rows[0]
+    assert row.regular_price == D("100")
+    assert row.website_price == D("0")
+
+
+def test_nonblank_invalid_website_price_is_still_an_error() -> None:
+    result = parsed("product_name,regular_price,website_discounted_price\nOven,100,abc\n")
+    assert [(error.row, error.column) for error in result.errors] == [
+        (2, "website_discounted_price")
+    ]
+
+
 def test_utf8_bom_is_accepted(tmp_path: Path) -> None:
     path = tmp_path / "in.csv"
     path.write_bytes(b"\xef\xbb\xbf" + f"{HEADER}\nÇamaşır,1,2\n".encode())
@@ -214,6 +234,14 @@ def test_apply_creates_updates_and_skips_per_decision(repo, db, clock) -> None: 
     note = db.execute("SELECT DISTINCT note FROM stock_history").fetchone()[0]
     assert note == "csv: in.csv"
     assert not db.in_transaction
+
+
+def test_apply_imports_regular_price_without_website_discount(repo, db) -> None:  # type: ignore[no-untyped-def]
+    plan = plan_for("product_name,regular_price\nOven,100\n", repo)
+    result = apply_plan(db, plan, {})
+    assert isinstance(result, Ok)
+    [oven] = repo.search("oven")
+    assert (oven.regular_price, oven.website_price) == (D("100"), D("0"))
 
 
 def test_every_conflict_needs_a_decision(repo, db) -> None:  # type: ignore[no-untyped-def]

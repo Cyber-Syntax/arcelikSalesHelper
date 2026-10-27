@@ -377,11 +377,13 @@ History must remain understandable after product prices, gift promotions, or not
 
 ### D. CSV import
 
-CSV import is the final MVP milestone. The required columns are exactly:
+CSV import is the final MVP milestone. The required columns are `product_name` and `regular_price`; `website_discounted_price` is optional:
 
 ```text
-product_name,regular_price,website_discounted_price
+product_name,regular_price[,website_discounted_price]
 ```
+
+If the optional website discount column is omitted or a row's value is blank, the importer stores `0`, which the application displays as “YOK”.
 
 The importer must:
 
@@ -506,7 +508,7 @@ Pricing, parsing, validation, formatting, and aggregation functions should be pu
 16. Transaction totals correctly sum independently calculated lines.
 17. A complete immutable calculation snapshot preserves all product values, quantities, gift choices, boss prices, modes, results, and warnings used at calculation time.
 18. All user-visible application text is Turkish; internal identifiers and CSV field names may remain English.
-19. CSV import supports only `product_name,regular_price,website_discounted_price`.
+19. CSV import requires `product_name,regular_price` and optionally accepts `website_discounted_price`.
 20. CSV import accepts both Turkish-style and plain numeric values and asks the user per conflict.
 21. Verified baseline, startup, clean-close, migration, manual, and retention backup behavior works as specified.
 22. Automated tests cover parsing, exact formatting, values with more than two fractional digits, carry behavior, gift/no-gift bases, quantity calculations, both manager value modes for both boss prices, the three real examples, option-specific POS calculations, multi-line totals, immutable snapshots, Turkish presentation, CSV conflicts, and backup verification/retention.

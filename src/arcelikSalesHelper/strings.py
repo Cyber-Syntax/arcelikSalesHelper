@@ -351,8 +351,9 @@ def import_counts(
 
 
 CSV_EXPECTED = (
-    "Beklenen sütunlar: product_name,regular_price,website_discounted_price "
-    "(ardından isteğe bağlı olarak quantity) veya stok sayımları için "
+    "Beklenen sütunlar: product_name,regular_price ve isteğe bağlı "
+    "website_discounted_price (boş bırakılırsa 0 / YOK; ardından isteğe bağlı "
+    "quantity) veya stok sayımları için "
     "product_name,quantity."
 )
 CSV_DELIMITER = (
