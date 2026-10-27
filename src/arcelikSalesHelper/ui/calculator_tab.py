@@ -38,7 +38,11 @@ from arcelikSalesHelper.application.calculator import (
     evaluate_transaction,
 )
 from arcelikSalesHelper.domain.formatting import format_money_input
-from arcelikSalesHelper.domain.models import POS_LABEL, ManagerMode
+from arcelikSalesHelper.domain.models import (
+    POS_LABEL,
+    ManagerMode,
+    PosCalculationMode,
+)
 from arcelikSalesHelper.domain.products import Product
 from arcelikSalesHelper.infrastructure.repositories import ProductRepository
 
@@ -76,6 +80,13 @@ class CalculatorLineWidget(QWidget):
         self.unit_radio = QRadioButton(T.RADIO_UNIT)
         self.line_radio = QRadioButton(T.RADIO_LINE)
         self.unit_radio.setChecked(True)
+        self.pos_mode_combo = QComboBox()
+        self.pos_mode_combo.addItem(
+            T.POS_MODE_FIXED, PosCalculationMode.FIXED_AMOUNT
+        )
+        self.pos_mode_combo.addItem(
+            T.POS_MODE_PERCENTAGE, PosCalculationMode.PERCENTAGE
+        )
 
         mode_box = QWidget()
         mode_layout = QHBoxLayout(mode_box)
@@ -107,6 +118,7 @@ class CalculatorLineWidget(QWidget):
         form.addRow(T.FORM_GIFT_NAME, self.gift_name_edit)
         form.addRow(T.FORM_MANAGER_VALUE, self.blocks["manager_value"])
         form.addRow(T.FORM_MANAGER_MODE, self.blocks["manager_mode"])
+        form.addRow(T.FORM_POS_CALCULATION_MODE, self.pos_mode_combo)
 
         for edit in (
             self.name_edit,
@@ -119,6 +131,7 @@ class CalculatorLineWidget(QWidget):
         self.quantity_spin.valueChanged.connect(self._emit)
         self.gift_check.toggled.connect(self._emit)
         self.unit_radio.toggled.connect(self._emit)
+        self.pos_mode_combo.currentIndexChanged.connect(self._emit)
         self.product_combo.currentIndexChanged.connect(
             self._on_product_changed
         )
@@ -146,6 +159,13 @@ class CalculatorLineWidget(QWidget):
             manager_mode=ManagerMode.LINE
             if self.line_radio.isChecked()
             else ManagerMode.UNIT,
+            pos_calculation_mode=(
+                self.pos_mode_combo.currentData()
+                if isinstance(
+                    self.pos_mode_combo.currentData(), PosCalculationMode
+                )
+                else PosCalculationMode.FIXED_AMOUNT
+            ),
             product_id=None if product is None else product.id,
         )
 

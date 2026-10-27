@@ -10,6 +10,7 @@ from arcelikSalesHelper.application.history import (
     build_snapshot,
 )
 from arcelikSalesHelper.domain.products import ProductDraft
+from arcelikSalesHelper.domain.models import PosCalculationMode
 from arcelikSalesHelper.domain.result import Ok
 from arcelikSalesHelper.infrastructure.history_repository import (
     HistoryRepository,
@@ -36,6 +37,20 @@ def test_save_and_get_roundtrip_is_lossless(db: sqlite3.Connection) -> None:
     sid = repo.save(record)
     assert repo.get(sid) == replace(record, id=sid)
     assert repo.count() == 1
+
+
+def test_save_and_get_preserves_pos_calculation_mode(db: sqlite3.Connection) -> None:
+    repo = HistoryRepository(db)
+    record = make_record([form(
+        regular_price="38.299,00",
+        website_discounted_price="34.469,10",
+        manager_value="30.000,00",
+        pos_calculation_mode=PosCalculationMode.PERCENTAGE,
+    )])
+    sid = repo.save(record)
+    restored = repo.get(sid)
+    assert restored is not None
+    assert restored.lines[0].pos_calculation_mode == "percentage"
 
 
 def test_get_missing_returns_none(db: sqlite3.Connection) -> None:

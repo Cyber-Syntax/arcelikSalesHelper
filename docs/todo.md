@@ -55,8 +55,9 @@ History tab is used to keep track of the calculation done by employee to remembe
 
 ## must-have features
 
-- [ ] Verify all the calculation text which some seems unnecessary.
-- [ ] add turkish language support
+- [ ] add a price for all of the products, not per line!!! 
+- [x] Verify all the calculation text which some seems unnecessary.
+- [x] add turkish language support
 - [ ] beautify the ui more responsive and user friendly
   - calculator and history need more better ui because currently there is a lot of written text and makes it hard to read and understand
 - [ ] add csv export feature
@@ -65,3 +66,4 @@ History tab is used to keep track of the calculation done by employee to remembe
 ## good-to-have features
 
 - [ ] add excel export feature
+- [ ] refactor product line add for fast calculation; for example, we might add multiple product in dropdown with multi select for fast product add.

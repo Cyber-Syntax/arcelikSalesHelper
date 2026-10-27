@@ -129,6 +129,13 @@ LBL_MANAGER_LINE_TOTAL = "Yönetici toplamı"
 
 POS_MISSING_MANAGER = "Yok: yönetici değeri girin"
 LBL_POS_AMOUNT = "POS giriş tutarı"
+FORM_POS_CALCULATION_MODE = "POS hesaplama yöntemi"
+POS_FORMULA_LABEL = "POS formülü"
+LBL_POS_DISCOUNT_RATE = "Hesaplanan indirim oranı"
+POS_MODE_FIXED = "Sabit indirim tutarı"
+POS_MODE_PERCENTAGE = "Yüzde indirimi"
+POS_FORMULA_FIXED = "Sabit yöntem: (ilk fiyat − web fiyatı) + yönetici fiyatı"
+POS_FORMULA_PERCENTAGE = "Yüzde yöntemi: yönetici fiyatı ÷ (web fiyatı / ilk fiyat)"
 LBL_DISCOUNT_AMOUNT = "İndirim tutarı"
 
 # transaction totals

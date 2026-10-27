@@ -14,7 +14,7 @@ _SNAPSHOT_COLS = "id, created_at, app_version, schema_version, totals_json, conf
 _LINE_COLS = (
     "line_index, product_id, product_name, quantity, regular_price, website_price, coupon, "
     "effective_website_unit, gift_selected, gift_name, manager_value_entered, manager_mode, "
-    "manager_line_total, manager_unit, result_json, entered_json"
+    "manager_line_total, manager_unit, result_json, entered_json, pos_calculation_mode"
 )
 
 
@@ -30,6 +30,7 @@ def _to_line(row: sqlite3.Row) -> LineRecord:
         gift_name=row["gift_name"],
         manager_value_entered=row["manager_value_entered"],
         manager_mode=row["manager_mode"],
+        pos_calculation_mode=row["pos_calculation_mode"],
         manager_line_total=row["manager_line_total"],
         manager_unit=row["manager_unit"],
         result_json=row["result_json"],
@@ -67,7 +68,7 @@ class HistoryRepository:
             for line in record.lines:
                 self._conn.execute(
                     f"INSERT INTO calculation_lines (snapshot_id, {_LINE_COLS}) "
-                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                     (
                         snapshot_id,
                         line.line_index,
@@ -86,6 +87,7 @@ class HistoryRepository:
                         line.manager_unit,
                         line.result_json,
                         line.entered_json,
+                        line.pos_calculation_mode,
                     ),
                 )
         return snapshot_id

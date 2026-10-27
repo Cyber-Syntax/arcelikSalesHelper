@@ -53,10 +53,11 @@ tests/conftest.py                   # tmp_path DB fixtures, Qt app fixture
   - gift selected: `regular_price × 0.90`;
   - no gift: `website_discounted_price × 0.90`.
 - Discount amount is the selected 10% base multiplied by `0.10`; it is separate from the manager-provided value.
-- POS remains `(regular line total - website discounted line total) + manager line total`, using the normal website discounted price and the selected manager mode.
+- Add a per-line POS calculation mode, defaulting to fixed amount. Fixed mode remains `(regular line total - website discounted line total) + manager line total`; percentage mode derives `rate = (regular price - website discounted price) / regular price` and calculates `manager line total / (1 - rate)`.
+- Percentage mode applies only to the website/no-gift POS result. Gift POS remains the boss gifted line total. Display the selected mode and formula, and store the mode in calculation history.
 - Update pure domain models, application result labels, formula explanations, and tests together. Results must remain hidden while input is invalid.
 
-**Exit checks (M2):** the two supplied real-world examples are tested exactly, gift/no-gift 10% bases are correct, both manager modes and quantities remain correct, POS tests use the website discounted price, and no coupon field or coupon terminology remains in the calculator flow.
+**Exit checks (M2):** the original fixed-amount examples and the new percentage example are tested exactly, gift/no-gift 10% bases are correct, both manager modes and quantities remain correct, per-line mode selection is retained in history, gift POS remains direct, and no coupon field or coupon terminology remains in the calculator flow.
 
 ## 4. Milestone 3: Domain core hardening (pure, no I/O)
 
@@ -84,7 +85,7 @@ tests/conftest.py                   # tmp_path DB fixtures, Qt app fixture
 **`domain/models.py`** (frozen dataclasses)
 
 - `ManagerMode(Enum): UNIT, LINE`
-- `LineInput`: `product_name, quantity:int, regular_price, website_discounted_price, gift_selected:bool, gift_name:str|None, manager_value:Decimal|None, manager_mode:ManagerMode|None, product_id:int|None`
+- `LineInput`: `product_name, quantity:int, regular_price, website_discounted_price, gift_selected:bool, gift_name:str|None, manager_value:Decimal|None, manager_mode:ManagerMode|None, pos_calculation_mode:PosCalculationMode (default FIXED_AMOUNT), product_id:int|None`
 - `LineResult`: `regular_total, website_discounted_total, ten_pct_base, ten_pct_discount_unit, ten_pct_unit, ten_pct_total, manager_unit|None, manager_line_total|None, pos_amount|None, warnings: tuple[Warning,...]`
 - `TransactionResult`: `lines`, `totals` (regular, website discounted, 10% scenario, manager, POS; each `None` if any line lacks the input, and the UI must explain the missing manager value rather than show a partial sum)
 - `Warning`: `code, message, line_index`
@@ -99,7 +100,7 @@ tests/conftest.py                   # tmp_path DB fixtures, Qt app fixture
 - `ten_percent(base) -> (discount, price)` using `base * Decimal("0.10")`
 - `discount_base(line)`: gift → `regular_price`; no gift → `website_discounted_price`
 - `manager_totals(value, mode, qty) -> (unit, line)`
-- `pos_amount(regular_total, website_discounted_total, manager_line_total)`: uses the website discounted total
+- `pos_amount(regular_total, website_discounted_total, manager_line_total, mode)`: supports fixed-amount and percentage gross-up modes
 - `calculate_line(LineInput) -> LineResult`
 - `calculate_transaction(Sequence[LineInput]) -> TransactionResult`
 - Option comparison: `build_options(result) -> (WebsiteOption, GiftOption | None)`. It only presents the two options; it never ranks them.
@@ -135,6 +136,7 @@ calculation_lines(id, snapshot_id FK ON DELETE RESTRICT, line_index,
    regular_price, website_discounted_price,
    gift_selected INTEGER, gift_name,
    manager_value_entered TEXT, manager_mode TEXT, manager_line_total TEXT, manager_unit TEXT,
+   pos_calculation_mode TEXT NOT NULL DEFAULT 'fixed_amount',
    result_json TEXT NOT NULL);        -- full LineResult, exact strings
 ```
 

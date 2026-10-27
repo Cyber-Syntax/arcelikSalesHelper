@@ -52,6 +52,7 @@ class LineRecord:
     gift_name: str | None
     manager_value_entered: str | None  # text exactly as typed
     manager_mode: str | None
+    pos_calculation_mode: str
     manager_line_total: str | None
     manager_unit: str | None
     result_json: str
@@ -152,6 +153,7 @@ def _line_record(
         manager_mode=None
         if result.manager_mode is None
         else result.manager_mode.value,
+        pos_calculation_mode=line.pos_calculation_mode.value,
         manager_line_total=(
             None
             if result.manager_line_total is None

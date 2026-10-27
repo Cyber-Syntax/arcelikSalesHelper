@@ -2,7 +2,7 @@ from decimal import Decimal as D
 
 import pytest
 
-from arcelikSalesHelper.domain.models import LineInput, ManagerMode
+from arcelikSalesHelper.domain.models import LineInput, ManagerMode, PosCalculationMode
 from arcelikSalesHelper.domain.pricing import build_options, calculate_line, calculate_transaction, effective_website_price, manager_totals, pos_amount
 from arcelikSalesHelper.domain.result import Err, Ok
 
@@ -78,6 +78,41 @@ def test_manager_unit_and_authoritative_line_modes_with_quantity():
 
 def test_pos_uses_normal_website_discounted_total():
     assert pos_amount(D(145298), D(132798), D(112000)) == D(124500)
+
+
+def test_percentage_pos_mode_grosses_up_manager_price_without_rounding():
+    line = calc(make(
+        regular_price=D("38299"),
+        website_discounted_price=D("34469.1"),
+        manager_value=D("30000"),
+        manager_mode=ManagerMode.UNIT,
+        pos_calculation_mode=PosCalculationMode.PERCENTAGE,
+    ))
+    assert line.pos_calculation_mode is PosCalculationMode.PERCENTAGE
+    assert line.pos_discount_percentage == D("10.0")
+    assert str(line.pos_amount).startswith("33333.333333333333")
+    assert line.pos_amount != D("33333.33")
+
+
+def test_percentage_pos_mode_respects_line_total_quantity_and_gift_pos():
+    line = calc(make(
+        quantity=2,
+        regular_price=D("100"),
+        website_discounted_price=D("90"),
+        manager_value=D("300"),
+        manager_mode=ManagerMode.LINE,
+        pos_calculation_mode=PosCalculationMode.PERCENTAGE,
+    ))
+    assert str(line.pos_amount).startswith("666.666666666666")
+    gift = calc(make(
+        regular_price=D("100"),
+        website_discounted_price=D("90"),
+        gift_selected=True,
+        manager_value=D("30"),
+        manager_mode=ManagerMode.UNIT,
+        pos_calculation_mode=PosCalculationMode.PERCENTAGE,
+    ))
+    assert gift.pos_amount == D("30")
 
 
 def test_options_keep_manager_value_on_selected_option_only():

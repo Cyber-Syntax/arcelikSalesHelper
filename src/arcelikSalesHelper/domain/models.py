@@ -18,6 +18,11 @@ class ManagerMode(Enum):
     LINE = "line"
 
 
+class PosCalculationMode(Enum):
+    FIXED_AMOUNT = "fixed_amount"
+    PERCENTAGE = "percentage"
+
+
 @dataclass(frozen=True)
 class LineInput:
     product_name: str
@@ -28,6 +33,7 @@ class LineInput:
     gift_name: str | None = None
     manager_value: Decimal | None = None
     manager_mode: ManagerMode | None = None
+    pos_calculation_mode: PosCalculationMode = PosCalculationMode.FIXED_AMOUNT
     product_id: int | None = None
 
 
@@ -52,6 +58,8 @@ class LineResult:
     manager_unit: Decimal | None
     manager_line_total: Decimal | None
     pos_amount: Decimal | None
+    pos_calculation_mode: PosCalculationMode
+    pos_discount_percentage: Decimal | None
     warnings: tuple[LineWarning, ...]
 
 

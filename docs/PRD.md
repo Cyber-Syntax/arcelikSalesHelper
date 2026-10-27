@@ -73,6 +73,7 @@ The GUI must not depend on scraping behavior, website markup, or anti-bot workar
 - **Boss discounted price:** A manually entered manager sale amount for the normal website/no-gift option. It is not a percentage.
 - **Boss gifted price:** A manually entered manager sale amount for the gift option. It is not a percentage.
 - **Manager value mode:** Whether a supplied boss price is a unit price or the total price for the entire calculator line.
+- **POS calculation mode:** Per-line choice between fixed-amount and percentage-based website/no-gift POS calculation. Defaults to fixed amount.
 - **POS-entry amount:** The value calculated for entry into Dynamics AX/POS. It is separate from the customer-facing website or manager option and remains labeled as requiring operational verification.
 
 ### Product fields
@@ -161,7 +162,7 @@ The manager may provide different sale values for the two mutually exclusive cus
 - **Boss discounted price:** the manager's price for the normal website/no-gift option.
 - **Boss gifted price:** the manager's price for the gift option.
 
-The boss prices are manual sale values, not percentages. The application must support both unit-price and total-line-price modes for each value:
+The boss prices are manual sale values, not percentages. The application must support both unit-price and total-line-price modes for each value. The website/no-gift POS calculation mode is separate:
 
 #### Unit-price mode
 
@@ -180,7 +181,7 @@ boss_line_total = boss_line_value
 boss_unit_value = boss_line_value / quantity
 ```
 
-The UI must clearly display which mode was used for each boss price. The application must not infer a percentage, compound a boss price with 10%, or automatically assign either boss price to the product.
+The UI must clearly display which mode was used for each boss price. The application must not treat a boss price itself as a percentage or automatically assign either boss price to the product. Percentage POS mode derives its rate from the regular and website discounted prices, independently of the standard 10% scenario.
 
 For a no-gift sale, the manager may provide a boss discounted price below the website discounted price. The examples use `112.000,00 TL` and `43.500,00 TL`.
 
@@ -209,6 +210,8 @@ The POS amount depends on the selected option.
 
 For the normal website/no-gift option:
 
+In **fixed-amount** mode (the default):
+
 ```text
 POS line amount =
 (regular line total - website discounted line total)
@@ -222,6 +225,15 @@ The discount amount used by this formula is:
 ```text
 discount amount = regular price - website discounted price
 ```
+
+In **percentage** mode, derive the website discount rate from the entered prices and gross up the boss line total by the remaining website-price ratio:
+
+```text
+website discount rate = (regular price - website discounted price) / regular price
+POS line amount = boss discounted line total / (1 - website discount rate)
+```
+
+Use Decimal arithmetic at the configured precision without currency quantization. If regular price is zero, use the boss line total unchanged because a percentage rate cannot be derived. The selected mode applies independently to each line and is recorded in history.
 
 For the gift option, the POS system workflow is different:
 
@@ -238,6 +250,8 @@ The POS result must be displayed separately as:
 `POS-entry calculation (verify before use)`
 
 The application must not claim that this result is an official or manager-approved POS instruction.
+
+For a gift sale, the selected website/no-gift POS mode has no effect. Gift POS remains the boss gifted line total.
 
 ### Rule F: Transaction totals
 
@@ -311,6 +325,15 @@ POS gifted = 48.000,00 TL
 
 The calculator must display `TKM 9961`, `14.539,00 TL`, and `12.399,00 TL` as gift information, 
 while keeping the boss gifted price (`48.000,00 TL`) and boss discounted price (`38.000,00 TL`) as separate sale inputs.
+
+#### Example 4: percentage-based website discount
+
+- regular/first price: `38.299,00`
+- website discounted price: `34.469,10`
+- boss discounted price: `30.000,00`
+- POS mode: percentage
+- derived rate: `(38.299,00 - 34.469,10) / 38.299,00 = 10%`
+- POS: `30.000,00 / (1 - 0,10) = 33.333,333… TL` (display the result to the configured Decimal precision)
 
 ## 7. Main screens
 
@@ -476,8 +499,8 @@ Pricing, parsing, validation, formatting, and aggregation functions should be pu
 9. The calculator supports multiple product lines, quantities, and independent gift selections.
 10. The calculator displays website and gift options side by side when a gift is available.
 11. Separate boss discounted and boss gifted prices can be entered, each as either a unit price or a total line price, and each selected mode is visible in results and history.
-12. Boss prices are not converted into percentages, compounded with the 10% scenario, or silently assigned to a product.
-13. For the website/no-gift option, the POS calculation is `(regular line total - website discounted line total) + boss discounted line total`.
+12. Boss prices are not themselves converted into percentages or compounded with the separate standard 10% scenario; percentage POS mode derives its rate only from regular and website discounted prices. Boss prices are never silently assigned to a product.
+13. For the website/no-gift option, fixed-amount mode calculates `(regular line total - website discounted line total) + boss discounted line total`; percentage mode derives the rate from regular and website discounted prices and gross-ups the boss line total by `1 / (1 - rate)`. Fixed amount is the default.
 14. For the gift option, the POS calculation is the boss gifted line total; the gift POS workflow represents the gift price as zero and writes the original product price.
 15. The POS result is visibly labeled `POS-entry calculation (verify before use)`.
 16. Transaction totals correctly sum independently calculated lines.

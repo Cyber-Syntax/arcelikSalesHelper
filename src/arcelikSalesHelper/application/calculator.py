@@ -17,6 +17,7 @@ from arcelikSalesHelper.domain.models import (
     LineInput,
     LineResult,
     ManagerMode,
+    PosCalculationMode,
     TotalValue,
     TransactionResult,
     WebsiteOption,
@@ -45,6 +46,7 @@ class LineForm:
     gift_name: str = ""
     manager_value: str = ""
     manager_mode: ManagerMode = ManagerMode.UNIT
+    pos_calculation_mode: PosCalculationMode = PosCalculationMode.FIXED_AMOUNT
     product_id: int | None = None
 
 
@@ -197,6 +199,7 @@ def evaluate_line(form: LineForm, line_index: int = 0) -> Evaluation:
         gift_name=form.gift_name.strip() or None,
         manager_value=manager_value,
         manager_mode=form.manager_mode if manager_value is not None else None,
+        pos_calculation_mode=form.pos_calculation_mode,
         product_id=form.product_id,
     )
     match calculate_line(line, line_index):
@@ -225,6 +228,11 @@ def _money_row(label: str, amount: Decimal) -> Row:
         format_try(amount),
         T.exact_value_tooltip(format_decimal_exact(amount)),
     )
+
+
+def _format_percentage(value: Decimal) -> str:
+    exact = format_decimal_exact(value)
+    return exact.rstrip("0").rstrip(".") if "." in exact else exact
 
 
 def present_result(line: LineInput, r: LineResult) -> ResultView:
@@ -261,6 +269,28 @@ def present_result(line: LineInput, r: LineResult) -> ResultView:
         pos_rows += (Row(T.LBL_POS_AMOUNT, T.POS_MISSING_MANAGER),)
     else:
         pos_rows += (_money_row(T.LBL_POS_AMOUNT, r.pos_amount),)
+        if not line.gift_selected:
+            formula = (
+                T.POS_FORMULA_PERCENTAGE
+                if line.pos_calculation_mode is PosCalculationMode.PERCENTAGE
+                else T.POS_FORMULA_FIXED
+            )
+            mode_label = (
+                T.POS_MODE_PERCENTAGE
+                if line.pos_calculation_mode is PosCalculationMode.PERCENTAGE
+                else T.POS_MODE_FIXED
+            )
+            pos_rows += (
+                Row(T.FORM_POS_CALCULATION_MODE, mode_label),
+                Row(T.POS_FORMULA_LABEL, formula),
+            )
+            if line.pos_calculation_mode is PosCalculationMode.PERCENTAGE:
+                rate_text = (
+                    T.NOT_AVAILABLE
+                    if r.pos_discount_percentage is None
+                    else f"{_format_percentage(r.pos_discount_percentage)}%"
+                )
+                pos_rows += (Row(T.LBL_POS_DISCOUNT_RATE, rate_text),)
     pos = Section(POS_LABEL, pos_rows)
 
     website_opt, gift_opt = build_options(line, r)

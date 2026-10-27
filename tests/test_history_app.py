@@ -13,7 +13,7 @@ from arcelikSalesHelper.application.history import (
     summarize,
     to_jsonable,
 )
-from arcelikSalesHelper.domain.models import POS_LABEL, ManagerMode
+from arcelikSalesHelper.domain.models import POS_LABEL, ManagerMode, PosCalculationMode
 from arcelikSalesHelper.domain.result import Err, Ok
 
 from .test_transaction_app import form, two_forms
@@ -78,6 +78,17 @@ def test_snapshot_columns_hold_normalized_values_and_entered_text() -> None:
     assert D(second.manager_line_total or "") == D(13500)
     assert D(second.manager_unit or "") == D(4500)
     assert json.loads(second.entered_json) == {}
+    assert first.pos_calculation_mode == PosCalculationMode.FIXED_AMOUNT.value
+
+
+def test_snapshot_preserves_percentage_pos_mode():
+    _, rec = snapshot([form(
+        regular_price="38.299,00",
+        website_discounted_price="34.469,10",
+        manager_value="30.000,00",
+        pos_calculation_mode=PosCalculationMode.PERCENTAGE,
+    )])
+    assert rec.lines[0].pos_calculation_mode == PosCalculationMode.PERCENTAGE.value
 
 
 def test_snapshot_level_fields() -> None:

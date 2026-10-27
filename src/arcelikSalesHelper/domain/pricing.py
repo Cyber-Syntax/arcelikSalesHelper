@@ -7,11 +7,22 @@ from functools import reduce
 from arcelikSalesHelper import strings as T
 
 from .arith import ZERO, add, div, mul, mul_qty, sub
-from .models import GiftOption, LineInput, LineResult, ManagerMode, TotalValue, TransactionResult, TransactionTotals, WebsiteOption
+from .models import (
+    GiftOption,
+    LineInput,
+    LineResult,
+    ManagerMode,
+    PosCalculationMode,
+    TotalValue,
+    TransactionResult,
+    TransactionTotals,
+    WebsiteOption,
+)
 from .result import Err, Ok, Result
 from .validation import ValidationError, soft_warnings, validate_line
 
 TEN_PERCENT = Decimal("0.10")
+HUNDRED = Decimal("100")
 
 
 def ten_percent(base: Decimal) -> tuple[Decimal, Decimal]:
@@ -43,7 +54,19 @@ def manager_totals(value: Decimal, mode: ManagerMode, quantity: int) -> tuple[De
     return div(value, Decimal(quantity)), value
 
 
-def pos_amount(regular_total: Decimal, website_discounted_total: Decimal, manager_line_total: Decimal) -> Decimal:
+def pos_amount(
+    regular_total: Decimal,
+    website_discounted_total: Decimal,
+    manager_line_total: Decimal,
+    mode: PosCalculationMode = PosCalculationMode.FIXED_AMOUNT,
+) -> Decimal:
+    if mode is PosCalculationMode.PERCENTAGE:
+        # The discount rate is (regular - website) / regular, so gross-up by
+        # dividing by its complement (website / regular). At a zero regular
+        # price there is no meaningful rate; preserve the manager amount.
+        if regular_total == ZERO or website_discounted_total == ZERO:
+            return manager_line_total
+        return div(mul(manager_line_total, regular_total), website_discounted_total)
     return add(sub(regular_total, website_discounted_total), manager_line_total)
 
 
@@ -57,9 +80,28 @@ def _compute_line(line: LineInput, line_index: int) -> LineResult:
     unit: Decimal | None = None
     total: Decimal | None = None
     pos: Decimal | None = None
+    pos_percentage: Decimal | None = None
     if line.manager_value is not None and line.manager_mode is not None:
         unit, total = manager_totals(line.manager_value, line.manager_mode, qty)
-        pos = pos_amount(regular_total, website_total, total)
+        if (
+            line.pos_calculation_mode is PosCalculationMode.PERCENTAGE
+            and not line.gift_selected
+        ):
+            pos_percentage = (
+                mul(div(sub(regular_total, website_total), regular_total), HUNDRED)
+                if regular_total != ZERO
+                else None
+            )
+        pos = (
+            total
+            if line.gift_selected
+            else pos_amount(
+                regular_total,
+                website_total,
+                total,
+                line.pos_calculation_mode,
+            )
+        )
     return LineResult(
         quantity=qty, regular_total=regular_total,
         website_discounted_total=website_total,
@@ -68,6 +110,8 @@ def _compute_line(line: LineInput, line_index: int) -> LineResult:
         ten_pct_unit=ten_unit, ten_pct_total=mul_qty(ten_unit, qty),
         manager_mode=line.manager_mode if total is not None else None,
         manager_unit=unit, manager_line_total=total, pos_amount=pos,
+        pos_calculation_mode=line.pos_calculation_mode,
+        pos_discount_percentage=pos_percentage,
         warnings=soft_warnings(line_index, total, website_total),
     )
 

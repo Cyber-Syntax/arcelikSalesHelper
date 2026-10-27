@@ -2,7 +2,7 @@ from decimal import Decimal as D
 
 from arcelikSalesHelper.application.calculator import LineForm, evaluate_line
 from arcelikSalesHelper import strings as T
-from arcelikSalesHelper.domain.models import POS_LABEL, ManagerMode
+from arcelikSalesHelper.domain.models import POS_LABEL, ManagerMode, PosCalculationMode
 
 
 def form(**kw: object) -> LineForm:
@@ -18,6 +18,19 @@ def test_standard_calculation_and_pos_use_website_discounted_price():
     assert ev.result.ten_pct_unit == D("119518.20")
     assert ev.result.pos_amount == D("124500")
     assert POS_LABEL in [section.title for section in ev.view.sections]
+
+
+def test_percentage_mode_explains_derived_rate_and_gross_up():
+    ev = evaluate_line(form(
+        regular_price="38.299,00",
+        website_discounted_price="34.469,10",
+        manager_value="30.000,00",
+        pos_calculation_mode=PosCalculationMode.PERCENTAGE,
+    ))
+    assert ev.view is not None and ev.result is not None
+    rows = {row.label: row.value for row in ev.view.card.pos.rows}
+    assert rows[T.LBL_POS_AMOUNT].startswith("33.333,333333333333")
+    assert rows[T.LBL_POS_DISCOUNT_RATE] == "10%"
 
 
 def test_zero_website_price_displays_regular_price_and_zero_discount():
