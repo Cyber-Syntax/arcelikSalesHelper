@@ -62,7 +62,7 @@ History tab is used to keep track of the calculation done by employee to remembe
 - [ ] beautify the ui more responsive and user friendly
   - calculator and history need more better ui because currently there is a lot of written text and makes it hard to read and understand
 - [ ] add csv export feature
-- [ ] refactor business-helper constants to arcelikSalesHelper constants
+- [x] refactor business-helper constants to arcelikSalesHelper constants
 
 ## good-to-have features
 

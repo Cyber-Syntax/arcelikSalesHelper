@@ -203,10 +203,11 @@ calculation_lines(id, snapshot_id FK ON DELETE RESTRICT, line_index,
 
 **`paths.py`**
 
-- Windows: `platformdirs.user_data_dir(app, company)`, which maps to `%LOCALAPPDATA%\<Company>\<App>`.
-- Linux: `platformdirs.user_data_dir(app)` (appauthor=False), which uses `$XDG_DATA_HOME` or `~/.local/share`.
-- Create directories with `exist_ok=True`. Allow an env override `src/arcelikSalesHelper_DATA_DIR` for tests only.
-- Open question to confirm before M12: the final `<CompanyName>` and `<AppName>` strings. Use placeholders `AppName="BusinessHelper"` and `CompanyName="BusinessHelper"` in a single constants module.
+- Windows: `platformdirs.user_data_dir("arcelikSalesHelper", "arcelikSalesHelper")`, mapping to `%LOCALAPPDATA%\arcelikSalesHelper\arcelikSalesHelper`.
+- Linux: `platformdirs.user_data_dir("arcelikSalesHelper", appauthor=False)`, using `$XDG_DATA_HOME` or `~/.local/share`.
+- Use `arcelikSalesHelper.sqlite` for the live database and `arcelikSalesHelper-` for backup filenames. The test/portable data-directory override is `ARCELIKSALESHELPER_DATA_DIR`.
+- Keep the GUI display name separate and user-facing; its current value is “Arcelik Satış Yardımcısı”.
+- Do not migrate the previous `BusinessHelper` data directory or settings; the renamed identity uses a fresh directory and leaves old files untouched.
 
 **Tests:** corrupted-temp detection (monkeypatch integrity result), retention (create 35, keep 30, newest preserved), failed backup does not delete old ones, live DB untouched, policy functions around the 24h boundary, and the failure banner state.
 

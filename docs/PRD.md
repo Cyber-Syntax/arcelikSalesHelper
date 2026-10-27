@@ -1,6 +1,6 @@
 # Product Requirements Document (PRD)
 
-**Project:** Business Helper  
+**Project:** arcelikSalesHelper
 **Document version:** 0.4
 **Status:** Proposed
 
@@ -59,7 +59,7 @@ Pricing calculations should use functional programming as much as practical. Pur
 
 Website scraping may be developed later as a separate authorized tool or as an optional integration if an authorized API/feed exists. The MVP workflow is:
 
-`external scraper or manual source -> CSV file -> Business Helper import`
+`external scraper or manual source -> CSV file -> arcelikSalesHelper import`
 
 The GUI must not depend on scraping behavior, website markup, or anti-bot workarounds.
 
@@ -420,8 +420,11 @@ Calculation snapshots and lines must preserve values as entered and normalized v
 
 Store the live database and a `backups/` directory using `platformdirs`:
 
-- Windows: `%LOCALAPPDATA%/<CompanyName>/<AppName>/`
-- Linux: `$XDG_DATA_HOME/<AppName>/`, falling back to `~/.local/share/<AppName>/`
+- Windows: `%LOCALAPPDATA%/arcelikSalesHelper/arcelikSalesHelper/`
+- Linux: `$XDG_DATA_HOME/arcelikSalesHelper/`, falling back to `~/.local/share/arcelikSalesHelper/`
+- Database: `arcelikSalesHelper.sqlite`; backups use the `arcelikSalesHelper-` filename prefix.
+- The test/portable data-directory override is `ARCELIKSALESHELPER_DATA_DIR`.
+- Keep technical storage identifiers separate from the GUI display name, currently “Arcelik Satış Yardımcısı”.
 
 Automatic backup requirements:
 

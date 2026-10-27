@@ -54,7 +54,7 @@ def names(directory: Path) -> list[str]:
 def test_backup_is_a_verified_single_file_copy(db, repo, backup_dir) -> None:  # type: ignore[no-untyped-def]
     repo.add(FRIDGE)
     info = make(db, backup_dir)
-    assert info.path.name == "business_helper-20260101T120000Z-manual.sqlite"
+    assert info.path.name == "arcelikSalesHelper-20260101T120000Z-manual.sqlite"
     assert names(backup_dir) == [
         info.path.name
     ]  # no temp, -wal or -shm leftovers
@@ -178,8 +178,8 @@ def test_retention_keeps_the_newest_30(db, backup_dir) -> None:  # type: ignore[
         make(db, backup_dir, now=T0 + timedelta(seconds=i))
     remaining = names(backup_dir)
     assert len(remaining) == 30
-    assert remaining[0] == "business_helper-20260101T120005Z-manual.sqlite"
-    assert remaining[-1] == "business_helper-20260101T120034Z-manual.sqlite"
+    assert remaining[0] == "arcelikSalesHelper-20260101T120005Z-manual.sqlite"
+    assert remaining[-1] == "arcelikSalesHelper-20260101T120034Z-manual.sqlite"
 
 
 def test_rotation_ignores_unrelated_files_and_removes_only_stale_temp_files(  # type: ignore[no-untyped-def]
@@ -187,7 +187,7 @@ def test_rotation_ignores_unrelated_files_and_removes_only_stale_temp_files(  # 
 ) -> None:
     backup_dir.mkdir()
     (backup_dir / "notes.txt").write_text("keep me")
-    (backup_dir / "business_helper.sqlite").write_bytes(b"live-looking file")
+    (backup_dir / "arcelikSalesHelper.sqlite").write_bytes(b"live-looking file")
     fresh = backup_dir / ".tmp-fresh.sqlite"
     fresh.write_bytes(b"x")
     stale = backup_dir / ".tmp-stale.sqlite"
@@ -199,7 +199,7 @@ def test_rotation_ignores_unrelated_files_and_removes_only_stale_temp_files(  # 
     make(db, backup_dir, now=T0 + timedelta(seconds=1), keep=1)
 
     remaining = names(backup_dir)
-    assert {"notes.txt", "business_helper.sqlite", ".tmp-fresh.sqlite"} <= set(
+    assert {"notes.txt", "arcelikSalesHelper.sqlite", ".tmp-fresh.sqlite"} <= set(
         remaining
     )
     assert ".tmp-stale.sqlite" not in remaining
