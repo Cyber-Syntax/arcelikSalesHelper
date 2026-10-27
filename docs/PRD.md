@@ -1,7 +1,7 @@
 # Product Requirements Document (PRD)
 
-**Project:** Business Helper  
-**Document version:** 0.3  
+**Project:** arcelikSalesHelper
+**Document version:** 0.4
 **Status:** Proposed
 
 ## 1. Project overview
@@ -21,13 +21,14 @@ Pricing calculations should use functional programming as much as practical. Pur
 - Optionally store a default gift name and notes for a product.
 - Calculate the standard 10% scenario.
 - Compare a normal website-discount option with a gift option.
-- Accept a manager-provided sale value as a manually entered amount, without modeling it as a fixed percentage.
-- Support both unit-price and total-line-price manager values.
-- Calculate the POS-entry amount using the supplied operational formula.
+- Accept separate manager-provided boss discounted and boss gifted sale values, without modeling either as a fixed percentage.
+- Support both unit-price and total-line-price modes for each manager-provided sale value.
+- Calculate the POS-entry amount using the operational formula for the selected website or gift option.
 - Support multiple products and quantities in one calculation.
 - Preserve complete, immutable calculation snapshots because prices and promotions can change over time.
 - Use one local SQLite database with robust automatic backups on Windows and Linux.
-- Present TRY amounts in Turkish-style currency format, such as `153.345,56 TL`, preserving kuruş.
+- Present TRY amounts in Turkish-style currency format: `.` separates thousands, `,` separates lira from the fractional amount, and the `TL` suffix is appended (for example `54.999,52 TL`). Do not round, quantize, or truncate displayed calculation results. Ordinary lira/kuruş inputs use two fractional digits (`00` through `99`); exact derived values may show more fractional digits when required to preserve the value employees must copy into the POS.
+- Present every user-visible label, message, warning, dialog, formula explanation, and history heading in Turkish for the first release. A language selector is deferred to a later enhancement.
 
 ## 3. MVP scope and non-goals
 
@@ -39,8 +40,7 @@ Pricing calculations should use functional programming as much as practical. Pur
 - Single-product and multi-product calculations.
 - Quantity per calculator line.
 - Per-line gift selection and gift-name override.
-- Temporary additional coupon override.
-- Temporary manager-provided value with unit or total-line mode.
+- Temporary boss discounted and boss gifted values, each with unit or total-line mode.
 - Website and gift options displayed side by side.
 - Complete calculation history.
 - SQLite schema migrations and verified automatic backups.
@@ -59,7 +59,7 @@ Pricing calculations should use functional programming as much as practical. Pur
 
 Website scraping may be developed later as a separate authorized tool or as an optional integration if an authorized API/feed exists. The MVP workflow is:
 
-`external scraper or manual source -> CSV file -> Business Helper import`
+`external scraper or manual source -> CSV file -> arcelikSalesHelper import`
 
 The GUI must not depend on scraping behavior, website markup, or anti-bot workarounds.
 
@@ -68,12 +68,12 @@ The GUI must not depend on scraping behavior, website markup, or anti-bot workar
 - **Product name:** The product's display name. Product codes are outside MVP scope.
 - **Regular/first price:** The product's original price shown by the company website or used as the POS starting price.
 - **Website discounted price:** The normal discounted price observed on the company website.
-- **Additional coupon discount amount:** An extra monetary reduction applied after the normal website discounted price. It may vary by customer and is a temporary calculator input unless explicitly saved as a future product feature.
-- **Effective website price:** `website_discounted_price - additional_coupon_discount_amount`.
 - **Gift:** A promotion included with a product. A saved product may have a default gift name, and the calculator may override it for the current transaction.
 - **Gift option:** The option in which the customer receives the gift and the discount scenarios use the regular/first price as their base.
-- **Manager-provided value:** A manually entered sale amount supplied by the manager. It is not a percentage and must not be converted into one.
-- **Manager value mode:** Whether the manager-provided value is a unit price or the total price for the entire calculator line.
+- **Boss discounted price:** A manually entered manager sale amount for the normal website/no-gift option. It is not a percentage.
+- **Boss gifted price:** A manually entered manager sale amount for the gift option. It is not a percentage.
+- **Manager value mode:** Whether a supplied boss price is a unit price or the total price for the entire calculator line.
+- **POS calculation mode:** Per-line choice between fixed-amount and percentage-based website/no-gift POS calculation. Defaults to fixed amount.
 - **POS-entry amount:** The value calculated for entry into Dynamics AX/POS. It is separate from the customer-facing website or manager option and remains labeled as requiring operational verification.
 
 ### Product fields
@@ -95,15 +95,15 @@ Product codes are not required or modeled in the MVP.
 
 Each calculator line supports:
 
-- Product selection or one-off product name.
+- Saved product selection through a searchable multi-select catalog, or a one-off product name.
 - Quantity, defaulting to one.
 - Regular price used.
 - Website discounted price used.
-- Additional coupon amount for this calculation.
 - Gift selected/not selected.
 - Gift name, using the saved default or a temporary override.
-- Manager-provided value.
-- Manager value mode: unit price or total line price.
+- Boss discounted price for the normal website/no-gift option, when supplied.
+- Boss gifted price for the gift option, when supplied.
+- A manager value mode for each sale value: unit price or total line price.
 
 All values used in a calculation must be copied into its history snapshot. Later product edits must not change old calculations.
 
@@ -113,48 +113,40 @@ Use Python's `Decimal` for monetary arithmetic. Never use binary floating-point 
 
 The application must accept:
 
-- Turkish-style values such as `54.999,00`.
+- Turkish-style values such as `54.999,00` and `54.999,52`.
 - Plain integer values such as `54999`.
 - Standard decimal values such as `54999.00`.
 
-Values are normalized internally and displayed consistently as Turkish TRY, for example `54.999,00 TL`.
+Values are normalized internally and displayed consistently as Turkish TRY, for example `54.999,52 TL`. Display formatting preserves the exact `Decimal` value without rounding. A value representing 100 kuruş carries into the lira portion as `1,00 TL`; it must never be displayed with a three-digit kuruş portion.
 
 Validate that:
 
 - Product prices are numeric and non-negative.
 - Quantity is a positive whole number.
-- Additional coupon amount is non-negative and does not exceed the website discounted price.
-- Effective website price cannot be negative.
-- Manager-provided value is numeric and non-negative.
-- Manager value mode is explicitly recorded.
+- Each supplied boss price is numeric and non-negative.
+- The manager value mode is explicitly recorded separately for each supplied boss price.
 
-The application may warn when a manager-provided value is unexpectedly greater than the applicable website amount, but it must not silently reinterpret or replace the value.
+The application may warn when a boss price is unexpectedly greater than the applicable website amount, but it must not silently reinterpret or replace the value.
 
 ## 6. Pricing and calculation requirements
 
-### Rule A: Website price and coupon
+### Rule A: Website discounted price
 
-`effective_website_price = website_discounted_price - additional_coupon_amount`
-
-The UI must show the regular price, normal website discounted price, coupon amount, and effective website price separately.
-
-The coupon amount is a temporary per-calculation override and must not overwrite saved product data automatically.
+The website discounted price is the normal price observed on the website. It is stored and used directly; the first release has no additional coupon input.
 
 For a quantity:
 
 ```text
 regular_total = regular_price × quantity
-website_total = website_discounted_price × quantity
-coupon_total = additional_coupon_amount × quantity
-effective_website_total = effective_website_price × quantity
+website_discounted_total = website_discounted_price × quantity
 ```
 
 ### Rule B: Standard 10% scenario
 
-The standard 10% scenario is separate from the manager-provided value.
+The standard 10% scenario is separate from the boss prices.
 
-- **No gift:** use the effective website price as the discount base.
-- **Gift selected:** use the regular/first price as the discount base.
+- **No gift:** use the website discounted price as the discount base.
+- **Gift selected:** use the regular/first price as the discount base only when a 10% gift scenario is explicitly needed. The real gift workflow may instead use the boss gifted price and boss discounted price described below.
 
 ```text
 discount_amount = discount_base × 0.10
@@ -163,16 +155,21 @@ scenario_price = discount_base - discount_amount
 
 The UI must display the base, discount amount, resulting unit price, quantity, and resulting line total.
 
-### Rule C: Manager-provided sale value
+### Rule C: Manager-provided sale values
 
-The manager provides a manual sale value. The application must support both modes:
+The manager may provide different sale values for the two mutually exclusive customer options. The calculator must keep these values separate:
+
+- **Boss discounted price:** the manager's price for the normal website/no-gift option.
+- **Boss gifted price:** the manager's price for the gift option.
+
+The boss prices are manual sale values, not percentages. The application must support both unit-price and total-line-price modes for each value. The website/no-gift POS calculation mode is separate:
 
 #### Unit-price mode
 
 The entered amount is the sale price for one product.
 
 ```text
-manager_line_total = manager_unit_value × quantity
+boss_line_total = boss_unit_value × quantity
 ```
 
 #### Total-line-price mode
@@ -180,27 +177,28 @@ manager_line_total = manager_unit_value × quantity
 The entered amount is the sale price for the entire calculator line.
 
 ```text
-manager_line_total = manager_line_value
-manager_unit_value = manager_line_value / quantity
+boss_line_total = boss_line_value
+boss_unit_value = boss_line_value / quantity
 ```
 
-The UI must clearly display which mode was used. The application must not infer a percentage, compound the value with 10%, or automatically assign it to the product.
+The UI must clearly display which mode was used for each boss price. The application must not treat a boss price itself as a percentage or automatically assign either boss price to the product. Percentage POS mode derives its rate from the regular and website discounted prices, independently of the standard 10% scenario.
 
-For a no-gift sale, the manager may provide a total below the website total, for example `12.000,00 TL` becoming `11.000,00 TL`.
+For a no-gift sale, the manager may provide a boss discounted price below the website discounted price. The examples use `112.000,00 TL` and `43.500,00 TL`.
 
-For a gift sale, the manager value may be entered per unit, for example `4.500,00 TL × 3 = 13.500,00 TL`. The customer can compare this with the lower website price when the gift has greater practical value.
+For a gift sale, the manager may provide a separate boss gifted price. The customer must choose either the normal website/no-gift option or the gift option; the application must not combine both offers into one result.
 
 ### Rule D: Website and gift comparison
 
 When a gift is available, show both options side by side:
 
 1. **Website discount option**
-   - Uses the normal/effective website price.
+   - Uses the website discounted price.
    - Shows the standard 10% result where applicable.
+   - Shows the boss discounted price when supplied.
 2. **Gift option**
    - Shows the gift name.
    - Uses the regular price as the 10% discount base.
-   - Shows the manager-provided value when supplied.
+   - Shows the boss gifted price when supplied.
 
 The application must not decide which option the customer should choose.
 
@@ -208,23 +206,44 @@ Gift selection is independent for each calculator line. A transaction may contai
 
 ### Rule E: POS-entry amount
 
-The supplied formula is:
+The POS amount depends on the selected option.
+
+For the normal website/no-gift option:
+
+In **fixed-amount** mode (the default):
 
 ```text
 POS line amount =
-(regular line total - normal website discounted line total)
-+ manager-provided line total
+(regular line total - website discounted line total)
++ boss discounted line total
 ```
 
-The formula uses the **normal website discounted price**, not the customer-specific effective website price after an additional coupon.
+The formula uses the **website discounted price**.
 
-For a single unit:
+The discount amount used by this formula is:
 
 ```text
-(5.000,00 - 4.000,00) + 3.000,00 = 4.000,00 TL
+discount amount = regular price - website discounted price
 ```
 
-For quantity, the regular and normal website prices are multiplied by quantity, and the manager value is normalized to its line total according to the selected manager value mode.
+In **percentage** mode, derive the website discount rate from the entered prices and gross up the boss line total by the remaining website-price ratio:
+
+```text
+website discount rate = (regular price - website discounted price) / regular price
+POS line amount = boss discounted line total / (1 - website discount rate)
+```
+
+Use Decimal arithmetic at the configured precision without currency quantization. If regular price is zero, use the boss line total unchanged because a percentage rate cannot be derived. The selected mode applies independently to each line and is recorded in history.
+
+For the gift option, the POS system workflow is different:
+
+```text
+POS gifted line amount = boss gifted line total
+```
+
+The gift price is entered as zero in the POS gift workflow, while the original product price is entered, resulting in the boss gifted price as the final POS amount. The calculator must show this as a separate gift-option POS result and must not apply the no-gift formula to it.
+
+For quantity, regular and website discounted prices are multiplied by quantity. Each boss price is normalized to its line total according to its selected manager value mode.
 
 The POS result must be displayed separately as:
 
@@ -232,16 +251,89 @@ The POS result must be displayed separately as:
 
 The application must not claim that this result is an official or manager-approved POS instruction.
 
+For a gift sale, the selected website/no-gift POS mode has no effect. Gift POS remains the boss gifted line total.
+
 ### Rule F: Transaction totals
 
 For multiple calculator lines:
 
 - Calculate every line independently.
-- Preserve each line's selected gift state and manager value mode.
+- Preserve each line's selected gift state and each supplied boss price's value mode.
 - Sum corresponding line totals for transaction totals.
 - Show per-line details and totals.
 
-At minimum, show totals for regular price, website option, effective website option, 10% scenario, manager option, and POS-entry amount when required inputs are present.
+At minimum, show totals for regular price, website discounted option, 10% scenario, boss discounted option, boss gifted option, and the option-specific POS-entry amount when required inputs are present.
+
+### Examples calculated by a real employee using real products
+
+NOTE: Two offer won't work together, customer need to choose one of them, either website discounted price or gift option. So, we need to show both options side by side to let the customer choose which one they want to use.
+
+These examples are acceptance fixtures for the calculator. Amounts are shown with Turkish separators in the UI, while the source examples may use a decimal point.
+
+#### Example 1: no gift
+
+- first price: 145,298.00 (learned from the website/POS)
+- discounted price: 132,798.00 (learned from the website/POS)
+- Last/boss price: 112,000.00 (learned from the boss/manager)
+- discounted price %10: 119.518,20 (132.798,00 * 0,9)
+- POS: 124,500.00 (112,000,00 + 12,500,00)
+- discount: 12.500,00 (145,298.00 - 132,798.00)
+
+Expected rules:
+
+```text
+discount amount = 145.298,00 - 132.798,00 = 12.500,00 TL
+POS = 112.000,00 + 12.500,00 = 124.500,00 TL
+```
+
+#### Example 2: no gift
+
+- first price: 54,299.00 (learned from the website/POS)
+- discounted price: 48,299.00 (learned from the website/POS)
+- Last/boss price: 43,500.00 (learned from the boss/manager)
+- discounted price %10: 43,469.1 (48,299.00 * 0,9)
+- POS: 49,500.00 (43,500.00 + 6,000.00)
+- discount: 6,000.00 (54,299.00 - 48,299.00)
+
+Expected rules:
+
+```text
+discount amount = 54.299,00 - 48.299,00 = 6.000,00 TL
+POS = 43.500,00 + 6.000,00 = 49.500,00 TL
+```
+
+#### Example 3: gift and no-gift options
+
+- first price: 53.199
+- discounted price: 45.199
+- boss gifted price: 48.000,00
+- boss discounted price: 38,000,00
+- POS gifted: 48.000,00 (POS system directly make 0 to gift price and write the 53.199, so POS system gifted is directly became the boss gifted price)
+- POS without gift: 46.000,00 (38.000,00 + 8.000,00)
+- discount amount: 8.000,00 TL
+- gift name: TKM 9961
+- gift price: 14.539
+- gift discounted price: 12.399
+
+The two offers are alternatives:
+
+```text
+discount amount = 53.199,00 - 45.199,00 = 8.000,00 TL
+POS without gift = 38.000,00 + 8.000,00 = 46.000,00 TL
+POS gifted = 48.000,00 TL
+```
+
+The calculator must display `TKM 9961`, `14.539,00 TL`, and `12.399,00 TL` as gift information, 
+while keeping the boss gifted price (`48.000,00 TL`) and boss discounted price (`38.000,00 TL`) as separate sale inputs.
+
+#### Example 4: percentage-based website discount
+
+- regular/first price: `38.299,00`
+- website discounted price: `34.469,10`
+- boss discounted price: `30.000,00`
+- POS mode: percentage
+- derived rate: `(38.299,00 - 34.469,10) / 38.299,00 = 10%`
+- POS: `30.000,00 / (1 - 0,10) = 33.333,333… TL` (display the result to the configured Decimal precision)
 
 ## 7. Main screens
 
@@ -257,11 +349,10 @@ At minimum, show totals for regular price, website option, effective website opt
 - Add, remove, and reorder product lines.
 - Select a saved product or enter a one-off product.
 - Set quantity for each line.
-- Override the coupon amount for the current calculation.
 - Select gift/no-gift per line.
 - Override the gift name per line.
-- Enter a manager-provided value per line.
-- Select unit-price or total-line-price manager mode.
+- Enter a boss discounted price and, when a gift is available, a separate boss gifted price.
+- Select unit-price or total-line-price mode for each supplied boss price.
 - Show website and gift options side by side.
 - Show per-line results and transaction totals.
 - Show formulas, bases, input values, and warnings.
@@ -273,9 +364,9 @@ Save complete immutable snapshots containing:
 
 - Date and time.
 - Product name and quantity.
-- Regular, website, coupon, and effective prices used.
+- Regular and website discounted prices used.
 - Gift selection and gift name.
-- Manager-provided value, normalized line total, and value mode.
+- Boss discounted price, boss gifted price, each normalized line total, and each selected value mode.
 - Website-option result.
 - Gift-option result.
 - 10% result.
@@ -286,11 +377,13 @@ History must remain understandable after product prices, gift promotions, or not
 
 ### D. CSV import
 
-CSV import is the final MVP milestone. The required columns are exactly:
+CSV import is the final MVP milestone. The required columns are `product_name` and `regular_price`; `website_discounted_price` is optional:
 
 ```text
-product_name,regular_price,website_discounted_price
+product_name,regular_price[,website_discounted_price]
 ```
+
+If the optional website discount column is omitted or a row's value is blank, the importer stores `0`, which the application displays as “YOK”.
 
 The importer must:
 
@@ -302,7 +395,7 @@ The importer must:
 - Apply a valid import transactionally.
 - Display an import summary.
 
-CSV import does not include product codes, manager values, gift data, or other optional fields in the MVP.
+CSV import does not include product codes, boss prices, gift data, or other optional fields in the MVP.
 
 ### E. Settings and backups
 
@@ -327,8 +420,11 @@ Calculation snapshots and lines must preserve values as entered and normalized v
 
 Store the live database and a `backups/` directory using `platformdirs`:
 
-- Windows: `%LOCALAPPDATA%/<CompanyName>/<AppName>/`
-- Linux: `$XDG_DATA_HOME/<AppName>/`, falling back to `~/.local/share/<AppName>/`
+- Windows: `%LOCALAPPDATA%/arcelikSalesHelper/arcelikSalesHelper/`
+- Linux: `$XDG_DATA_HOME/arcelikSalesHelper/`, falling back to `~/.local/share/arcelikSalesHelper/`
+- Database: `arcelikSalesHelper.sqlite`; backups use the `arcelikSalesHelper-` filename prefix.
+- The test/portable data-directory override is `ARCELIKSALESHELPER_DATA_DIR`.
+- Keep technical storage identifiers separate from the GUI display name, currently “Arcelik Satış Yardımcısı”.
 
 Automatic backup requirements:
 
@@ -383,36 +479,43 @@ Pricing, parsing, validation, formatting, and aggregation functions should be pu
 
 ## 10. MVP milestones
 
-1. Functional money parsing, formatting, validation, and pricing calculations.
-2. SQLite product catalog and migrations.
-3. Single-product calculator.
-4. Multi-product calculator with quantities and gift comparisons.
-5. Complete calculation history.
-6. Verified automatic backups.
-7. CSV import as the final MVP milestone.
-8. Windows and Linux packaging and validation.
+1. Turkish-only localization of every user-visible string.
+2. Calculator rule correction and removal of the unused coupon feature.
+3. Domain core hardening: parsing, formatting, validation, and pure pricing tests.
+4. SQLite product catalog and migrations.
+5. Products tab and single-product calculator.
+6. Multi-product calculator with quantities and gift comparisons.
+7. Calculation history plus calculator save-product/save-history actions.
+8. Verified automatic backups.
+9. CSV import and export features.
+10. Selling types, reservations, and POS price division.
+11. Windows and Linux PyInstaller packaging and validation.
 
 ## 11. Acceptance criteria
 
 1. The PySide6 application launches on target Windows and Linux systems and stores SQLite data in the correct per-user data directory.
 2. A user can add, search, edit, archive, and restore products using product name, regular price, website discounted price, optional gift name, and notes.
 3. Product codes are not required for MVP operation.
-4. The application accepts `54.999,00`, `54999`, and `54999.00`, and displays each as `54.999,00 TL`.
-5. A coupon of `50,00 TL` applied to a website discounted price of `4.000,00 TL` produces an effective website price of `3.950,00 TL`.
-6. A no-gift 10% scenario uses the effective website price as its base.
+4. The application accepts `54.999,00`, `54.999,52`, `54999`, and `54999.00`, and displays them with Turkish separators and a `TL` suffix without changing their exact values.
+5. Display formatting preserves exact derived decimal values, including values with more than two fractional digits when division requires them.
+6. A no-gift 10% scenario uses the website discounted price as its base.
 7. A gift 10% scenario uses the regular price as its base.
-8. The calculator supports multiple product lines, quantities, and independent gift selections.
-9. The calculator displays website and gift options side by side when a gift is available.
-10. A manager value can be entered as either a unit price or a total line price, and the selected mode is visible in results and history.
-11. The manager value is not converted into a percentage, compounded automatically, or silently assigned to a product.
-12. The POS calculation uses `(regular line total - normal website discounted line total) + manager-provided line total` and does not substitute the effective coupon price.
-13. The POS result is visibly labeled `POS-entry calculation (verify before use)`.
-14. Transaction totals correctly sum independently calculated lines.
-15. A complete immutable calculation snapshot preserves all product values, quantities, gift choices, manager values, modes, results, and warnings used at calculation time.
-16. CSV import is the final MVP milestone and supports only `product_name,regular_price,website_discounted_price`.
-17. CSV import accepts both Turkish-style and plain numeric values and asks the user per conflict.
-18. Verified baseline, startup, clean-close, migration, manual, and retention backup behavior works as specified.
-19. Automated tests cover parsing, formatting, coupon validation, gift/no-gift bases, quantity calculations, both manager value modes, POS examples, multi-line totals, immutable snapshots, CSV conflicts, and backup verification/retention.
+8. Currency formatting represents 100 kuruş as the next lira (`1,00 TL`), never as a three-digit kuruş value.
+9. The calculator supports multiple product lines, quantities, and independent gift selections.
+10. The calculator displays website and gift options side by side when a gift is available.
+11. Separate boss discounted and boss gifted prices can be entered, each as either a unit price or a total line price, and each selected mode is visible in results and history.
+12. Boss prices are not themselves converted into percentages or compounded with the separate standard 10% scenario; percentage POS mode derives its rate only from regular and website discounted prices. Boss prices are never silently assigned to a product.
+13. For the website/no-gift option, fixed-amount mode calculates `(regular line total - website discounted line total) + boss discounted line total`; percentage mode derives the rate from regular and website discounted prices and gross-ups the boss line total by `1 / (1 - rate)`. Fixed amount is the default.
+14. For the gift option, the POS calculation is the boss gifted line total; the gift POS workflow represents the gift price as zero and writes the original product price.
+15. The POS result is visibly labeled `POS-entry calculation (verify before use)`.
+16. Transaction totals correctly sum independently calculated lines.
+17. A complete immutable calculation snapshot preserves all product values, quantities, gift choices, boss prices, modes, results, and warnings used at calculation time.
+18. All user-visible application text is Turkish; internal identifiers and CSV field names may remain English.
+19. CSV import requires `product_name,regular_price` and optionally accepts `website_discounted_price`.
+20. CSV import accepts both Turkish-style and plain numeric values and asks the user per conflict.
+21. Verified baseline, startup, clean-close, migration, manual, and retention backup behavior works as specified.
+22. Automated tests cover parsing, exact formatting, values with more than two fractional digits, carry behavior, gift/no-gift bases, quantity calculations, both manager value modes for both boss prices, the three real examples, option-specific POS calculations, multi-line totals, immutable snapshots, Turkish presentation, CSV conflicts, and backup verification/retention.
+23. Calculator users can search active products by name, select several across different queries, add them as lines in one action, and add one-off products without a per-line product dropdown.
 
 ## 12. Operational caution
 

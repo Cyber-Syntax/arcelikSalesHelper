@@ -6,7 +6,11 @@ description = "Desktop sales helper for Arcelik product pricing and calculations
 keywords = ["arcelik", "sales", "pricing", "desktop"]
 requires-python = ">=3.11"
 authors = [{ name = "Cyber-Syntax" }]
-dependencies = ["PySide6>=6.8", "platformdirs>=4.3"]
+dependencies = [
+  "PySide6>=6.8",
+  "platformdirs>=4.3",
+  "qt-material>=2.17",
+]
 classifiers = [
   "Development Status :: 3 - Alpha",
   "Environment :: X11 Applications",
@@ -30,6 +34,7 @@ dev = [
   "pytest>=8.3",
   "pytest-cov>=5",
   "pytest-qt>=4.4",
+  "pytest-asyncio>=0.22",
 ]
 lint = ["ruff>=0.9"]
 
@@ -40,6 +45,9 @@ build-backend = "setuptools.build_meta"
 [tool.uv]
 managed = true
 exclude-newer = "7 days"
+
+[tool.setuptools.package-data]
+arcelikSalesHelper = ["infrastructure/migrations/*.sql"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
