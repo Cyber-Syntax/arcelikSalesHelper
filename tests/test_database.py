@@ -159,7 +159,7 @@ def test_newer_schema_is_refused_and_left_untouched(tmp_path: Path) -> None:
     result = open_database(path)
     assert isinstance(result, Err)
     assert result.error.code == "schema_too_new"
-    assert "newer version" in result.error.message
+    assert "daha yeni bir sürümüyle" in result.error.message
 
     raw = sqlite3.connect(path)
     assert raw.execute("PRAGMA user_version").fetchone()[0] == 99

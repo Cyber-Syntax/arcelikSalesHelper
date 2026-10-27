@@ -123,7 +123,7 @@ def test_mixed_gift_and_no_gift_lines_give_the_expected_totals(
     assert result is not None
     assert result.totals.regular.value == D(23000)
     assert result.totals.ten_pct.value == D(19800)
-    assert pos_total(tab) == D(20500)
+    assert pos_total(tab) == D(17500)
     assert not tab.rows[
         0
     ].line.gift_check.isChecked()  # gift state is per line
@@ -136,7 +136,7 @@ def test_removing_a_line_recomputes_totals(qtbot, repo) -> None:  # type: ignore
     fill_two(tab)
     tab.rows[0].remove_button.click()
     assert len(tab.rows) == 1 and tab.rows[0].line.name_edit.text() == "Washer"
-    assert pos_total(tab) == D(16500)
+    assert pos_total(tab) == D(13500)
 
 
 def test_reordering_moves_the_state_with_the_line(qtbot, repo) -> None:  # type: ignore[no-untyped-def]
@@ -250,7 +250,7 @@ def test_transaction_pos_total_precedes_multi_line_details(qtbot, repo) -> None:
     fill_two(tab)
 
     amounts = [label.text() for label in tab.panel.findChildren(QLabel, "posAmount")]
-    assert amounts == ["20.500,00 TL", "4.000,00 TL", "16.500,00 TL"]
+    assert amounts == ["17.500,00 TL", "4.000,00 TL", "13.500,00 TL"]
     discounts = [label.text() for label in tab.panel.findChildren(QLabel, "discountAmountValue")]
     assert discounts == ["1.000,00 TL", "3.000,00 TL"]
     labels = " ".join(label.text() for label in tab.panel.findChildren(QLabel))
@@ -282,7 +282,7 @@ def test_option_cards_stack_at_narrow_width_and_return_to_columns(qtbot, repo) -
     assert tab.panel._option_layouts[0].direction() == QBoxLayout.Direction.TopToBottom
 
     install_material_theme(app, 100)
-    tab.panel.resize(700, 900)
+    tab.panel.resize(900, 900)
     tab.panel._update_option_directions()
     assert tab.panel._option_layouts[0].direction() == QBoxLayout.Direction.LeftToRight
     install_material_theme(app, DEFAULT_FONT_SCALE)
@@ -298,8 +298,8 @@ def test_light_blue_material_theme_and_result_styles_are_installed(qtbot) -> Non
     assert "QGroupBox#lineResultCard::title" in app.styleSheet()
     assert "QLabel#lineQuantityValue" in app.styleSheet()
     assert "QLabel#discountAmountLabel" in app.styleSheet()
-    assert "font-size: 24pt" in readability_styles(100)
-    assert "font-size: 13pt;\n    font-weight: 700" in readability_styles(100)
+    assert "font-size: 14pt" in readability_styles(100)
+    assert "font-size: 21pt;\n    font-weight: 700" in readability_styles(150)
     assert "QGroupBox::title" in app.styleSheet()
     assert "color: #26384a" in app.styleSheet()
 
@@ -353,6 +353,18 @@ def test_ambiguous_price_shows_a_hint(qtbot, repo) -> None:  # type: ignore[no-u
     qtbot.addWidget(tab)
     tab.rows[0].line.regular_edit.setText("5.000")
     assert "5.000,00 TL" in tab.rows[0].line.blocks["regular_price"].hint_text
+
+
+def test_single_dot_three_digit_input_uses_turkish_thousands_value(
+    qtbot, repo
+) -> None:  # type: ignore[no-untyped-def]
+    tab = CalculatorTab(repo)
+    qtbot.addWidget(tab)
+    line = tab.rows[0].line
+    fill(tab.rows[0], "Fridge", "1.234", "1.000,00")
+    assert tab.evaluation.lines[0].line is not None
+    assert tab.evaluation.lines[0].line.regular_price == D("1234")
+    assert "1.234,00 TL" in line.blocks["regular_price"].hint_text
 
 
 def test_save_emits_the_transaction_evaluation_with_entered_text(

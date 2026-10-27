@@ -4,6 +4,7 @@ from pathlib import Path
 import pytest
 from PySide6.QtWidgets import QMessageBox
 
+from arcelikSalesHelper import strings as T
 from arcelikSalesHelper.domain.products import ProductDraft
 from arcelikSalesHelper.domain.result import Ok
 from arcelikSalesHelper.domain.stock import StockSource
@@ -16,7 +17,11 @@ HEADER = "product_name,regular_price,website_discounted_price"
 
 @pytest.fixture(autouse=True)
 def no_message_boxes(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(QMessageBox, "information", lambda *a, **k: None)
+    monkeypatch.setattr(
+        QMessageBox,
+        "exec",
+        lambda _self: int(QMessageBox.StandardButton.Ok),
+    )
 
 
 def csv_file(tmp_path: Path, text: str) -> Path:
@@ -38,10 +43,13 @@ def test_preview_conflicts_need_a_decision_before_apply(qtbot, repo, db, tmp_pat
     dialog.load_file(csv_file(tmp_path, f'{HEADER}\nFridge,"5.500,00",4000\nOven,100,90\n'))
 
     assert dialog.table.rowCount() == 2
-    assert [dialog.table.item(r, 1).text() for r in range(2)] == ["Conflict", "New"]
+    assert [dialog.table.item(r, 1).text() for r in range(2)] == [
+        T.STATUS_CONFLICT,
+        T.STATUS_NEW,
+    ]
     assert "5.000,00 TL → 5.500,00 TL" in dialog.table.item(0, 3).text()
     assert not dialog.apply_button.isEnabled()
-    assert "conflict" in dialog.status_label.text().lower()
+    assert "çakışma" in dialog.status_label.text().lower()
 
     dialog.decision_combos[2].setCurrentIndex(1)  # Update
     assert dialog.apply_button.isEnabled()
@@ -80,7 +88,7 @@ def test_a_bad_header_shows_a_message_and_no_preview(qtbot, repo, db, tmp_path) 
     dialog = ImportDialog(repo, db)
     qtbot.addWidget(dialog)
     dialog.load_file(csv_file(tmp_path, "name,price\nA,1\n"))
-    assert "Invalid header" in dialog.file_error.text()
+    assert "Geçersiz başlık" in dialog.file_error.text()
     assert dialog.table.rowCount() == 0 and not dialog.apply_button.isEnabled()
 
 
@@ -99,7 +107,7 @@ def test_stock_file_preview_shows_old_and_new_quantity(qtbot, repo, db, tmp_path
     dialog = ImportDialog(repo, db)
     qtbot.addWidget(dialog)
     dialog.load_file(csv_file(tmp_path, "product_name,quantity\nFridge,6\n"))
-    assert dialog.table.item(0, 1).text() == "Stock update"
+    assert dialog.table.item(0, 1).text() == T.STATUS_STOCK_UPDATE
     assert dialog.table.item(0, 5).text() == "2 → 6"
     dialog.apply_button.click()
     assert repo.get(fridge.id).quantity == 6  # type: ignore[union-attr]

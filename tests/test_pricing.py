@@ -103,7 +103,7 @@ def test_percentage_pos_mode_respects_line_total_quantity_and_gift_pos():
         manager_mode=ManagerMode.LINE,
         pos_calculation_mode=PosCalculationMode.PERCENTAGE,
     ))
-    assert str(line.pos_amount).startswith("666.666666666666")
+    assert str(line.pos_amount).startswith("333.333333333333")
     gift = calc(make(
         regular_price=D("100"),
         website_discounted_price=D("90"),
@@ -134,6 +134,45 @@ def test_quantity_scales_totals_and_transaction():
     assert transaction.value.totals.website_discounted.value == D(12000)
 
 
-@pytest.mark.parametrize("line", [make(quantity=0), make(regular_price=D(-1)), make(website_discounted_price=D(-1)), make(manager_value=D(1))])
+@pytest.mark.parametrize(
+    "line",
+    [
+        make(quantity=0),
+        make(quantity=True),
+        make(regular_price=D(-1)),
+        make(regular_price=D("NaN")),
+        make(website_discounted_price=D(-1)),
+        make(website_discounted_price=D("Infinity")),
+        make(manager_value=D(1)),
+        make(manager_value=D(-1), manager_mode=ManagerMode.UNIT),
+        make(manager_value=D("NaN"), manager_mode=ManagerMode.LINE),
+        make(manager_mode=ManagerMode.UNIT),
+    ],
+)
 def test_invalid_calculator_values_are_rejected(line: LineInput):
     assert isinstance(calculate_line(line), Err)
+
+
+def test_manager_total_above_website_total_is_a_warning_and_is_preserved():
+    line = make(
+        quantity=2,
+        website_discounted_price=D("4000"),
+        manager_value=D("9000"),
+        manager_mode=ManagerMode.LINE,
+    )
+    result = calc(line)
+    assert result.manager_line_total == D("9000")
+    assert len(result.warnings) == 1
+    assert result.warnings[0].code == "manager_exceeds_website"
+
+
+def test_transaction_totals_mark_missing_manager_lines_without_partial_sum():
+    lines = [
+        make(manager_value=D("1000"), manager_mode=ManagerMode.UNIT),
+        make(product_name="Washer"),
+    ]
+    result = calculate_transaction(lines)
+    assert isinstance(result, Ok)
+    assert result.value.totals.manager.value is None
+    assert result.value.totals.manager.missing_lines == (1,)
+    assert result.value.totals.regular.value == D("10000")

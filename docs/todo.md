@@ -55,7 +55,8 @@ History tab is used to keep track of the calculation done by employee to remembe
 
 ## must-have features
 
-- [ ] add a price for all of the products, not per line!!! 
+- [-] add a price for all of the products, not per line!!!
+  - [ ] workoaround used now, first line can be useable for fast calculations
 - [x] Verify all the calculation text which some seems unnecessary.
 - [x] add turkish language support
 - [ ] beautify the ui more responsive and user friendly

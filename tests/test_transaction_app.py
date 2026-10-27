@@ -45,7 +45,7 @@ def test_mixed_gift_and_no_gift_totals_are_formatted() -> None:
     assert ev.valid
     t = totals(ev)
     assert t[T.LBL_TOTAL_DISCOUNT] == "4.000,00 TL"
-    assert t[T.LBL_TOTAL_POS] == "20.500,00 TL"
+    assert t[T.LBL_TOTAL_POS] == "17.500,00 TL"
     assert POS_LABEL in [s.title for s in ev.totals_sections]
     assert ev.result is not None
     assert [r.discount_amount for r in ev.result.lines] == [D(1000), D(3000)]
@@ -131,7 +131,11 @@ def test_no_gift_line_shows_only_final_website_offer_amounts() -> (
     assert val(card.website_option, T.LBL_WEBSITE_OFFER_TOTAL) == "3.600,00 TL"
     assert val(card.website_option, T.LBL_DISCOUNT_AMOUNT) == "1.000,00 TL"
     assert val(card.prices, "Yönetici toplamı") == "3.000,00 TL"
-    assert [row.label for row in card.pos.rows] == [T.LBL_POS_AMOUNT]
+    assert [row.label for row in card.pos.rows] == [
+        T.LBL_POS_AMOUNT,
+        T.FORM_POS_CALCULATION_MODE,
+        T.POS_FORMULA_LABEL,
+    ]
     assert all("baz" not in row.label.lower() for row in card.website_option.rows)
 
 

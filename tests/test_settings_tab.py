@@ -157,7 +157,7 @@ def test_text_scale_changes_immediately_and_persists_across_windows(
     app = QApplication.instance()
     assert app is not None
     assert "font-size: 19.5px" in app.styleSheet()
-    assert "font-size: 42.0pt" in app.styleSheet()
+    assert "font-size: 21pt" in app.styleSheet()
 
     restored_settings = QSettings(
         str(tmp_path / "ui-settings.ini"), QSettings.Format.IniFormat

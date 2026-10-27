@@ -22,7 +22,7 @@ def test_mixed_gift_and_no_gift_totals() -> None:
     assert t.website_discounted.value == D(19000)  # 4000 + 15000
     assert t.ten_pct.value == D(19800)  # 3600 + (5400 * 3)
     assert t.manager.value == D(16500)  # 3000 + 13500
-    assert t.pos.value == D(20500)  # 4000 + 16500
+    assert t.pos.value == D(17500)  # 4000 + 13500 (gift POS is the line total)
     assert r.value.lines[0].ten_pct_base == D(
         4000
     )  # no gift -> effective website

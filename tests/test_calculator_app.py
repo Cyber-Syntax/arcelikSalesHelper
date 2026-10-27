@@ -1,6 +1,10 @@
 from decimal import Decimal as D
 
-from arcelikSalesHelper.application.calculator import LineForm, evaluate_line
+from arcelikSalesHelper.application.calculator import (
+    LineForm,
+    evaluate_line,
+    read_money,
+)
 from arcelikSalesHelper import strings as T
 from arcelikSalesHelper.domain.models import POS_LABEL, ManagerMode, PosCalculationMode
 
@@ -64,6 +68,27 @@ def test_gift_uses_regular_price_for_ten_percent():
     gift_rows = {row.label: row.value for row in ev.view.card.gift_option.rows}
     assert gift_rows[T.LBL_FIRST_PRICE_TEN_PERCENT] == "130.768,20 TL"
     assert T.LBL_DISCOUNT_AMOUNT not in gift_rows
+
+
+def test_ambiguous_turkish_thousands_input_is_parsed_and_hinted():
+    read = read_money("1.234")
+    assert read.value == D("1234")
+    assert read.error is None
+    assert read.hint is not None and "1.234,00 TL" in read.hint
+
+
+def test_calculator_keeps_exact_fractional_input_and_result_display():
+    ev = evaluate_line(
+        form(
+            regular_price="1,005",
+            website_discounted_price="0,995",
+            manager_value="0,005",
+        )
+    )
+    assert ev.line is not None and ev.view is not None
+    assert ev.line.regular_price == D("1.005")
+    displayed = {row.label: row.value for row in ev.view.card.prices.rows}
+    assert displayed[T.LBL_REGULAR_UNIT] == "1,005 TL"
 
 
 def test_total_line_manager_value_remains_authoritative():

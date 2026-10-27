@@ -69,12 +69,12 @@ def test_utf8_bom_is_accepted(tmp_path: Path) -> None:
 @pytest.mark.parametrize(
     "text, fragment",
     [
-        ("", "empty"),
-        ("name,price\n", "missing"),
-        (f"{HEADER},extra\n", "unexpected"),
-        ("product_name,regular_price\n", "missing"),
-        (f"{HEADER},{HEADER.split(',')[0]}\n", "more than once"),
-        (HEADER.replace(",", ";") + "\n", "semicolon"),
+        ("", "boş"),
+        ("name,price\n", "eksik"),
+        (f"{HEADER},extra\n", "beklenmeyen"),
+        ("product_name,regular_price\n", "eksik"),
+        (f"{HEADER},{HEADER.split(',')[0]}\n", "birden fazla"),
+        (HEADER.replace(",", ";") + "\n", "noktalı virgül"),
     ],
 )
 def test_bad_headers_are_file_level_errors(text: str, fragment: str) -> None:
@@ -96,7 +96,7 @@ def test_blank_lines_are_skipped_and_errors_carry_row_and_column() -> None:
 def test_duplicate_names_in_the_file_reference_the_first_row() -> None:
     p = parsed(f"{HEADER}\nFridge,1,1\n  fridge ,2,2\n")
     assert [r.row for r in p.rows] == [2]
-    assert p.errors[0].row == 3 and "row 2" in p.errors[0].message
+    assert p.errors[0].row == 3 and "2. satır" in p.errors[0].message
 
 
 def test_extra_cells_are_an_error_unless_blank() -> None:
@@ -125,7 +125,7 @@ def test_stock_format_needs_a_quantity_on_every_row_and_any_column_order() -> No
 def test_row_and_size_limits(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(csv_import, "MAX_ROWS", 2)
     result = parse_csv_text(f"{HEADER}\nA,1,1\nB,1,1\nC,1,1\n")
-    assert isinstance(result, Err) and "Too many rows" in result.error
+    assert isinstance(result, Err) and "çok fazla satır" in result.error.lower()
 
     path = tmp_path / "big.csv"
     path.write_text(f"{HEADER}\nA,1,1\n", encoding="utf-8")

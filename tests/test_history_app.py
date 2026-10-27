@@ -95,7 +95,7 @@ def test_snapshot_level_fields() -> None:
     _, rec = snapshot()
     assert rec.confirmation_state == "pos_unverified"
     assert (rec.app_version, rec.schema_version) == ("0.1.0", 2)
-    assert json.loads(rec.totals_json)["pos_total_text"] == "20.500,00 TL"
+    assert json.loads(rec.totals_json)["pos_total_text"] == "17.500,00 TL"
     assert json.loads(rec.warnings_json) == []
 
 
@@ -174,7 +174,7 @@ def test_summary_and_confirmation_text() -> None:
     summary = summarize(header)
     assert (summary.products_text, summary.pos_total) == (
         "Fridge, Washer",
-        "20.500,00 TL",
+        "17.500,00 TL",
     )
     assert summarize(replace(header, totals_json="{")).pos_total == "?"
     assert POS_LABEL in confirmation_text("pos_unverified")

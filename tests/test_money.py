@@ -16,6 +16,9 @@ from arcelikSalesHelper.domain.result import Err, Ok
         ("54.999", "54999"),
         ("1.234.567,89", "1234567.89"),
         ("1,234.56", "1234.56"),  # last separator is the decimal mark
+        ("1.234,56", "1234.56"),
+        ("1.234.567", "1234567"),
+        ("1234,567", "1234.567"),
         ("12.5", "12.5"),
         ("12,5", "12.5"),
         ("0,5", "0.5"),
@@ -26,6 +29,7 @@ from arcelikSalesHelper.domain.result import Err, Ok
         ("0,00", "0"),
         ("  54.999,00 TL ", "54999"),
         ("54999 try", "54999"),
+        (" 1.234,56 TRY ", "1234.56"),
         ("12TL", "12"),
     ],
 )
@@ -48,7 +52,6 @@ def test_rejects(text: str) -> None:
 def test_dot_followed_by_three_digits_is_read_as_thousands_and_flagged_ambiguous() -> None:
     # "1.234" could be 1234 or 1.234; we choose thousands (Turkish convention).
     parsed = parse_money_ex("1.234")
-    assert parsed == Ok(parsed.value.__class__ and parsed.value)  # shape check
     assert isinstance(parsed, Ok)
     assert parsed.value.value == Decimal("1234")
     assert parsed.value.ambiguous is True
@@ -66,15 +69,16 @@ def test_unambiguous_inputs_are_not_flagged(text: str) -> None:
     [
         ("54999", "54.999,00 TL"),
         ("153345.56", "153.345,56 TL"),
+        ("0.01", "0,01 TL"),
         ("0", "0,00 TL"),
-        ("0.005", "0,01 TL"),  # ROUND_HALF_UP, not banker's rounding
-        ("0.004", "0,00 TL"),
-        ("2.675", "2,68 TL"),
-        ("999.995", "1.000,00 TL"),
-        ("1234567.891", "1.234.567,89 TL"),
+        ("0.005", "0,005 TL"),
+        ("0.004", "0,004 TL"),
+        ("2.675", "2,675 TL"),
+        ("999.995", "999,995 TL"),
+        ("1234567.891", "1.234.567,891 TL"),
         ("-1234.5", "-1.234,50 TL"),
-        ("-0.001", "0,00 TL"),
-        ("3.3333333333333333333333333333333333", "3,33 TL"),
+        ("-0.001", "-0,001 TL"),
+        ("3.3333333333333333333333333333333333", "3,3333333333333333333333333333333333 TL"),
         ("123456789012345678901234567890.12", "123.456.789.012.345.678.901.234.567.890,12 TL"),
     ],
 )
@@ -95,9 +99,14 @@ def test_format_decimal_exact_is_plain_and_lossless() -> None:
 
 
 def test_roundtrip_deterministic() -> None:
-    for text in ["0.00", "0.01", "999.99", "1000.00", "54999.00", "153345.56", "1234567.89"]:
+    for text in ["0.00", "0.01", "999.99", "1000.00", "54999.00", "153345.56", "1234567.89", "0.005", "999.995"]:
         d = Decimal(text)
         assert parse_money(format_try(d)) == Ok(d)
+
+
+def test_format_try_keeps_fractional_digits_at_carry_boundary() -> None:
+    assert format_try(Decimal("999.999")) == "999,999 TL"
+    assert format_try(Decimal("999.995")) != "1.000,00 TL"
 
 
 def test_roundtrip_hypothesis() -> None:

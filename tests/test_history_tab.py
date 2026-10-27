@@ -52,7 +52,7 @@ def test_saving_from_the_calculator_lists_and_shows_the_snapshot(  # type: ignor
     assert tab.table.rowCount() == 1
     assert tab.table.item(0, 1).text() == "Fridge, Washer"
     assert tab.table.item(0, 2).text() == "2"
-    assert tab.table.item(0, 3).text() == "20.500,00 TL"
+    assert tab.table.item(0, 3).text() == "17.500,00 TL"
     assert tab.selected_id() == 1
     titles = detail_titles(tab)
     assert {
@@ -124,7 +124,7 @@ def test_detail_is_rendered_from_stored_rows_without_recalculating(  # type: ign
         monkeypatch.setattr(target, boom)
 
     tab.table.selectRow(0)
-    assert "20.500,00 TL" in detail_texts(tab)
+    assert "17.500,00 TL" in detail_texts(tab)
 
 
 def test_corrupt_snapshot_shows_a_message_instead_of_crashing(  # type: ignore[no-untyped-def]
