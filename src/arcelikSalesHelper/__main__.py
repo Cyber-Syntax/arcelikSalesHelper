@@ -1,3 +1,3 @@
-from .main import main
+from arcelikSalesHelper.main import main
 
 raise SystemExit(main())
