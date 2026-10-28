@@ -509,7 +509,8 @@ class CalculatorTab(QWidget):
         selector_actions.addWidget(self.add_selected_button)
         selector_layout.addLayout(selector_actions)
 
-        manager_total_row = QHBoxLayout()
+        self.manager_total_row = QWidget()
+        manager_total_row = QHBoxLayout(self.manager_total_row)
         manager_total_row.addWidget(QLabel(T.LBL_SHARED_MANAGER_TOTAL))
         manager_total_row.addWidget(self.shared_manager_edit, 1)
 
@@ -525,10 +526,10 @@ class CalculatorTab(QWidget):
         left_layout = QVBoxLayout(left)
         left_layout.setContentsMargins(0, 0, 0, 0)
         left_layout.addWidget(selector)
-        left_layout.addLayout(manager_total_row)
+        left_layout.addWidget(self.manager_total_row)
+        self.quick_panel.hide()
         left_layout.addWidget(self.quick_mode_check)
         left_layout.addWidget(self.quick_panel)
-        self.quick_panel.hide()
         left_layout.addWidget(rows_scroll, 1)
         self._selector = selector
         self._rows_scroll = rows_scroll
@@ -824,7 +825,7 @@ class CalculatorTab(QWidget):
 
     def _quick_mode_changed(self, quick: bool) -> None:
         self._selector.setVisible(not quick)
-        self.shared_manager_edit.setVisible(not quick)
+        self.manager_total_row.setVisible(not quick)
         self._rows_scroll.setVisible(not quick)
         self.quick_panel.setVisible(quick)
         self.recalculate()
