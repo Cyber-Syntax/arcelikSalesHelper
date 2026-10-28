@@ -6,6 +6,7 @@ from PySide6.QtWidgets import (
     QGroupBox,
     QHBoxLayout,
     QLabel,
+    QLineEdit,
     QPushButton,
     QScrollArea,
     QSplitter,
@@ -30,7 +31,7 @@ from arcelikSalesHelper.infrastructure.history_repository import (
 )
 
 from .calculator_tab import section_box
-from .common import HINT_STYLE, WARNING_STYLE, format_local_timestamp
+from .common import HINT_STYLE, WARNING_STYLE, ask_yes_no, format_local_timestamp
 
 _COLUMNS = T.HISTORY_COLUMNS
 
@@ -56,6 +57,12 @@ class SnapshotDetail(QWidget):
             Qt.TextInteractionFlag.TextSelectableByMouse
         )
         layout.addWidget(header)
+        if snapshot.customer_name:
+            customer = QLabel(T.history_customer(snapshot.customer_name))
+            customer.setTextInteractionFlags(
+                Qt.TextInteractionFlag.TextSelectableByMouse
+            )
+            layout.addWidget(customer)
         layout.addWidget(
             self._note(
                 confirmation_text(snapshot.confirmation_state), WARNING_STYLE
@@ -99,7 +106,7 @@ class SnapshotDetail(QWidget):
 
 
 class HistoryTab(QWidget):
-    """Read-only list of saved calculations. No edit, no delete."""
+    """Searchable snapshot history with whole-entry deletion."""
 
     def __init__(
         self,
@@ -112,6 +119,11 @@ class HistoryTab(QWidget):
         self._page_size = page_size
         self._oldest_id: int | None = None
         self._more = False
+        self.search_edit = QLineEdit()
+        self.search_edit.setPlaceholderText(T.PH_HISTORY_SEARCH)
+        self.search_edit.setClearButtonEnabled(True)
+        self.delete_button = QPushButton(T.BTN_DELETE_HISTORY)
+        self.delete_button.setEnabled(False)
 
         self.table = QTableWidget(0, len(_COLUMNS))
         self.table.setHorizontalHeaderLabels(list(_COLUMNS))
@@ -136,6 +148,8 @@ class HistoryTab(QWidget):
         left_layout = QVBoxLayout(left)
         left_layout.setContentsMargins(0, 0, 0, 0)
         left_layout.addWidget(self.table, 1)
+        left_layout.addWidget(self.search_edit)
+        left_layout.addWidget(self.delete_button)
         left_layout.addWidget(self.count_label)
         left_layout.addWidget(self.load_more_button)
         splitter = QSplitter(Qt.Orientation.Horizontal)
@@ -146,6 +160,9 @@ class HistoryTab(QWidget):
         layout.addWidget(splitter)
 
         self.table.itemSelectionChanged.connect(self._show_selected)
+        self.table.itemSelectionChanged.connect(self._update_delete_button)
+        self.search_edit.textChanged.connect(lambda _t: self.reload())
+        self.delete_button.clicked.connect(self._delete_selected)
         self.load_more_button.clicked.connect(
             lambda _c=False: self._load_more()
         )
@@ -169,7 +186,7 @@ class HistoryTab(QWidget):
         try:
             self.table.setRowCount(0)
             self._oldest_id = None
-            self._append(self._repo.list_headers(self._page_size))
+            self._append(self._repo.list_headers(self._page_size, query=self.search_edit.text()))
             if keep is not None:
                 for row in range(self.table.rowCount()):
                     item = self.table.item(row, 0)
@@ -183,10 +200,11 @@ class HistoryTab(QWidget):
             self.table.blockSignals(False)
         self._update_footer()
         self._show_selected()
+        self._update_delete_button()
 
     def _load_more(self) -> None:
         self._append(
-            self._repo.list_headers(self._page_size, before_id=self._oldest_id)
+            self._repo.list_headers(self._page_size, before_id=self._oldest_id, query=self.search_edit.text())
         )
         self._update_footer()
 
@@ -197,7 +215,7 @@ class HistoryTab(QWidget):
             self.table.insertRow(row)
             cells = (
                 format_local_timestamp(summary.created_at),
-                summary.products_text,
+                T.history_summary(summary.customer_name, summary.products_text),
                 str(summary.line_count),
                 summary.pos_total,
             )
@@ -211,7 +229,7 @@ class HistoryTab(QWidget):
         self._more = len(headers) == self._page_size
 
     def _update_footer(self) -> None:
-        total = self._repo.count()
+        total = self._repo.count(self.search_edit.text())
         shown = self.table.rowCount()
         self.count_label.setText(
             T.history_footer(shown, total) if total else T.HISTORY_NONE_YET
@@ -243,3 +261,17 @@ class HistoryTab(QWidget):
                 self.detail_scroll.setWidget(SnapshotDetail(snapshot))
             case Err(message):
                 self._show_message(message)
+
+    def _update_delete_button(self) -> None:
+        self.delete_button.setEnabled(self.selected_id() is not None)
+
+    def _delete_selected(self) -> None:
+        snapshot_id = self.selected_id()
+        if snapshot_id is None:
+            return
+        if not ask_yes_no(
+            self, T.DLG_DELETE_HISTORY, T.confirm_delete_history(snapshot_id)
+        ):
+            return
+        self._repo.delete(snapshot_id)
+        self.reload()

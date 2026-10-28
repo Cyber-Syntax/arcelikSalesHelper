@@ -29,7 +29,7 @@ _COLUMNS = (
 
 @dataclass(frozen=True)
 class RepoError:
-    code: str  # invalid | not_found | duplicate_name | name_collision
+    code: str  # invalid | not_found | duplicate_name | name_collision | product_in_use
     message: str
     details: tuple[ValidationError, ...] = ()
 
@@ -185,6 +185,22 @@ class ProductRepository:
 
     def restore(self, product_id: int) -> Result[Product, RepoError]:
         return self._set_archived(product_id, archived=False)
+
+    def delete_if_unused(self, product_id: int) -> Result[None, RepoError]:
+        """Permanently delete a product only when no calculation cites it."""
+        with transaction(self._conn):
+            if self.get(product_id) is None:
+                return Err(_not_found(product_id))
+            used = self._conn.execute(
+                "SELECT 1 FROM calculation_lines WHERE product_id = ? LIMIT 1",
+                (product_id,),
+            ).fetchone()
+            if used is not None:
+                return Err(RepoError("product_in_use", T.PRODUCT_IN_HISTORY))
+            self._conn.execute("DELETE FROM stock_history WHERE product_id = ?", (product_id,))
+            self._conn.execute("DELETE FROM pricing_history WHERE product_id = ?", (product_id,))
+            self._conn.execute("DELETE FROM products WHERE id = ?", (product_id,))
+        return Ok(None)
 
     def set_quantity(
         self,

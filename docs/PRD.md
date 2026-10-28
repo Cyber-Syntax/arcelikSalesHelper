@@ -1,7 +1,7 @@
 # Product Requirements Document (PRD)
 
 **Project:** arcelikSalesHelper
-**Document version:** 0.4
+**Document version:** 0.5
 **Status:** Proposed
 
 ## 1. Project overview
@@ -10,7 +10,7 @@ Build a small, reliable desktop application for Windows and Linux to help an emp
 
 The app supports a workflow around the company's website and Microsoft Dynamics AX/POS. It is a personal productivity tool, not a replacement for the company's official systems. It must not modify Dynamics AX/POS, claim its stored data is an official record, or treat a calculation as manager-approved unless the relevant inputs were provided by the user.
 
-The application should remain useful without inventory tracking. Warehouse verification and deeper AX/POS integration are future possibilities, not MVP requirements.
+The MVP records manually counted on-hand quantity to support catalog productivity. It does not claim live or official inventory accuracy. Reserved/available stock, multi-laptop sharing, and scraping are later milestones.
 
 Pricing calculations should use functional programming as much as practical. Pure pricing, validation, parsing, formatting, and aggregation functions must remain independent of the UI and database. Class-based code is appropriate for PySide6 widgets, application lifecycle, persistence, and other infrastructure.
 
@@ -25,9 +25,15 @@ Pricing calculations should use functional programming as much as practical. Pur
 - Support both unit-price and total-line-price modes for each manager-provided sale value.
 - Calculate the POS-entry amount using the operational formula for the selected website or gift option.
 - Support multiple products and quantities in one calculation.
+- Let the manager provide one total sale value for a multi-product transaction and allocate it by each line's regular-price total, reconciling the allocations so they sum exactly to the entered total.
+- Provide a product-free total-only calculation path as well as per-line manager values.
+- Preserve fixed-amount and percentage POS modes; percentage mode remains available for third-party offers where the normal website discount does not describe the combined offer.
+- Record a manually counted on-hand quantity per catalog product.
+- Search and delete whole history entries, optionally labeled with a customer name.
+- Export the product catalog to CSV.
 - Preserve complete, immutable calculation snapshots because prices and promotions can change over time.
 - Use one local SQLite database with robust automatic backups on Windows and Linux.
-- Present TRY amounts in Turkish-style currency format: `.` separates thousands, `,` separates lira from the fractional amount, and the `TL` suffix is appended (for example `54.999,52 TL`). Do not round, quantize, or truncate displayed calculation results. Ordinary lira/kuruş inputs use two fractional digits (`00` through `99`); exact derived values may show more fractional digits when required to preserve the value employees must copy into the POS.
+- Present TRY amounts in Turkish-style currency format: `.` separates thousands, `,` separates lira from the fractional amount, and the `TL` suffix is appended (for example `54.999,52 TL`). Preserve exact derived values in calculation details. POS-entry amounts are rounded half-up to two fractional digits because POS accepts kuruş precision only; transaction POS totals sum these rounded line-entry values.
 - Present every user-visible label, message, warning, dialog, formula explanation, and history heading in Turkish for the first release. A language selector is deferred to a later enhancement.
 
 ## 3. MVP scope and non-goals
@@ -35,25 +41,30 @@ Pricing calculations should use functional programming as much as practical. Pur
 ### Included in the MVP
 
 - Manual product entry and editing.
+- Optional manually counted on-hand quantity, entered in the product editor or stock-count workflow.
 - Product name, regular price, and website discounted price.
 - Optional saved gift name and notes.
 - Single-product and multi-product calculations.
 - Quantity per calculator line.
 - Per-line gift selection and gift-name override.
 - Temporary boss discounted and boss gifted values, each with unit or total-line mode.
+- One shared manager total allocated across product lines by regular line totals, while retaining per-line input as an alternate.
+- Product-free total-only calculation using transaction totals.
 - Website and gift options displayed side by side.
 - Complete calculation history.
+- Optional customer name, history search, and confirmed deletion of a complete history entry.
 - SQLite schema migrations and verified automatic backups.
-- CSV import as the final MVP milestone.
+- CSV export and preview-based CSV import.
 
 ### Non-goals for the MVP
 
 - Product codes or barcode identifiers.
 - Automatic website scraping from the GUI.
-- Automatic warehouse tracking, stock transfers, or stock availability claims.
+- Reserved/available stock, stock transfers, reservation workflows, or live warehouse claims.
 - Editing or reconciling official Dynamics AX/POS data.
 - Multi-user or network-shared database access.
-- Customer account management or storage of customer personal information.
+- Automatic website scraping from the GUI.
+- Customer account management or storage of personal data beyond an optional customer display name on a calculation.
 - Automatic approval or selection of the manager's sale value.
 - Excel export.
 
@@ -73,6 +84,7 @@ The GUI must not depend on scraping behavior, website markup, or anti-bot workar
 - **Boss discounted price:** A manually entered manager sale amount for the normal website/no-gift option. It is not a percentage.
 - **Boss gifted price:** A manually entered manager sale amount for the gift option. It is not a percentage.
 - **Manager value mode:** Whether a supplied boss price is a unit price or the total price for the entire calculator line.
+- **Shared manager total:** One transaction-wide manager sale total, split proportionally to each product line's regular price multiplied by quantity. Fractional residue is assigned deterministically so allocated line totals add exactly to the entered total.
 - **POS calculation mode:** Per-line choice between fixed-amount and percentage-based website/no-gift POS calculation. Defaults to fixed amount.
 - **POS-entry amount:** The value calculated for entry into Dynamics AX/POS. It is separate from the customer-facing website or manager option and remains labeled as requiring operational verification.
 
@@ -88,6 +100,7 @@ The MVP product record supports:
 - Optional notes.
 - Created/updated timestamps.
 - Archived status.
+- Optional manually counted on-hand quantity and count timestamp.
 
 Product codes are not required or modeled in the MVP.
 
@@ -104,6 +117,8 @@ Each calculator line supports:
 - Boss discounted price for the normal website/no-gift option, when supplied.
 - Boss gifted price for the gift option, when supplied.
 - A manager value mode for each sale value: unit price or total line price.
+- Alternatively, one transaction-wide manager total allocated by regular line totals; the employee can switch back to per-line values.
+- A product-free total-only path accepts regular total, website discounted total, manager total, and fixed or percentage POS mode.
 
 All values used in a calculation must be copied into its history snapshot. Later product edits must not change old calculations.
 
@@ -117,7 +132,7 @@ The application must accept:
 - Plain integer values such as `54999`.
 - Standard decimal values such as `54999.00`.
 
-Values are normalized internally and displayed consistently as Turkish TRY, for example `54.999,52 TL`. Display formatting preserves the exact `Decimal` value without rounding. A value representing 100 kuruş carries into the lira portion as `1,00 TL`; it must never be displayed with a three-digit kuruş portion.
+Values are normalized internally and displayed consistently as Turkish TRY, for example `54.999,52 TL`. General calculation display preserves the exact `Decimal` value. POS-entry amounts are the exception: round half-up to two decimal places, including gift POS amounts, and total the rounded line entries. A value representing 100 kuruş carries into the lira portion as `1,00 TL`; it must never be displayed with a three-digit kuruş portion.
 
 Validate that:
 
@@ -141,12 +156,12 @@ regular_total = regular_price × quantity
 website_discounted_total = website_discounted_price × quantity
 ```
 
-### Rule B: Standard 10% scenario
+### Rule B: Discount scenarios
 
-The standard 10% scenario is separate from the boss prices.
+The 10%, 15%, 18%, and 20% scenarios are separate from manager prices. Each uses the selected option's discount base:
 
 - **No gift:** use the website discounted price as the discount base.
-- **Gift selected:** use the regular/first price as the discount base only when a 10% gift scenario is explicitly needed. The real gift workflow may instead use the boss gifted price and boss discounted price described below.
+- **Gift selected:** use the regular/first price.
 
 ```text
 discount_amount = discount_base × 0.10
@@ -154,6 +169,7 @@ scenario_price = discount_base - discount_amount
 ```
 
 The UI must display the base, discount amount, resulting unit price, quantity, and resulting line total.
+Transaction totals display regular total, website discounted total, and each scenario total in a collapsible price-scenarios section.
 
 ### Rule C: Manager-provided sale values
 
@@ -233,7 +249,7 @@ website discount rate = (regular price - website discounted price) / regular pri
 POS line amount = boss discounted line total / (1 - website discount rate)
 ```
 
-Use Decimal arithmetic at the configured precision without currency quantization. If regular price is zero, use the boss line total unchanged because a percentage rate cannot be derived. The selected mode applies independently to each line and is recorded in history.
+Use Decimal arithmetic at the configured precision for the formula, then round the final line POS-entry amount half-up to two decimal places. If regular price is zero, use the boss line total unchanged before this POS precision step because a percentage rate cannot be derived. The selected mode applies independently to each line and is recorded in history. Sum the rounded line POS amounts for the transaction POS total.
 
 For the gift option, the POS system workflow is different:
 
@@ -333,7 +349,7 @@ while keeping the boss gifted price (`48.000,00 TL`) and boss discounted price (
 - boss discounted price: `30.000,00`
 - POS mode: percentage
 - derived rate: `(38.299,00 - 34.469,10) / 38.299,00 = 10%`
-- POS: `30.000,00 / (1 - 0,10) = 33.333,333… TL` (display the result to the configured Decimal precision)
+- POS: `30.000,00 / (1 - 0,10) = 33.333,333…`; POS entry shown as `33.333,33 TL` after half-up rounding to kuruş.
 
 ## 7. Main screens
 
@@ -360,7 +376,7 @@ while keeping the boss gifted price (`48.000,00 TL`) and boss discounted price (
 
 ### C. Calculation history
 
-Save complete immutable snapshots containing:
+Save immutable calculation facts in complete snapshots containing:
 
 - Date and time.
 - Product name and quantity.
@@ -372,15 +388,18 @@ Save complete immutable snapshots containing:
 - 10% result.
 - POS-entry result.
 - Warnings and confirmation state shown at calculation time.
+- Optional customer display name.
+
+History search matches customer or product names. Confirmed deletion removes the entire snapshot and its lines together; saved facts cannot be edited.
 
 History must remain understandable after product prices, gift promotions, or notes change.
 
 ### D. CSV import
 
-CSV import is the final MVP milestone. The required columns are `product_name` and `regular_price`; `website_discounted_price` is optional:
+CSV export is available before import. It writes product name, regular price, website discounted price, and known quantity. CSV import uses the required `product_name` and `regular_price` columns with optional `website_discounted_price` and `quantity`:
 
 ```text
-product_name,regular_price[,website_discounted_price]
+product_name,regular_price[,website_discounted_price][,quantity]
 ```
 
 If the optional website discount column is omitted or a row's value is blank, the importer stores `0`, which the application displays as “YOK”.
@@ -480,16 +499,15 @@ Pricing, parsing, validation, formatting, and aggregation functions should be pu
 ## 10. MVP milestones
 
 1. Turkish-only localization of every user-visible string.
-2. Calculator rule correction and removal of the unused coupon feature.
-3. Domain core hardening: parsing, formatting, validation, and pure pricing tests.
-4. SQLite product catalog and migrations.
-5. Products tab and single-product calculator.
-6. Multi-product calculator with quantities and gift comparisons.
-7. Calculation history plus calculator save-product/save-history actions.
-8. Verified automatic backups.
-9. CSV import and export features.
-10. Selling types, reservations, and POS price division.
-11. Windows and Linux PyInstaller packaging and validation.
+2. Preserve existing fixed/percentage POS rules and finish exact domain arithmetic.
+3. Calculator productivity: shared manager total with weighted allocation, product-free total-only mode, and retained per-line mode.
+4. Catalog productivity: edit product quantity, bulk archive/restore, safe confirmed deletion, and CSV export.
+5. History productivity: optional customer name, search, and confirmed whole-entry deletion.
+6. CSV import preview and conflict handling, compatible with exported quantity data.
+7. Verified automatic backups and Windows/Linux packaging.
+8. Reservation states and reserved/available quantity, after the on-hand workflow is established.
+9. Authorized scraper integration with bounded update frequency and failure reporting.
+10. Multi-laptop PostgreSQL access after hosting, permissions, backups, and offline behavior are designed.
 
 ## 11. Acceptance criteria
 
@@ -497,7 +515,7 @@ Pricing, parsing, validation, formatting, and aggregation functions should be pu
 2. A user can add, search, edit, archive, and restore products using product name, regular price, website discounted price, optional gift name, and notes.
 3. Product codes are not required for MVP operation.
 4. The application accepts `54.999,00`, `54.999,52`, `54999`, and `54999.00`, and displays them with Turkish separators and a `TL` suffix without changing their exact values.
-5. Display formatting preserves exact derived decimal values, including values with more than two fractional digits when division requires them.
+5. General calculation display preserves exact derived decimal values, including values with more than two fractional digits; POS-entry values are rounded half-up to two fractional digits.
 6. A no-gift 10% scenario uses the website discounted price as its base.
 7. A gift 10% scenario uses the regular price as its base.
 8. Currency formatting represents 100 kuruş as the next lira (`1,00 TL`), never as a three-digit kuruş value.
@@ -516,6 +534,12 @@ Pricing, parsing, validation, formatting, and aggregation functions should be pu
 21. Verified baseline, startup, clean-close, migration, manual, and retention backup behavior works as specified.
 22. Automated tests cover parsing, exact formatting, values with more than two fractional digits, carry behavior, gift/no-gift bases, quantity calculations, both manager value modes for both boss prices, the three real examples, option-specific POS calculations, multi-line totals, immutable snapshots, Turkish presentation, CSV conflicts, and backup verification/retention.
 23. Calculator users can search active products by name, select several across different queries, add them as lines in one action, and add one-off products without a per-line product dropdown.
+24. A shared manager total is allocated by regular line total and the allocations sum exactly to that input; fixed and percentage POS modes still apply per line.
+25. A product-free total-only calculation accepts aggregate regular, website, and manager values.
+26. Product editing can record on-hand quantity; bulk archive and confirmed deletion are available, with deletion blocked when calculation history references the product.
+27. History can be searched by customer/product name and a confirmed action deletes the complete entry and its lines.
+28. Product CSV export can be imported again, including quantity where known.
+29. Every POS line amount is rounded half-up to two decimals, and transaction POS total equals the sum of rounded line amounts.
 
 ## 12. Operational caution
 

@@ -69,6 +69,7 @@ class SnapshotRecord:
     warnings_json: str
     lines: tuple[LineRecord, ...]
     id: int | None = None
+    customer_name: str | None = None
 
 
 @dataclass(frozen=True)
@@ -78,6 +79,7 @@ class SnapshotHeader:
     line_count: int
     product_names: tuple[str, ...]
     totals_json: str
+    customer_name: str | None = None
 
 
 # ---- serialisation ----------------------------------------------------------
@@ -147,7 +149,7 @@ def _line_record(
         website_discounted_price=format_decimal_exact(line.website_discounted_price),
         gift_selected=line.gift_selected,
         gift_name=line.gift_name,
-        manager_value_entered=(form.manager_value.strip() or None)
+        manager_value_entered=(form.manager_value.strip() or format_decimal_exact(line.manager_value))
         if has_manager
         else None,
         manager_mode=None
@@ -175,6 +177,7 @@ def build_snapshot(
     created_at: str,
     app_version: str,
     schema_version: int,
+    customer_name: str | None = None,
 ) -> Result[SnapshotRecord, str]:
     """Pure. Only a fully valid evaluation can become a snapshot."""
     result = evaluation.result
@@ -204,6 +207,9 @@ def build_snapshot(
             confirmation_state=ConfirmationState.POS_UNVERIFIED.value,
             warnings_json=_dumps(warnings),
             lines=tuple(lines),
+            customer_name=(" ".join(customer_name.split()) or None)
+            if customer_name is not None
+            else None,
         )
     )
 
@@ -242,6 +248,7 @@ class StoredSnapshot:
     totals_sections: tuple[Section, ...]
     warnings: tuple[StoredWarning, ...]
     lines: tuple[StoredLine, ...]
+    customer_name: str | None = None
 
 
 @dataclass(frozen=True)
@@ -251,6 +258,7 @@ class HistorySummary:
     line_count: int
     products_text: str
     pos_total: str
+    customer_name: str | None = None
 
 
 def _opt_str(value: object) -> str | None:
@@ -308,6 +316,7 @@ def parse_snapshot(record: SnapshotRecord) -> Result[StoredSnapshot, str]:
                     for w in warnings
                 ),
                 lines=tuple(_parse_line(line) for line in record.lines),
+                customer_name=record.customer_name,
             )
         )
     except (KeyError, TypeError, ValueError, AttributeError, IndexError):
@@ -325,6 +334,7 @@ def summarize(header: SnapshotHeader) -> HistorySummary:
         header.line_count,
         ", ".join(header.product_names),
         pos,
+        header.customer_name,
     )
 
 

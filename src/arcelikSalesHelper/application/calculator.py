@@ -45,6 +45,7 @@ class LineForm:
     gift_selected: bool = False
     gift_name: str = ""
     manager_value: str = ""
+    manager_value_decimal: Decimal | None = None
     manager_mode: ManagerMode = ManagerMode.UNIT
     pos_calculation_mode: PosCalculationMode = PosCalculationMode.FIXED_AMOUNT
     product_id: int | None = None
@@ -189,7 +190,11 @@ def evaluate_line(form: LineForm, line_index: int = 0) -> Evaluation:
         return Evaluation(errors=errors, hints=hints)
 
     manager_read = reads["manager_value"]
-    manager_value = None if manager_read.empty else _need(manager_read)
+    manager_value = (
+        form.manager_value_decimal
+        if form.manager_value_decimal is not None
+        else None if manager_read.empty else _need(manager_read)
+    )
     line = LineInput(
         product_name=name,
         quantity=form.quantity,
@@ -383,9 +388,15 @@ def _total_row(label: str, total: TotalValue, what: str) -> Row:
 
 def present_totals(result: TransactionResult) -> tuple[Section, ...]:
     t = result.totals
-    main = Section(T.SEC_TOTALS, (
+    main = Section(T.SEC_PRICE_SCENARIOS, (
         Row(T.LBL_LINES, str(len(result.lines))),
+        _total_row(T.LBL_TOTAL_REGULAR, t.regular, T.MISSING_PRICE),
+        _total_row(T.LBL_TOTAL_WEBSITE, t.website_discounted, T.MISSING_PRICE),
         _total_row(T.LBL_TOTAL_DISCOUNT, t.discount_amount, T.MISSING_PRICE),
+        _total_row(T.LBL_TOTAL_TEN, t.ten_pct, T.MISSING_PRICE),
+        _total_row(T.LBL_TOTAL_FIFTEEN, t.fifteen_pct, T.MISSING_PRICE),
+        _total_row(T.LBL_TOTAL_EIGHTEEN, t.eighteen_pct, T.MISSING_PRICE),
+        _total_row(T.LBL_TOTAL_TWENTY, t.twenty_pct, T.MISSING_PRICE),
     ))
     pos = Section(
         POS_LABEL,

@@ -92,6 +92,35 @@ def localize_buttons(box: QDialogButtonBox | QMessageBox) -> None:
         button = box.button(getattr(enum, name))
         if button is not None:
             button.setText(text)
+    button_box = (
+        box
+        if isinstance(box, QDialogButtonBox)
+        else box.findChild(QDialogButtonBox)
+    )
+    if button_box is not None:
+        order_enum = QDialogButtonBox.StandardButton
+        left = next(
+            (
+                button_box.button(getattr(order_enum, name))
+                for name in ("Yes", "Ok", "Save")
+                if button_box.button(getattr(order_enum, name)) is not None
+            ),
+            None,
+        )
+        right = next(
+            (
+                button_box.button(getattr(order_enum, name))
+                for name in ("Cancel", "No", "Close")
+                if button_box.button(getattr(order_enum, name)) is not None
+            ),
+            None,
+        )
+        if left is not None and right is not None:
+            layout = button_box.layout()
+            layout.removeWidget(left)
+            layout.removeWidget(right)
+            layout.insertWidget(0, left)
+            layout.addWidget(right)
 
 
 def _show(

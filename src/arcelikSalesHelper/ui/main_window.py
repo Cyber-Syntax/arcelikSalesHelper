@@ -9,6 +9,7 @@ from PySide6.QtWidgets import (
     QApplication,
     QLabel,
     QMainWindow,
+    QInputDialog,
     QTabWidget,
     QVBoxLayout,
     QWidget,
@@ -161,13 +162,14 @@ class MainWindow(QMainWindow):
     # ---- history ---------------------------------------------------------
 
     def save_calculation(
-        self, evaluation: TransactionEvaluation
+        self, evaluation: TransactionEvaluation, customer_name: str | None = None
     ) -> Result[int, str]:
         built = build_snapshot(
             evaluation,
             created_at=to_utc_iso(utc_now()),
             app_version=__version__,
             schema_version=schema_version(self._conn),
+            customer_name=customer_name,
         )
         if isinstance(built, Err):
             return Err(built.error)
@@ -181,7 +183,14 @@ class MainWindow(QMainWindow):
     def _on_save_requested(self, evaluation: object) -> None:
         if not isinstance(evaluation, TransactionEvaluation):
             return
-        outcome = self.save_calculation(evaluation)
+        customer_name, accepted = QInputDialog.getText(
+            self,
+            T.DLG_CUSTOMER_NAME,
+            T.PROMPT_CUSTOMER_NAME,
+        )
+        if not accepted:
+            return
+        outcome = self.save_calculation(evaluation, customer_name)
         if isinstance(outcome, Err):
             show_warning(self, T.CALC_NOT_SAVED_TITLE, outcome.error)
             return
