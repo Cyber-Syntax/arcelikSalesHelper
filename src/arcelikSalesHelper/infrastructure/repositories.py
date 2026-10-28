@@ -251,6 +251,19 @@ class ProductRepository:
             )
             return Ok(self._require(product_id))
 
+    def clear_quantity(self, product_id: int) -> Result[Product, RepoError]:
+        """Clear the current count without changing the append-only stock log."""
+        with transaction(self._conn):
+            current = self.get(product_id)
+            if current is None:
+                return Err(_not_found(product_id))
+            self._conn.execute(
+                "UPDATE products SET quantity = NULL, quantity_updated_at = NULL "
+                "WHERE id = ?",
+                (product_id,),
+            )
+            return Ok(self._require(product_id))
+
     # ---- internals -------------------------------------------------------
 
     def _set_archived(

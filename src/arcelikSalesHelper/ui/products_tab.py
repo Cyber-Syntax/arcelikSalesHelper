@@ -292,6 +292,16 @@ class ProductDialog(QDialog):
                         self._show_repo_error(stock.error)
                         return
                     saved = stock.value
+                elif (
+                    self._product is not None
+                    and self._product.quantity is not None
+                    and quantity is None
+                ):
+                    cleared = self._repo.clear_quantity(saved.id)
+                    if isinstance(cleared, Err):
+                        self._show_repo_error(cleared.error)
+                        return
+                    saved = cleared.value
                 self.saved = saved
                 super().accept()
 
@@ -308,75 +318,6 @@ class ProductDialog(QDialog):
         if not shown:
             self._general.setText(error.message)
             self._general.show()
-
-
-class StockDialog(QDialog):
-    """Record a counted quantity for one product. Inline errors; stays open on failure."""
-
-    def __init__(
-        self,
-        repo: ProductRepository,
-        product: Product,
-        parent: QWidget | None = None,
-    ) -> None:
-        super().__init__(parent)
-        self._repo = repo
-        self._product = product
-        self.saved: Product | None = None
-        self.setWindowTitle(T.stock_title(product.name))
-        self.setMinimumWidth(440)
-
-        self.quantity_edit = QLineEdit()
-        self.quantity_edit.setPlaceholderText(T.PH_QTY)
-        self.note_edit = QLineEdit()
-        self.note_edit.setPlaceholderText(T.PH_QTY_NOTE)
-        self.block = FieldBlock(self.quantity_edit)
-
-        if product.quantity is None or product.quantity_updated_at is None:
-            current = T.STOCK_NO_COUNT
-        else:
-            current = T.stock_current(
-                product.quantity,
-                format_local_timestamp(product.quantity_updated_at),
-            )
-            self.quantity_edit.setText(str(product.quantity))
-        info = QLabel(T.stock_info(current))
-        info.setWordWrap(True)
-
-        form = QFormLayout()
-        form.addRow(T.LBL_COUNTED_QTY, self.block)
-        form.addRow(T.LBL_NOTE, self.note_edit)
-        buttons = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Save
-            | QDialogButtonBox.StandardButton.Cancel
-        )
-        localize_buttons(buttons)
-        buttons.accepted.connect(self.accept)
-        buttons.rejected.connect(self.reject)
-        layout = QVBoxLayout(self)
-        layout.addWidget(info)
-        layout.addLayout(form)
-        layout.addWidget(buttons)
-
-    def accept(self) -> None:
-        self.block.set_error(None)
-        match parse_quantity(self.quantity_edit.text()):
-            case Err(message):
-                self.block.set_error(message)
-                return
-            case Ok(quantity):
-                outcome = self._repo.set_quantity(
-                    self._product.id,
-                    quantity,
-                    StockSource.MANUAL,
-                    self.note_edit.text(),
-                )
-        match outcome:
-            case Err(error):
-                self.block.set_error(error.message)
-            case Ok(saved):
-                self.saved = saved
-                super().accept()
 
 
 class ProductsTab(QWidget):
@@ -428,7 +369,6 @@ class ProductsTab(QWidget):
         self.add_button = QPushButton(T.BTN_ADD_PRODUCT)
         self.edit_button = QPushButton(T.BTN_EDIT)
         self.archive_button = QPushButton(T.BTN_ARCHIVE)
-        self.stock_button = QPushButton(T.BTN_UPDATE_QTY)
         self.import_button = QPushButton(T.BTN_IMPORT_CSV)
         self.import_button.setEnabled(conn is not None)
         self.bulk_archive_button = QPushButton(T.BTN_ARCHIVE_SELECTED)
@@ -442,7 +382,6 @@ class ProductsTab(QWidget):
         bottom.addWidget(self.add_button)
         bottom.addWidget(self.edit_button)
         bottom.addWidget(self.archive_button)
-        bottom.addWidget(self.stock_button)
         bottom.addWidget(self.bulk_archive_button)
         bottom.addWidget(self.export_button)
         bottom.addWidget(self.delete_button)
@@ -458,7 +397,6 @@ class ProductsTab(QWidget):
         self.add_button.clicked.connect(self._add)
         self.edit_button.clicked.connect(self._edit)
         self.archive_button.clicked.connect(self._toggle_archive)
-        self.stock_button.clicked.connect(lambda _c=False: self._update_stock())
         self.import_button.clicked.connect(lambda _c=False: self._import_csv())
         self.bulk_archive_button.clicked.connect(lambda _c=False: self._bulk_archive())
         self.export_button.clicked.connect(lambda _c=False: self._export_csv())
@@ -502,7 +440,6 @@ class ProductsTab(QWidget):
         product = products[0] if len(products) == 1 else None
         self.edit_button.setEnabled(product is not None)
         self.archive_button.setEnabled(product is not None)
-        self.stock_button.setEnabled(product is not None)
         self.delete_button.setEnabled(product is not None)
         self.archive_button.setText(
             T.BTN_RESTORE
@@ -516,16 +453,6 @@ class ProductsTab(QWidget):
             if products and all(p.archived for p in products)
             else T.BTN_ARCHIVE_SELECTED
         )
-        self.stock_button.setEnabled(product is not None)
-
-    def _update_stock(self) -> None:
-        product = self.selected_product()
-        if product is None:
-            return
-        dialog = StockDialog(self._repo, product, parent=self)
-        if dialog.exec() == QDialog.DialogCode.Accepted:
-            self.reload()
-            self._select_id(product.id)
 
     def _import_csv(self) -> None:
         if self._conn is None:
