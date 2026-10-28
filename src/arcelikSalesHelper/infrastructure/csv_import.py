@@ -41,6 +41,7 @@ REQUIRED_COLUMNS = (
 )
 WEBSITE_PRICE_COLUMN = "website_discounted_price"
 QUANTITY_COLUMN = "quantity"
+_FORMULA_PREFIXES = "=+-@\t\r"
 STOCK_ONLY_COLUMNS = ("product_name", QUANTITY_COLUMN)
 MAX_FILE_BYTES = 50 * 1024 * 1024
 MAX_ROWS = 100_000
@@ -202,7 +203,7 @@ def _parse_row(
     errors: list[RowError] = []
     warnings: list[str] = []
 
-    name = " ".join(get("product_name").split())
+    name = _restore_exported_name(" ".join(get("product_name").split()))
     key = name_key(name) if name else ""
     if not name:
         errors.append(
@@ -254,6 +255,22 @@ def _parse_row(
     return errors, ParsedRow(
         line, name, key, regular, website, quantity, tuple(warnings)
     )
+
+
+def _restore_exported_name(name: str) -> str:
+    """Undo the exporter’s formula escape, including escaped literal apostrophes."""
+    if not name.startswith("'"):
+        return name
+    value = name[1:]
+    marker = len(value) - len(value.lstrip())
+    if value[marker:marker + 1] in _FORMULA_PREFIXES:
+        return value
+    if value.startswith("'"):
+        literal = value[1:]
+        marker = len(literal) - len(literal.lstrip())
+        if literal[marker:marker + 1] in _FORMULA_PREFIXES:
+            return literal
+    return name
 
 
 def parse_csv_text(text: str) -> Result[ParsedCsv, str]:
