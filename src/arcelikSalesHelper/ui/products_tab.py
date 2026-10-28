@@ -185,6 +185,7 @@ class ProductDialog(QDialog):
             "regular_price": FieldBlock(self.regular_edit),
             "website_price": FieldBlock(self.website_edit),
         }
+        self.quantity_block = FieldBlock(self.quantity_edit)
         self._general = QLabel()
         self._general.setStyleSheet(ERROR_STYLE)
         self._general.setWordWrap(True)
@@ -196,7 +197,7 @@ class ProductDialog(QDialog):
         form.addRow(T.LBL_WEBSITE_DISCOUNTED, self.blocks["website_price"])
         form.addRow(T.LBL_DEFAULT_GIFT, self.gift_edit)
         form.addRow(T.LBL_NOTES, self.notes_edit)
-        form.addRow(T.LBL_COUNTED_QTY, self.quantity_edit)
+        form.addRow(T.LBL_COUNTED_QTY, self.quantity_block)
 
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Save
@@ -238,6 +239,9 @@ class ProductDialog(QDialog):
     def _clear_errors(self) -> None:
         for block in self.blocks.values():
             block.set_error(None)
+        self.quantity_block.set_error(None)
+        self.quantity_edit.setToolTip("")
+        self.quantity_edit.setStyleSheet("")
         self._general.hide()
 
     def accept(self) -> None:
@@ -259,13 +263,10 @@ class ProductDialog(QDialog):
             return
 
         quantity: int | None = None
-        self.quantity_edit.setToolTip("")
-        self.quantity_edit.setStyleSheet("")
         if self.quantity_edit.text().strip():
             match parse_quantity(self.quantity_edit.text()):
                 case Err(message):
-                    self.quantity_edit.setToolTip(message)
-                    self.quantity_edit.setStyleSheet(ERROR_STYLE)
+                    self.quantity_block.set_error(message)
                     return
                 case Ok(value):
                     quantity = value
