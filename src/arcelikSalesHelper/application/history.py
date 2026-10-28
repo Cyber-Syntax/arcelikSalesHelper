@@ -146,10 +146,15 @@ def _line_record(
         product_name=line.product_name,
         quantity=line.quantity,
         regular_price=format_decimal_exact(line.regular_price),
-        website_discounted_price=format_decimal_exact(line.website_discounted_price),
+        website_discounted_price=format_decimal_exact(
+            line.website_discounted_price
+        ),
         gift_selected=line.gift_selected,
         gift_name=line.gift_name,
-        manager_value_entered=(form.manager_value.strip() or format_decimal_exact(line.manager_value))
+        manager_value_entered=(
+            form.manager_value.strip()
+            or format_decimal_exact(line.manager_value)
+        )
         if has_manager
         else None,
         manager_mode=None

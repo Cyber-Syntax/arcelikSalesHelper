@@ -90,17 +90,25 @@ def test_zero_website_price_is_saved_and_shown_as_yok_in_history(
     assert T.LBL_FIRST_PRICE_TEN_PERCENT in texts
     option_boxes = [
         box
-        for box in window.history_tab.detail_scroll.widget().findChildren(QGroupBox)
+        for box in window.history_tab.detail_scroll.widget().findChildren(
+            QGroupBox
+        )
         if box.title() in (T.SEC_WEBSITE_OPTION, T.SEC_GIFT_OPTION)
     ]
-    website_boxes = [box for box in option_boxes if box.title() == T.SEC_WEBSITE_OPTION]
-    gift_boxes = [box for box in option_boxes if box.title() == T.SEC_GIFT_OPTION]
+    website_boxes = [
+        box for box in option_boxes if box.title() == T.SEC_WEBSITE_OPTION
+    ]
+    gift_boxes = [
+        box for box in option_boxes if box.title() == T.SEC_GIFT_OPTION
+    ]
     assert any(
-        T.LBL_DISCOUNT_AMOUNT in [label.text() for label in box.findChildren(QLabel)]
+        T.LBL_DISCOUNT_AMOUNT
+        in [label.text() for label in box.findChildren(QLabel)]
         for box in website_boxes
     )
     assert all(
-        T.LBL_DISCOUNT_AMOUNT not in [label.text() for label in box.findChildren(QLabel)]
+        T.LBL_DISCOUNT_AMOUNT
+        not in [label.text() for label in box.findChildren(QLabel)]
         for box in gift_boxes
     )
 

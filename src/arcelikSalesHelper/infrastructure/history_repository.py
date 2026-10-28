@@ -120,17 +120,21 @@ class HistoryRepository:
 
     def count(self, query: str = "") -> int:
         if not query.strip():
-            return int(self._conn.execute(
-                "SELECT COUNT(*) FROM calculation_snapshots"
-            ).fetchone()[0])
+            return int(
+                self._conn.execute(
+                    "SELECT COUNT(*) FROM calculation_snapshots"
+                ).fetchone()[0]
+            )
         pattern = f"%{query.strip()}%"
-        return int(self._conn.execute(
-            "SELECT COUNT(*) FROM calculation_snapshots s WHERE "
-            "s.customer_name LIKE ? COLLATE NOCASE OR EXISTS ("
-            "SELECT 1 FROM calculation_lines f WHERE f.snapshot_id = s.id "
-            "AND f.product_name LIKE ? COLLATE NOCASE)",
-            (pattern, pattern),
-        ).fetchone()[0])
+        return int(
+            self._conn.execute(
+                "SELECT COUNT(*) FROM calculation_snapshots s WHERE "
+                "s.customer_name LIKE ? COLLATE NOCASE OR EXISTS ("
+                "SELECT 1 FROM calculation_lines f WHERE f.snapshot_id = s.id "
+                "AND f.product_name LIKE ? COLLATE NOCASE)",
+                (pattern, pattern),
+            ).fetchone()[0]
+        )
 
     def list_headers(
         self, limit: int = 100, before_id: int | None = None, query: str = ""
@@ -186,14 +190,17 @@ class HistoryRepository:
         """Permanently remove one whole history entry and its lines atomically."""
         with transaction(self._conn):
             exists = self._conn.execute(
-                "SELECT 1 FROM calculation_snapshots WHERE id = ?", (snapshot_id,)
+                "SELECT 1 FROM calculation_snapshots WHERE id = ?",
+                (snapshot_id,),
             ).fetchone()
             if exists is None:
                 return False
             self._conn.execute(
-                "DELETE FROM calculation_lines WHERE snapshot_id = ?", (snapshot_id,)
+                "DELETE FROM calculation_lines WHERE snapshot_id = ?",
+                (snapshot_id,),
             )
             self._conn.execute(
-                "DELETE FROM calculation_snapshots WHERE id = ?", (snapshot_id,)
+                "DELETE FROM calculation_snapshots WHERE id = ?",
+                (snapshot_id,),
             )
         return True

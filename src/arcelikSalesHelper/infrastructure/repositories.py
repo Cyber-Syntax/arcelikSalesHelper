@@ -197,9 +197,16 @@ class ProductRepository:
             ).fetchone()
             if used is not None:
                 return Err(RepoError("product_in_use", T.PRODUCT_IN_HISTORY))
-            self._conn.execute("DELETE FROM stock_history WHERE product_id = ?", (product_id,))
-            self._conn.execute("DELETE FROM pricing_history WHERE product_id = ?", (product_id,))
-            self._conn.execute("DELETE FROM products WHERE id = ?", (product_id,))
+            self._conn.execute(
+                "DELETE FROM stock_history WHERE product_id = ?", (product_id,)
+            )
+            self._conn.execute(
+                "DELETE FROM pricing_history WHERE product_id = ?",
+                (product_id,),
+            )
+            self._conn.execute(
+                "DELETE FROM products WHERE id = ?", (product_id,)
+            )
         return Ok(None)
 
     def set_quantity(

@@ -31,7 +31,12 @@ from arcelikSalesHelper.infrastructure.history_repository import (
 )
 
 from .calculator_tab import section_box
-from .common import HINT_STYLE, WARNING_STYLE, ask_yes_no, format_local_timestamp
+from .common import (
+    HINT_STYLE,
+    WARNING_STYLE,
+    ask_yes_no,
+    format_local_timestamp,
+)
 
 _COLUMNS = T.HISTORY_COLUMNS
 
@@ -68,9 +73,7 @@ class SnapshotDetail(QWidget):
                 confirmation_text(snapshot.confirmation_state), WARNING_STYLE
             )
         )
-        layout.addWidget(
-            self._note(T.NOTE_HISTORY_FROZEN)
-        )
+        layout.addWidget(self._note(T.NOTE_HISTORY_FROZEN))
         for line in snapshot.lines:
             layout.addWidget(self._line_box(line))
         for section in snapshot.totals_sections:
@@ -186,7 +189,11 @@ class HistoryTab(QWidget):
         try:
             self.table.setRowCount(0)
             self._oldest_id = None
-            self._append(self._repo.list_headers(self._page_size, query=self.search_edit.text()))
+            self._append(
+                self._repo.list_headers(
+                    self._page_size, query=self.search_edit.text()
+                )
+            )
             if keep is not None:
                 for row in range(self.table.rowCount()):
                     item = self.table.item(row, 0)
@@ -204,7 +211,11 @@ class HistoryTab(QWidget):
 
     def _load_more(self) -> None:
         self._append(
-            self._repo.list_headers(self._page_size, before_id=self._oldest_id, query=self.search_edit.text())
+            self._repo.list_headers(
+                self._page_size,
+                before_id=self._oldest_id,
+                query=self.search_edit.text(),
+            )
         )
         self._update_footer()
 
@@ -215,7 +226,9 @@ class HistoryTab(QWidget):
             self.table.insertRow(row)
             cells = (
                 format_local_timestamp(summary.created_at),
-                T.history_summary(summary.customer_name, summary.products_text),
+                T.history_summary(
+                    summary.customer_name, summary.products_text
+                ),
                 str(summary.line_count),
                 summary.pos_total,
             )

@@ -250,7 +250,9 @@ def verify_backup_file(
             return Err(T.backup_integrity("; ".join(rows[:3])))
         version = int(conn.execute("PRAGMA user_version").fetchone()[0])
         if version != expected_user_version:
-            return Err(T.backup_version_mismatch(version, expected_user_version))
+            return Err(
+                T.backup_version_mismatch(version, expected_user_version)
+            )
         return Ok(None)
     except sqlite3.Error as exc:
         return Err(str(exc))
@@ -298,9 +300,7 @@ def create_backup(
         size = final.stat().st_size
     except (sqlite3.Error, OSError) as exc:
         _discard(tmp)
-        return Err(
-            BackupError("failed", T.backup_failed_create(str(exc)))
-        )
+        return Err(BackupError("failed", T.backup_failed_create(str(exc))))
 
     # Only now, with a new verified backup in place, is anything old removed.
     deleted, rotation_errors = rotate_backups(backup_dir, keep, protect=final)

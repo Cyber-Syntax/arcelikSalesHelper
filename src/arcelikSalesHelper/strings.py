@@ -136,7 +136,9 @@ LBL_POS_DISCOUNT_RATE = "Hesaplanan indirim oranı"
 POS_MODE_FIXED = "Sabit indirim tutarı"
 POS_MODE_PERCENTAGE = "Yüzde indirimi"
 POS_FORMULA_FIXED = "Sabit yöntem: (ilk fiyat − web fiyatı) + yönetici fiyatı"
-POS_FORMULA_PERCENTAGE = "Yüzde yöntemi: yönetici fiyatı ÷ (web fiyatı / ilk fiyat)"
+POS_FORMULA_PERCENTAGE = (
+    "Yüzde yöntemi: yönetici fiyatı ÷ (web fiyatı / ilk fiyat)"
+)
 CHK_SHARED_MANAGER_TOTAL = "Tek yönetici toplamını ürünlere dağıt"
 CHK_TOTAL_ONLY_MODE = "Ürün seçmeden toplam hesapla"
 GROUP_TOTAL_ONLY = "Hızlı toplam hesabı"
@@ -188,10 +190,9 @@ HISTORY_ONLY_COMPLETE = (
     "Yalnızca eksiksiz ve geçerli bir hesaplama kaydedilebilir."
 )
 
+
 def confirmation_pos_unverified() -> str:
-    return (
-        f"Bu hesaplama kaydedildiğinde {POS_LABEL} doğrulanmamıştı."
-    )
+    return f"Bu hesaplama kaydedildiğinde {POS_LABEL} doğrulanmamıştı."
 
 
 def confirmation_other(state: str) -> str:
@@ -222,13 +223,15 @@ def history_summary(customer: str | None, products: str) -> str:
 
 
 def confirm_delete_history(snapshot_id: int) -> str:
-    return (
-        f"#{snapshot_id} numaralı hesaplama ve ürün satırları kalıcı olarak silinsin mi?"
-    )
+    return f"#{snapshot_id} numaralı hesaplama ve ürün satırları kalıcı olarak silinsin mi?"
+
+
 NOTE_HISTORY_FROZEN = (
     "Hesaplandığı ve kaydedildiği gibi gösterilir. Ürünlerde, fiyatlarda veya "
     "hediyelerde sonradan yapılan değişiklikler bunu etkilemez."
 )
+
+
 def history_header(
     snapshot_id: int, saved_at: str, app_version: str, schema: int
 ) -> str:
@@ -328,6 +331,8 @@ PRODUCT_IN_HISTORY = "Bu ürün hesaplama geçmişinde kullanılmış. Kalıcı 
 
 def confirm_delete_product(name: str) -> str:
     return f"{name} ürünü ve fiyat/stok kayıtları kalıcı olarak silinsin mi?"
+
+
 BTN_ARCHIVE_SELECTED = "Seçilenleri arşivle"
 BTN_RESTORE_SELECTED = "Seçilenleri geri yükle"
 PH_QTY_OPTIONAL = "isteğe bağlı, tam sayı"
@@ -347,6 +352,8 @@ def export_failed(message: str) -> str:
 
 def export_done(count: int) -> str:
     return f"{count} ürün CSV dosyasına aktarıldı."
+
+
 CANNOT_CHANGE_TITLE = "Ürün değiştirilemiyor"
 
 PH_QTY = "tam sayı, örneğin 12"

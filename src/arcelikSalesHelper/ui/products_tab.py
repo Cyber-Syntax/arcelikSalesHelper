@@ -164,7 +164,9 @@ class ProductDialog(QDialog):
         self._repo = repo
         self._product = product
         self.saved: Product | None = None
-        self.setWindowTitle(T.DLG_EDIT_PRODUCT if product else T.DLG_ADD_PRODUCT)
+        self.setWindowTitle(
+            T.DLG_EDIT_PRODUCT if product else T.DLG_ADD_PRODUCT
+        )
         self.setMinimumWidth(420)
 
         self.name_edit = QLineEdit()
@@ -352,7 +354,9 @@ class ProductsTab(QWidget):
         self.table.setSelectionBehavior(
             QAbstractItemView.SelectionBehavior.SelectRows
         )
-        self.table.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
+        self.table.setSelectionMode(
+            QAbstractItemView.SelectionMode.ExtendedSelection
+        )
         self.table.setEditTriggers(
             QAbstractItemView.EditTrigger.NoEditTriggers
         )
@@ -398,9 +402,13 @@ class ProductsTab(QWidget):
         self.edit_button.clicked.connect(self._edit)
         self.archive_button.clicked.connect(self._toggle_archive)
         self.import_button.clicked.connect(lambda _c=False: self._import_csv())
-        self.bulk_archive_button.clicked.connect(lambda _c=False: self._bulk_archive())
+        self.bulk_archive_button.clicked.connect(
+            lambda _c=False: self._bulk_archive()
+        )
         self.export_button.clicked.connect(lambda _c=False: self._export_csv())
-        self.delete_button.clicked.connect(lambda _c=False: self._delete_product())
+        self.delete_button.clicked.connect(
+            lambda _c=False: self._delete_product()
+        )
         self.table.doubleClicked.connect(lambda _i: self._edit())
         self.table.selectionModel().selectionChanged.connect(
             lambda _s, _d: self._update_buttons()
@@ -427,7 +435,8 @@ class ProductsTab(QWidget):
         return [
             product
             for index in self.table.selectionModel().selectedRows()
-            if (product := self.table_model.product_at(index.row())) is not None
+            if (product := self.table_model.product_at(index.row()))
+            is not None
         ]
 
     def _select_id(self, product_id: int) -> None:
@@ -457,7 +466,9 @@ class ProductsTab(QWidget):
     def _import_csv(self) -> None:
         if self._conn is None:
             return
-        dialog = ImportDialog(self._repo, self._conn, self._backups, parent=self)
+        dialog = ImportDialog(
+            self._repo, self._conn, self._backups, parent=self
+        )
         dialog.exec()
         self.reload()
         if dialog.summary is not None:
@@ -504,9 +515,13 @@ class ProductsTab(QWidget):
         if not products:
             return
         restoring = all(product.archived for product in products)
-        action = T.BTN_RESTORE_SELECTED if restoring else T.BTN_ARCHIVE_SELECTED
+        action = (
+            T.BTN_RESTORE_SELECTED if restoring else T.BTN_ARCHIVE_SELECTED
+        )
         if not ask_yes_no(
-            self, T.DLG_BULK_PRODUCTS, T.confirm_bulk_products(action, len(products))
+            self,
+            T.DLG_BULK_PRODUCTS,
+            T.confirm_bulk_products(action, len(products)),
         ):
             return
         errors: list[str] = []
@@ -537,7 +552,9 @@ class ProductsTab(QWidget):
                 Path(path),
             )
         except OSError as exc:
-            show_warning(self, T.EXPORT_FAILED_TITLE, T.export_failed(str(exc)))
+            show_warning(
+                self, T.EXPORT_FAILED_TITLE, T.export_failed(str(exc))
+            )
             return
         show_warning(self, T.EXPORT_DONE_TITLE, T.export_done(count))
 

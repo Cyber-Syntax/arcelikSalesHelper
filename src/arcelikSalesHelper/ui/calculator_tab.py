@@ -94,12 +94,8 @@ class CalculatorLineWidget(QWidget):
         form = QFormLayout(self)
         form.addRow(T.FORM_NAME, self.blocks["product_name"])
         form.addRow(T.FORM_QUANTITY, self.blocks["quantity"])
-        form.addRow(
-            T.FORM_REGULAR, self.blocks["regular_price"]
-        )
-        form.addRow(
-            T.FORM_WEBSITE, self.blocks["website_discounted_price"]
-        )
+        form.addRow(T.FORM_REGULAR, self.blocks["regular_price"])
+        form.addRow(T.FORM_WEBSITE, self.blocks["website_discounted_price"])
         form.addRow("", self.gift_check)
         form.addRow(T.FORM_GIFT_NAME, self.gift_name_edit)
         form.addRow(T.FORM_POS_CALCULATION_MODE, self.pos_mode_combo)
@@ -149,8 +145,12 @@ class CalculatorLineWidget(QWidget):
         try:
             self._product = product
             self.name_edit.setText(product.name)
-            self.regular_edit.setText(format_money_input(product.regular_price))
-            self.website_edit.setText(format_money_input(product.website_price))
+            self.regular_edit.setText(
+                format_money_input(product.regular_price)
+            )
+            self.website_edit.setText(
+                format_money_input(product.website_price)
+            )
             self.gift_name_edit.setText(product.default_gift_name or "")
             self.name_edit.setReadOnly(True)
         finally:
@@ -316,7 +316,8 @@ class TransactionPanel(QWidget):
                             widget.setVisible(box.isChecked())
                         box.toggled.connect(
                             lambda checked, widgets=content: [
-                                widget.setVisible(checked) for widget in widgets
+                                widget.setVisible(checked)
+                                for widget in widgets
                             ]
                         )
                     self._totals.addWidget(box)
@@ -359,16 +360,16 @@ class TransactionPanel(QWidget):
             evaluation.line.product_name if evaluation.line is not None else ""
         )
         box = QGroupBox(
-            T.line_title_named(index + 1, name) if name else T.line_title(index + 1)
+            T.line_title_named(index + 1, name)
+            if name
+            else T.line_title(index + 1)
         )
         box.setObjectName("lineResultCard")
         layout = QVBoxLayout(box)
         view = evaluation.view
         if view is None:
             text = (
-                T.CARD_INCOMPLETE
-                if evaluation.incomplete_only
-                else T.CARD_FIX
+                T.CARD_INCOMPLETE if evaluation.incomplete_only else T.CARD_FIX
             )
             layout.addWidget(self._note(text))  # never show stale results
             return box
@@ -414,8 +415,9 @@ def _pos_summary_box(section: Section) -> QFrame:
             Qt.TextInteractionFlag.TextSelectableByMouse
         )
         is_amount = amount.label in amount_labels
-        is_missing = amount.value == T.NOT_AVAILABLE or amount.value.startswith(
-            f"{T.NOT_AVAILABLE}:"
+        is_missing = (
+            amount.value == T.NOT_AVAILABLE
+            or amount.value.startswith(f"{T.NOT_AVAILABLE}:")
         )
         value.setProperty("missing", not is_amount or is_missing)
         if amount.tooltip:
@@ -453,8 +455,12 @@ class CalculatorTab(QWidget):
         self.quick_manager_edit = QLineEdit()
         self.quick_manager_edit.setPlaceholderText(T.PH_OPTIONAL)
         self.quick_pos_mode = QComboBox()
-        self.quick_pos_mode.addItem(T.POS_MODE_FIXED, PosCalculationMode.FIXED_AMOUNT)
-        self.quick_pos_mode.addItem(T.POS_MODE_PERCENTAGE, PosCalculationMode.PERCENTAGE)
+        self.quick_pos_mode.addItem(
+            T.POS_MODE_FIXED, PosCalculationMode.FIXED_AMOUNT
+        )
+        self.quick_pos_mode.addItem(
+            T.POS_MODE_PERCENTAGE, PosCalculationMode.PERCENTAGE
+        )
         self.quick_panel = QGroupBox(T.GROUP_TOTAL_ONLY)
         quick_form = QFormLayout(self.quick_panel)
         quick_form.addRow(T.FORM_TOTAL_REGULAR, self.quick_regular_edit)
@@ -569,7 +575,11 @@ class CalculatorTab(QWidget):
         )
         self.shared_manager_edit.textChanged.connect(self.recalculate)
         self.quick_mode_check.toggled.connect(self._quick_mode_changed)
-        for edit in (self.quick_regular_edit, self.quick_website_edit, self.quick_manager_edit):
+        for edit in (
+            self.quick_regular_edit,
+            self.quick_website_edit,
+            self.quick_manager_edit,
+        ):
             edit.textChanged.connect(self.recalculate)
         self.quick_pos_mode.currentIndexChanged.connect(self.recalculate)
         self._render_products()
@@ -632,9 +642,7 @@ class CalculatorTab(QWidget):
             for product_id in self._staged_products
             if product_id in active_products
         ]
-        self._staged_products = {
-            product.id: product for product in products
-        }
+        self._staged_products = {product.id: product for product in products}
         if not products:
             self._render_products()
             return
@@ -654,7 +662,9 @@ class CalculatorTab(QWidget):
         self.product_list.clear()
         for product in products:
             selected = product.id in self._staged_products
-            item = QListWidgetItem(self._product_option_text(product, selected))
+            item = QListWidgetItem(
+                self._product_option_text(product, selected)
+            )
             item.setData(Qt.ItemDataRole.UserRole, product)
             item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
             item.setCheckState(
@@ -769,7 +779,9 @@ class CalculatorTab(QWidget):
                 manager_mode=ManagerMode.LINE,
                 pos_calculation_mode=(
                     self.quick_pos_mode.currentData()
-                    if isinstance(self.quick_pos_mode.currentData(), PosCalculationMode)
+                    if isinstance(
+                        self.quick_pos_mode.currentData(), PosCalculationMode
+                    )
                     else PosCalculationMode.FIXED_AMOUNT
                 ),
             )
@@ -781,18 +793,24 @@ class CalculatorTab(QWidget):
                 parsed = read_money(total_text)
                 if parsed.value is not None:
                     weighted_evals = [
-                        evaluate_line(LineForm(
-                            product_name=form.product_name,
-                            quantity=form.quantity,
-                            regular_price=form.regular_price,
-                            website_discounted_price=form.website_discounted_price,
-                        ))
+                        evaluate_line(
+                            LineForm(
+                                product_name=form.product_name,
+                                quantity=form.quantity,
+                                regular_price=form.regular_price,
+                                website_discounted_price=form.website_discounted_price,
+                            )
+                        )
                         for form in forms
                     ]
                     if all(item.result is not None for item in weighted_evals):
                         allocations = allocate_total_by_weight(
                             parsed.value,
-                            tuple(item.result.regular_total for item in weighted_evals if item.result is not None),
+                            tuple(
+                                item.result.regular_total
+                                for item in weighted_evals
+                                if item.result is not None
+                            ),
                         )
                         forms = [
                             replace(
@@ -801,10 +819,14 @@ class CalculatorTab(QWidget):
                                 manager_value_decimal=allocation,
                                 manager_mode=ManagerMode.LINE,
                             )
-                            for form, allocation in zip(forms, allocations, strict=True)
+                            for form, allocation in zip(
+                                forms, allocations, strict=True
+                            )
                         ]
                 else:
-                    self.shared_manager_edit.setToolTip(parsed.error or T.MONEY_FORMAT)
+                    self.shared_manager_edit.setToolTip(
+                        parsed.error or T.MONEY_FORMAT
+                    )
                     evaluation = evaluate_transaction(forms)
                     evaluation = replace(
                         evaluation,
@@ -820,7 +842,9 @@ class CalculatorTab(QWidget):
             evaluation = evaluate_transaction(forms)
         self.evaluation = evaluation
         if not self.quick_mode_check.isChecked():
-            for row, line_eval in zip(self.rows, evaluation.lines, strict=True):
+            for row, line_eval in zip(
+                self.rows, evaluation.lines, strict=True
+            ):
                 row.line.set_feedback(line_eval.errors, line_eval.hints)
         self.panel.show_evaluation(evaluation)
         self.save_button.setEnabled(evaluation.valid)

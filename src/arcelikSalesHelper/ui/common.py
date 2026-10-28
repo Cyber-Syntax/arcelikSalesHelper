@@ -140,15 +140,33 @@ def _show(
 
 
 def show_info(parent: QWidget | None, title: str, text: str) -> None:
-    _show(parent, QMessageBox.Icon.Information, title, text, QMessageBox.StandardButton.Ok)
+    _show(
+        parent,
+        QMessageBox.Icon.Information,
+        title,
+        text,
+        QMessageBox.StandardButton.Ok,
+    )
 
 
 def show_warning(parent: QWidget | None, title: str, text: str) -> None:
-    _show(parent, QMessageBox.Icon.Warning, title, text, QMessageBox.StandardButton.Ok)
+    _show(
+        parent,
+        QMessageBox.Icon.Warning,
+        title,
+        text,
+        QMessageBox.StandardButton.Ok,
+    )
 
 
 def show_critical(parent: QWidget | None, title: str, text: str) -> None:
-    _show(parent, QMessageBox.Icon.Critical, title, text, QMessageBox.StandardButton.Ok)
+    _show(
+        parent,
+        QMessageBox.Icon.Critical,
+        title,
+        text,
+        QMessageBox.StandardButton.Ok,
+    )
 
 
 def ask_yes_no(parent: QWidget | None, title: str, text: str) -> bool:
@@ -165,7 +183,9 @@ def install_qt_translations(app: QCoreApplication) -> None:
     strings stay in English; every string of this application comes from
     ``strings.py`` and does not depend on it.
     """
-    QLocale.setDefault(QLocale(QLocale.Language.Turkish, QLocale.Country.Turkey))
+    QLocale.setDefault(
+        QLocale(QLocale.Language.Turkish, QLocale.Country.Turkey)
+    )
     directory = QLibraryInfo.path(QLibraryInfo.LibraryPath.TranslationsPath)
     for name in ("qtbase",):
         translator = QTranslator(app)

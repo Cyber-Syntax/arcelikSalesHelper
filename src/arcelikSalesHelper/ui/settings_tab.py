@@ -97,7 +97,8 @@ class SettingsTab(QWidget):
 
         form = QFormLayout()
         form.addRow(
-            T.LBL_DATABASE, self._with_button(self.db_edit, self.open_data_button)
+            T.LBL_DATABASE,
+            self._with_button(self.db_edit, self.open_data_button),
         )
         form.addRow(
             T.LBL_BACKUP_FOLDER,
@@ -134,7 +135,10 @@ class SettingsTab(QWidget):
 
     def _change_font_scale(self, index: int) -> None:
         percent = self.font_scale_combo.itemData(index)
-        if isinstance(percent, int) and self._on_font_scale_changed is not None:
+        if (
+            isinstance(percent, int)
+            and self._on_font_scale_changed is not None
+        ):
             self._on_font_scale_changed(percent)
 
     @staticmethod

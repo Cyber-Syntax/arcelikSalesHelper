@@ -22,7 +22,9 @@ def test_default_location_ends_with_app_name() -> None:
     assert resolve_paths({}).data_dir.name == APP_NAME
 
 
-def test_application_identity_uses_technical_and_display_names_separately() -> None:
+def test_application_identity_uses_technical_and_display_names_separately() -> (
+    None
+):
     assert APP_NAME == "arcelikSalesHelper"
     assert COMPANY_NAME == "arcelikSalesHelper"
     assert DB_FILENAME == "arcelikSalesHelper.sqlite"

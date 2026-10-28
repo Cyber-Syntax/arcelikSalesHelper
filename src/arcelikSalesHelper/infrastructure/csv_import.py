@@ -163,7 +163,9 @@ def _detect_format(header: Sequence[str]) -> Result[ImportFormat, str]:
         return Ok(ImportFormat.STOCK)
     missing = [c for c in REQUIRED_COLUMNS if c not in present]
     unknown = sorted(
-        present - set(REQUIRED_COLUMNS) - {WEBSITE_PRICE_COLUMN, QUANTITY_COLUMN}
+        present
+        - set(REQUIRED_COLUMNS)
+        - {WEBSITE_PRICE_COLUMN, QUANTITY_COLUMN}
     )
     if missing or unknown:
         return Err(T.csv_bad_header(missing, unknown))
@@ -206,9 +208,7 @@ def _parse_row(
     name = _restore_exported_name(" ".join(get("product_name").split()))
     key = name_key(name) if name else ""
     if not name:
-        errors.append(
-            RowError(line, "product_name", T.VAL_NAME_REQUIRED)
-        )
+        errors.append(RowError(line, "product_name", T.VAL_NAME_REQUIRED))
     elif len(name) > MAX_NAME_LENGTH:
         errors.append(
             RowError(
@@ -263,12 +263,12 @@ def _restore_exported_name(name: str) -> str:
         return name
     value = name[1:]
     marker = len(value) - len(value.lstrip())
-    if value[marker:marker + 1] in _FORMULA_PREFIXES:
+    if value[marker : marker + 1] in _FORMULA_PREFIXES:
         return value
     if value.startswith("'"):
         literal = value[1:]
         marker = len(literal) - len(literal.lstrip())
-        if literal[marker:marker + 1] in _FORMULA_PREFIXES:
+        if literal[marker : marker + 1] in _FORMULA_PREFIXES:
             return literal
     return name
 
@@ -498,15 +498,11 @@ def apply_plan(
                         set_stock(created.id, row)
                     case Kind.STOCK_UPDATE:
                         if existing is None:
-                            raise _Abort(
-                                T.import_row_no_plan(row.row)
-                            )
+                            raise _Abort(T.import_row_no_plan(row.row))
                         set_stock(existing.id, row)
                     case Kind.CONFLICT:
                         if existing is None:
-                            raise _Abort(
-                                T.import_row_no_plan(row.row)
-                            )
+                            raise _Abort(T.import_row_no_plan(row.row))
                         if decisions[row.row] is Decision.SKIP:
                             counts.skipped += 1
                             continue
@@ -538,9 +534,7 @@ def apply_plan(
         )
     except sqlite3.Error as exc:
         log.exception("CSV import failed")
-        return Err(
-            ImportFailure("failed", T.import_db_error(str(exc)))
-        )
+        return Err(ImportFailure("failed", T.import_db_error(str(exc))))
 
     return Ok(
         ImportSummary(

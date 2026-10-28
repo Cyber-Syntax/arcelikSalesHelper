@@ -142,7 +142,9 @@ def test_mixed_gift_and_no_gift_lines_give_the_expected_totals(
     assert tab.rows[1].line.gift_check.isChecked()
 
 
-def test_blank_shared_manager_total_applies_no_manager_values(qtbot, repo) -> None:  # type: ignore[no-untyped-def]
+def test_blank_shared_manager_total_applies_no_manager_values(
+    qtbot, repo
+) -> None:  # type: ignore[no-untyped-def]
     tab = CalculatorTab(repo)
     qtbot.addWidget(tab)
     fill(tab.rows[0], "Fridge", "5.000,00", "4.000,00")
@@ -204,7 +206,10 @@ def test_invalid_line_hides_totals_but_keeps_the_valid_card(
     assert "Satır 1: Fridge" in shown
     assert "POS hesaplama ayrıntıları" not in shown
     line_pos = tab.panel.findChildren(QLabel, "posAmount")
-    assert len(line_pos) == 1 and line_pos[0].text() == "Yok: yönetici değeri girin"
+    assert (
+        len(line_pos) == 1
+        and line_pos[0].text() == "Yok: yönetici değeri girin"
+    )
     assert "İşlem toplamları" not in shown
     assert any(
         "Tamamlanacak veya düzeltilecek satırlar: 2" in lb.text()
@@ -257,14 +262,26 @@ def test_pos_result_is_prominent_selectable_and_first(qtbot, repo) -> None:  # t
 
     amount = tab.panel.findChild(QLabel, "posAmount")
     assert amount is not None and amount.text() == "4.000,00 TL"
-    assert amount.textInteractionFlags() & Qt.TextInteractionFlag.TextSelectableByMouse
+    assert (
+        amount.textInteractionFlags()
+        & Qt.TextInteractionFlag.TextSelectableByMouse
+    )
     assert tab.panel._totals.itemAt(0).widget().objectName() == "posHero"
     discount_label = tab.panel.findChild(QLabel, "discountAmountLabel")
     discount_value = tab.panel.findChild(QLabel, "discountAmountValue")
-    assert discount_label is not None and discount_label.text() == "İndirim tutarı"
-    assert discount_value is not None and discount_value.text() == "1.000,00 TL"
-    assert discount_label.parentWidget().title() == "Web sitesi indirim seçeneği"
-    assert discount_value.parentWidget().title() == "Web sitesi indirim seçeneği"
+    assert (
+        discount_label is not None
+        and discount_label.text() == "İndirim tutarı"
+    )
+    assert (
+        discount_value is not None and discount_value.text() == "1.000,00 TL"
+    )
+    assert (
+        discount_label.parentWidget().title() == "Web sitesi indirim seçeneği"
+    )
+    assert (
+        discount_value.parentWidget().title() == "Web sitesi indirim seçeneği"
+    )
 
     result_card = tab.panel.findChild(QGroupBox, "lineResultCard")
     assert result_card is not None and result_card.title() == "Satır 1: Fridge"
@@ -272,14 +289,21 @@ def test_pos_result_is_prominent_selectable_and_first(qtbot, repo) -> None:  # t
     assert tab.panel.findChild(QLabel, "lineQuantityValue").text() == "1"
 
 
-def test_transaction_pos_total_precedes_multi_line_details(qtbot, repo) -> None:  # type: ignore[no-untyped-def]
+def test_transaction_pos_total_precedes_multi_line_details(
+    qtbot, repo
+) -> None:  # type: ignore[no-untyped-def]
     tab = CalculatorTab(repo)
     qtbot.addWidget(tab)
     fill_two(tab)
 
-    amounts = [label.text() for label in tab.panel.findChildren(QLabel, "posAmount")]
+    amounts = [
+        label.text() for label in tab.panel.findChildren(QLabel, "posAmount")
+    ]
     assert amounts == ["17.500,00 TL", "4.586,96 TL", "12.913,04 TL"]
-    discounts = [label.text() for label in tab.panel.findChildren(QLabel, "discountAmountValue")]
+    discounts = [
+        label.text()
+        for label in tab.panel.findChildren(QLabel, "discountAmountValue")
+    ]
     assert discounts == ["1.000,00 TL", "3.000,00 TL"]
     labels = " ".join(label.text() for label in tab.panel.findChildren(QLabel))
     assert "%10 bazı" not in labels
@@ -289,7 +313,9 @@ def test_transaction_pos_total_precedes_multi_line_details(qtbot, repo) -> None:
     assert tab.panel._totals.itemAt(0).widget().objectName() == "posHero"
 
 
-def test_option_cards_stack_at_narrow_width_and_return_to_columns(qtbot, repo) -> None:  # type: ignore[no-untyped-def]
+def test_option_cards_stack_at_narrow_width_and_return_to_columns(
+    qtbot, repo
+) -> None:  # type: ignore[no-untyped-def]
     app = QApplication.instance()
     assert app is not None
     install_material_theme(app, DEFAULT_FONT_SCALE)
@@ -298,25 +324,39 @@ def test_option_cards_stack_at_narrow_width_and_return_to_columns(qtbot, repo) -
     fill(tab.rows[0], "Washer", "6.000,00", "5.000,00", gift="Vacuum")
     tab.panel.resize(700, 900)
     tab.panel._update_option_directions()
-    assert tab.panel._option_layouts[0].direction() == QBoxLayout.Direction.TopToBottom
+    assert (
+        tab.panel._option_layouts[0].direction()
+        == QBoxLayout.Direction.TopToBottom
+    )
 
     tab.panel.resize(900, 900)
     tab.panel._update_option_directions()
-    assert tab.panel._option_layouts[0].direction() == QBoxLayout.Direction.LeftToRight
+    assert (
+        tab.panel._option_layouts[0].direction()
+        == QBoxLayout.Direction.LeftToRight
+    )
 
     install_material_theme(app, 150)
     tab.panel.resize(900, 900)
     tab.panel._update_option_directions()
-    assert tab.panel._option_layouts[0].direction() == QBoxLayout.Direction.TopToBottom
+    assert (
+        tab.panel._option_layouts[0].direction()
+        == QBoxLayout.Direction.TopToBottom
+    )
 
     install_material_theme(app, 100)
     tab.panel.resize(900, 900)
     tab.panel._update_option_directions()
-    assert tab.panel._option_layouts[0].direction() == QBoxLayout.Direction.LeftToRight
+    assert (
+        tab.panel._option_layouts[0].direction()
+        == QBoxLayout.Direction.LeftToRight
+    )
     install_material_theme(app, DEFAULT_FONT_SCALE)
 
 
-def test_light_blue_material_theme_and_result_styles_are_installed(qtbot) -> None:  # type: ignore[no-untyped-def]
+def test_light_blue_material_theme_and_result_styles_are_installed(
+    qtbot,
+) -> None:  # type: ignore[no-untyped-def]
     app = QApplication.instance()
     assert app is not None
     install_material_theme(app)
@@ -367,8 +407,10 @@ def test_batch_product_search_keeps_selection_across_queries_and_adds_in_order(
     product_item(tab, fridge.name).setCheckState(Qt.CheckState.Checked)
     tab.product_search.setText("Washer")
     qtbot.waitUntil(
-        lambda: tab.product_list.count() == 1
-        and tab.product_list.item(0).text().endswith("Washer")
+        lambda: (
+            tab.product_list.count() == 1
+            and tab.product_list.item(0).text().endswith("Washer")
+        )
     )
     assert tab.product_list.item(0).text().endswith("Washer")
     product_item(tab, washer.name).setCheckState(Qt.CheckState.Checked)
@@ -392,9 +434,11 @@ def test_product_search_shows_no_results_message(qtbot, repo) -> None:  # type: 
     qtbot.addWidget(tab)
     tab.product_search.setText("no matching name")
     qtbot.waitUntil(
-        lambda: tab.product_list.count() == 1
-        and tab.product_list.item(0).text()
-        == "Bu aramayla eşleşen ürün bulunamadı."
+        lambda: (
+            tab.product_list.count() == 1
+            and tab.product_list.item(0).text()
+            == "Bu aramayla eşleşen ürün bulunamadı."
+        )
     )
     assert tab.product_list.count() == 1
     assert tab.product_list.item(0).text() == (
@@ -402,9 +446,7 @@ def test_product_search_shows_no_results_message(qtbot, repo) -> None:  # type: 
     )
 
 
-def test_product_checkbox_has_visible_high_contrast_state(
-    qtbot, repo
-) -> None:  # type: ignore[no-untyped-def]
+def test_product_checkbox_has_visible_high_contrast_state(qtbot, repo) -> None:  # type: ignore[no-untyped-def]
     product = add_product(repo, "Fridge")
     tab = CalculatorTab(repo)
     qtbot.addWidget(tab)

@@ -162,7 +162,9 @@ class MainWindow(QMainWindow):
     # ---- history ---------------------------------------------------------
 
     def save_calculation(
-        self, evaluation: TransactionEvaluation, customer_name: str | None = None
+        self,
+        evaluation: TransactionEvaluation,
+        customer_name: str | None = None,
     ) -> Result[int, str]:
         built = build_snapshot(
             evaluation,
@@ -195,6 +197,4 @@ class MainWindow(QMainWindow):
             show_warning(self, T.CALC_NOT_SAVED_TITLE, outcome.error)
             return
         self.history_tab.reload(select_id=outcome.value)
-        self.statusBar().showMessage(
-            T.calc_saved_status(outcome.value), 8000
-        )
+        self.statusBar().showMessage(T.calc_saved_status(outcome.value), 8000)

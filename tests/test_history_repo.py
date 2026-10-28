@@ -39,14 +39,20 @@ def test_save_and_get_roundtrip_is_lossless(db: sqlite3.Connection) -> None:
     assert repo.count() == 1
 
 
-def test_save_and_get_preserves_pos_calculation_mode(db: sqlite3.Connection) -> None:
+def test_save_and_get_preserves_pos_calculation_mode(
+    db: sqlite3.Connection,
+) -> None:
     repo = HistoryRepository(db)
-    record = make_record([form(
-        regular_price="38.299,00",
-        website_discounted_price="34.469,10",
-        manager_value="30.000,00",
-        pos_calculation_mode=PosCalculationMode.PERCENTAGE,
-    )])
+    record = make_record(
+        [
+            form(
+                regular_price="38.299,00",
+                website_discounted_price="34.469,10",
+                manager_value="30.000,00",
+                pos_calculation_mode=PosCalculationMode.PERCENTAGE,
+            )
+        ]
+    )
     sid = repo.save(record)
     restored = repo.get(sid)
     assert restored is not None

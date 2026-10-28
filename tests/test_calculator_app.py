@@ -6,11 +6,19 @@ from arcelikSalesHelper.application.calculator import (
     read_money,
 )
 from arcelikSalesHelper import strings as T
-from arcelikSalesHelper.domain.models import POS_LABEL, ManagerMode, PosCalculationMode
+from arcelikSalesHelper.domain.models import (
+    POS_LABEL,
+    ManagerMode,
+    PosCalculationMode,
+)
 
 
 def form(**kw: object) -> LineForm:
-    values: dict[str, object] = dict(product_name="Fridge", regular_price="145.298,00", website_discounted_price="132.798,00")
+    values: dict[str, object] = dict(
+        product_name="Fridge",
+        regular_price="145.298,00",
+        website_discounted_price="132.798,00",
+    )
     values.update(kw)
     return LineForm(**values)  # type: ignore[arg-type]
 
@@ -25,12 +33,14 @@ def test_standard_calculation_and_pos_use_website_discounted_price():
 
 
 def test_percentage_mode_explains_derived_rate_and_gross_up():
-    ev = evaluate_line(form(
-        regular_price="38.299,00",
-        website_discounted_price="34.469,10",
-        manager_value="30.000,00",
-        pos_calculation_mode=PosCalculationMode.PERCENTAGE,
-    ))
+    ev = evaluate_line(
+        form(
+            regular_price="38.299,00",
+            website_discounted_price="34.469,10",
+            manager_value="30.000,00",
+            pos_calculation_mode=PosCalculationMode.PERCENTAGE,
+        )
+    )
     assert ev.view is not None and ev.result is not None
     rows = {row.label: row.value for row in ev.view.card.pos.rows}
     assert rows[T.LBL_POS_AMOUNT].startswith("33.333,333333333333")
@@ -53,7 +63,9 @@ def test_zero_website_price_displays_regular_price_and_zero_discount():
     prices = {row.label: row.value for row in ev.view.card.prices.rows}
     assert prices[T.LBL_WEBSITE_UNIT] == T.NO_WEBSITE_DISCOUNT
     assert prices[T.LBL_WEBSITE_DISCOUNTED_TOTAL] == T.NO_WEBSITE_DISCOUNT
-    options = {row.label: row.value for row in ev.view.card.website_option.rows}
+    options = {
+        row.label: row.value for row in ev.view.card.website_option.rows
+    }
     assert options[T.LBL_WEBSITE_DISCOUNTED_TOTAL] == T.NO_WEBSITE_DISCOUNT
     assert options[T.LBL_DISCOUNT_AMOUNT] == "0,00 TL"
     assert options[T.LBL_FIRST_PRICE_TEN_PERCENT] == "34.469,10 TL"
@@ -92,10 +104,14 @@ def test_calculator_keeps_exact_fractional_input_and_result_display():
 
 
 def test_total_line_manager_value_remains_authoritative():
-    ev = evaluate_line(form(quantity=3, manager_value="10", manager_mode=ManagerMode.LINE))
+    ev = evaluate_line(
+        form(quantity=3, manager_value="10", manager_mode=ManagerMode.LINE)
+    )
     assert ev.result is not None
     assert ev.result.manager_line_total == D(10)
-    assert str(ev.result.manager_unit).startswith("3.333333") and ev.result.manager_unit != D("3.33")
+    assert str(ev.result.manager_unit).startswith(
+        "3.333333"
+    ) and ev.result.manager_unit != D("3.33")
 
 
 def test_invalid_price_hides_results():
@@ -108,4 +124,8 @@ def test_coupon_is_not_an_input_or_result():
     assert "coupon" not in LineForm.__dataclass_fields__
     ev = evaluate_line(form())
     assert ev.view is not None
-    assert all("kupon" not in row.label.casefold() for section in ev.view.sections for row in section.rows)
+    assert all(
+        "kupon" not in row.label.casefold()
+        for section in ev.view.sections
+        for row in section.rows
+    )

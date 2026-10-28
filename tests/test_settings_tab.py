@@ -27,7 +27,9 @@ from arcelikSalesHelper.ui.theme import (
 def make_window(db, tmp_path: Path, clock):  # type: ignore[no-untyped-def]
     paths = resolve_paths({DATA_DIR_ENV_VAR: str(tmp_path / "data")})
     manager = BackupManager(db, paths.backup_dir, clock)
-    settings = QSettings(str(tmp_path / "ui-settings.ini"), QSettings.Format.IniFormat)
+    settings = QSettings(
+        str(tmp_path / "ui-settings.ini"), QSettings.Format.IniFormat
+    )
     return MainWindow(db, paths, manager, settings), manager, paths
 
 
