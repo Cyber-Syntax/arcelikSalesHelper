@@ -2,6 +2,41 @@
 
 Source: PRD v0.5. This file is the working contract. Prioritize calculator productivity, then catalog productivity; keep scraping and shared PostgreSQL as later architectural milestones.
 
+## Feedback implementation status
+
+Status reflects code and documentation currently present. “Implemented” describes scope, not a claim that the acceptance tests or employee workflow review have passed.
+
+| Feedback area | Status | Implemented / remaining |
+| --- | --- | --- |
+| Shared manager total in calculator | Implemented | Enter one manager total and allocate it by each line's regular total; per-line manager input remains available. |
+| Product-free total calculator | Implemented | Aggregate regular, website, manager, and POS mode inputs work without selecting catalog products. |
+| POS amount precision | Implemented | Each line POS-entry amount rounds half-up to two decimals; transaction POS total sums the rounded line amounts. |
+| POS total allocation target | Remaining | Current allocation splits the manager total. A separate mode that accepts a final POS-entry target and distributes that exact target across product lines has not been implemented. Confirm which total employees intend to enter before building it. |
+| Fixed and percentage POS modes | Implemented; detection remaining | Both modes remain selectable per line, including in the total-only workflow. Automatic detection of percentage offers is not implemented. |
+| Third-party combined offers | Partial | The percentage POS formula remains available. A transaction-wide combined-offer rule and its input/source semantics still need employee confirmation; individual website prices remain unchanged. |
+| Transaction price scenarios | Implemented | Regular and website totals plus 10%, 15%, 18%, and 20% totals appear in a collapsible section that opens by default. |
+| Unit-price / line-total inputs | Implemented; clarity remaining | Both modes affect calculations. Review with employees whether the unit value and selected mode are clear enough in the result cards. |
+| Product quantity / stock | Partial | On-hand count can be edited with product details or the count workflow; the dedicated count action remains a shortcut with count notes. Reserved and available quantities, reservations, and live stock synchronization remain deferred. |
+| Bulk product actions | Implemented | Multi-select archive/restore is available. |
+| Product deletion | Implemented | Confirmation is required; products referenced by calculation history cannot be permanently deleted and should be archived. |
+| Product CSV export/import | Implemented | Export includes prices and known quantity; import supports the exported columns. |
+| History customer/search/delete | Implemented | Customer display name is optional; history search matches customer/product names; confirmed deletion removes a whole snapshot and its lines. |
+| Shared laptops / PostgreSQL | Deferred | Hosting, authentication, permissions, backup ownership, and offline behavior need a design before implementation. |
+| Website scraping | Deferred | Requires authorized-source review, request limits, source-change handling, and failure behavior before implementation. |
+| Product save from calculator | Remaining | One-off calculator products cannot yet be saved directly to the catalog. |
+| POS operational verification | Remaining | Two-decimal entry formatting is implemented, but the formulas and exact AX/POS fields still need validation against a real, non-sensitive workflow example. |
+
+## Milestone status
+
+- **M1–M4: Implemented.** Localization, calculator/domain rules, exact arithmetic, SQLite migrations, catalog persistence, and stock-count foundations are present. Test/acceptance review remains outstanding.
+- **M5: Implemented.** Shared manager total, weighted allocation, total-only calculation, retained per-line mode, and scenario totals are present.
+- **M6: Implemented.** Quantity editing, multi-select archive/restore, safe deletion, and CSV export are present.
+- **M7: Implemented with one remaining item.** Customer name, search, and whole-entry deletion are present; saving a one-off product directly from the calculator remains.
+- **M8–M9: Implemented.** Verified backups and CSV import/export are present.
+- **M10: Deferred.** Reservations, sale/open-account workflow, and reserved/available quantities.
+- **M11: Partial.** Windows packaging runs in GitHub Actions. Linux packaging, platform validation, a reusable PyInstaller spec, and `scripts/smoke.py` remain.
+- **Future architecture: Deferred.** Scraper integration and managed PostgreSQL sharing remain later milestones.
+
 ## 0. Locked decisions
 
 | Topic            | Decision                                                                                                                                                                                                                            |
@@ -82,7 +117,7 @@ tests/conftest.py                   # tmp_path DB fixtures, Qt app fixture
 - `100` kuruş is represented as `1,00 TL`, never as a kuruş value of `100`. Derived values such as `Decimal("100") / 3` must remain visibly exact rather than becoming a rounded two-digit currency value.
 - Add formatting tests for `0,00 TL`, `0,01 TL`, `54.999,99 TL`, an exact value with more than two fractional digits, and carry behavior without display rounding.
 - No locale dependency, so Windows and Linux behave identically.
-- Also `format_decimal_exact(d)` for snapshot/debug views and exact-value display. Calculator and POS-facing result fields must use the exact formatter, not a rounded currency formatter.
+- Also `format_decimal_exact(d)` for snapshot/debug views and exact-value display. General calculation fields preserve exact values; POS-entry amounts use the domain's half-up two-decimal result.
 
 **`domain/models.py`** (frozen dataclasses)
 
