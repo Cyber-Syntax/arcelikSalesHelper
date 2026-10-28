@@ -21,7 +21,6 @@ from PySide6.QtWidgets import (
     QListWidget,
     QListWidgetItem,
     QPushButton,
-    QRadioButton,
     QScrollArea,
     QSpinBox,
     QSplitter,
@@ -77,11 +76,6 @@ class CalculatorLineWidget(QWidget):
         self.website_edit.setPlaceholderText(T.PH_WEBSITE)
         self.gift_check = QCheckBox(T.CHK_GIFT)
         self.gift_name_edit = QLineEdit()
-        self.manager_edit = QLineEdit()
-        self.manager_edit.setPlaceholderText(T.PH_OPTIONAL)
-        self.unit_radio = QRadioButton(T.RADIO_UNIT)
-        self.line_radio = QRadioButton(T.RADIO_LINE)
-        self.unit_radio.setChecked(True)
         self.pos_mode_combo = QComboBox()
         self.pos_mode_combo.addItem(
             T.POS_MODE_FIXED, PosCalculationMode.FIXED_AMOUNT
@@ -90,20 +84,11 @@ class CalculatorLineWidget(QWidget):
             T.POS_MODE_PERCENTAGE, PosCalculationMode.PERCENTAGE
         )
 
-        mode_box = QWidget()
-        mode_layout = QHBoxLayout(mode_box)
-        mode_layout.setContentsMargins(0, 0, 0, 0)
-        mode_layout.addWidget(self.unit_radio)
-        mode_layout.addWidget(self.line_radio)
-        mode_layout.addStretch(1)
-
         self.blocks = {
             "product_name": FieldBlock(self.name_edit),
             "quantity": FieldBlock(self.quantity_spin),
             "regular_price": FieldBlock(self.regular_edit),
             "website_discounted_price": FieldBlock(self.website_edit),
-            "manager_value": FieldBlock(self.manager_edit),
-            "manager_mode": FieldBlock(mode_box),
         }
 
         form = QFormLayout(self)
@@ -117,8 +102,6 @@ class CalculatorLineWidget(QWidget):
         )
         form.addRow("", self.gift_check)
         form.addRow(T.FORM_GIFT_NAME, self.gift_name_edit)
-        form.addRow(T.FORM_MANAGER_VALUE, self.blocks["manager_value"])
-        form.addRow(T.FORM_MANAGER_MODE, self.blocks["manager_mode"])
         form.addRow(T.FORM_POS_CALCULATION_MODE, self.pos_mode_combo)
 
         for edit in (
@@ -126,12 +109,10 @@ class CalculatorLineWidget(QWidget):
             self.regular_edit,
             self.website_edit,
             self.gift_name_edit,
-            self.manager_edit,
         ):
             edit.textChanged.connect(self._emit)
         self.quantity_spin.valueChanged.connect(self._emit)
         self.gift_check.toggled.connect(self._emit)
-        self.unit_radio.toggled.connect(self._emit)
         self.pos_mode_combo.currentIndexChanged.connect(self._emit)
 
     # ---- state -----------------------------------------------------------
@@ -152,10 +133,6 @@ class CalculatorLineWidget(QWidget):
             website_discounted_price=self.website_edit.text(),
             gift_selected=self.gift_check.isChecked(),
             gift_name=self.gift_name_edit.text(),
-            manager_value=self.manager_edit.text(),
-            manager_mode=ManagerMode.LINE
-            if self.line_radio.isChecked()
-            else ManagerMode.UNIT,
             pos_calculation_mode=(
                 self.pos_mode_combo.currentData()
                 if isinstance(
@@ -466,8 +443,6 @@ class CalculatorTab(QWidget):
         self.rows: list[LineRow] = []
         self.evaluation = TransactionEvaluation(lines=())
 
-        self.shared_manager_check = QCheckBox(T.CHK_SHARED_MANAGER_TOTAL)
-        self.shared_manager_check.setChecked(True)
         self.shared_manager_edit = QLineEdit()
         self.shared_manager_edit.setPlaceholderText(T.PH_MANAGER_TOTAL)
         self.quick_mode_check = QCheckBox(T.CHK_TOTAL_ONLY_MODE)
@@ -535,7 +510,7 @@ class CalculatorTab(QWidget):
         selector_layout.addLayout(selector_actions)
 
         manager_total_row = QHBoxLayout()
-        manager_total_row.addWidget(self.shared_manager_check)
+        manager_total_row.addWidget(QLabel(T.LBL_SHARED_MANAGER_TOTAL))
         manager_total_row.addWidget(self.shared_manager_edit, 1)
 
         self._rows_host = QWidget()
@@ -589,7 +564,6 @@ class CalculatorTab(QWidget):
         self.save_button.clicked.connect(
             lambda _c=False: self.save_requested.emit(self.evaluation)
         )
-        self.shared_manager_check.toggled.connect(self._manager_mode_changed)
         self.shared_manager_edit.textChanged.connect(self.recalculate)
         self.quick_mode_check.toggled.connect(self._quick_mode_changed)
         for edit in (self.quick_regular_edit, self.quick_website_edit, self.quick_manager_edit):
@@ -612,7 +586,6 @@ class CalculatorTab(QWidget):
                     self.recalculate()
                 return starter
         row = LineRow()
-        row.line.manager_edit.setEnabled(not self.shared_manager_check.isChecked())
         if product is not None:
             row.line.set_product(product)
         row.line.changed.connect(self.recalculate)
@@ -632,7 +605,6 @@ class CalculatorTab(QWidget):
             and not line.regular_edit.text()
             and not line.website_edit.text()
             and not line.gift_name_edit.text()
-            and not line.manager_edit.text()
             and line.quantity_spin.value() == 1
             and not line.gift_check.isChecked()
         )
@@ -802,7 +774,7 @@ class CalculatorTab(QWidget):
         else:
             forms = [row.line.form() for row in self.rows]
             total_text = self.shared_manager_edit.text().strip()
-            if self.shared_manager_check.isChecked() and total_text:
+            if total_text:
                 parsed = read_money(total_text)
                 if parsed.value is not None:
                     weighted_evals = [
@@ -850,15 +822,8 @@ class CalculatorTab(QWidget):
         self.panel.show_evaluation(evaluation)
         self.save_button.setEnabled(evaluation.valid)
 
-    def _manager_mode_changed(self, shared: bool) -> None:
-        self.shared_manager_edit.setEnabled(shared)
-        for row in self.rows:
-            row.line.manager_edit.setEnabled(not shared)
-        self.recalculate()
-
     def _quick_mode_changed(self, quick: bool) -> None:
         self._selector.setVisible(not quick)
-        self.shared_manager_check.setVisible(not quick)
         self.shared_manager_edit.setVisible(not quick)
         self._rows_scroll.setVisible(not quick)
         self.quick_panel.setVisible(quick)

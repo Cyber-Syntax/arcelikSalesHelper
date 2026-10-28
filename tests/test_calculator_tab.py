@@ -31,8 +31,6 @@ def fill(
     website: str,
     qty: int = 1,
     gift: str | None = None,
-    manager: str | None = None,
-    total_mode: bool = False,
 ) -> None:
     line = row.line
     line.name_edit.setText(name)
@@ -42,15 +40,11 @@ def fill(
     if gift is not None:
         line.gift_check.setChecked(True)
         line.gift_name_edit.setText(gift)
-    if manager is not None:
-        line.manager_edit.setText(manager)
-    if total_mode:
-        line.line_radio.setChecked(True)
 
 
 def fill_two(tab: CalculatorTab) -> None:
     tab.add_line()
-    fill(tab.rows[0], "Fridge", "5.000,00", "4.000,00", manager="3.000,00")
+    fill(tab.rows[0], "Fridge", "5.000,00", "4.000,00")
     fill(
         tab.rows[1],
         "Washer",
@@ -58,8 +52,8 @@ def fill_two(tab: CalculatorTab) -> None:
         "5.000,00",
         qty=3,
         gift="Vacuum",
-        manager="4.500,00",
     )
+    tab.shared_manager_edit.setText("16.500,00")
 
 
 def titles(tab: CalculatorTab) -> list[str]:
@@ -148,13 +142,26 @@ def test_mixed_gift_and_no_gift_lines_give_the_expected_totals(
     assert tab.rows[1].line.gift_check.isChecked()
 
 
+def test_blank_shared_manager_total_applies_no_manager_values(qtbot, repo) -> None:  # type: ignore[no-untyped-def]
+    tab = CalculatorTab(repo)
+    qtbot.addWidget(tab)
+    fill(tab.rows[0], "Fridge", "5.000,00", "4.000,00")
+
+    assert tab.evaluation.valid
+    assert tab.evaluation.lines[0].line is not None
+    assert tab.evaluation.lines[0].line.manager_value is None
+    assert tab.evaluation.lines[0].result is not None
+    assert tab.evaluation.lines[0].result.manager_line_total is None
+    assert tab.evaluation.forms[0].manager_value == ""
+
+
 def test_removing_a_line_recomputes_totals(qtbot, repo) -> None:  # type: ignore[no-untyped-def]
     tab = CalculatorTab(repo)
     qtbot.addWidget(tab)
     fill_two(tab)
     tab.rows[0].remove_button.click()
     assert len(tab.rows) == 1 and tab.rows[0].line.name_edit.text() == "Washer"
-    assert pos_total(tab) == D(13500)
+    assert pos_total(tab) == D("16500.00")
 
 
 def test_reordering_moves_the_state_with_the_line(qtbot, repo) -> None:  # type: ignore[no-untyped-def]
@@ -173,7 +180,9 @@ def test_reordering_moves_the_state_with_the_line(qtbot, repo) -> None:  # type:
         first.gift_check.isChecked()
         and first.gift_name_edit.text() == "Vacuum"
     )
-    assert first.manager_edit.text() == "4.500,00"
+    assert tab.evaluation.lines[0].line is not None
+    assert tab.evaluation.lines[0].result is not None
+    assert tab.evaluation.lines[0].result.manager_line_total is not None
     assert [r.title() for r in tab.rows] == ["Satır 1", "Satır 2"]
     after = tab.evaluation.result
     assert after is not None and after.totals == before.totals
@@ -195,7 +204,7 @@ def test_invalid_line_hides_totals_but_keeps_the_valid_card(
     assert "Satır 1: Fridge" in shown
     assert "POS hesaplama ayrıntıları" not in shown
     line_pos = tab.panel.findChildren(QLabel, "posAmount")
-    assert len(line_pos) == 1 and line_pos[0].text() == "4.000,00 TL"
+    assert len(line_pos) == 1 and line_pos[0].text() == "Yok: yönetici değeri girin"
     assert "İşlem toplamları" not in shown
     assert any(
         "Tamamlanacak veya düzeltilecek satırlar: 2" in lb.text()
@@ -203,7 +212,7 @@ def test_invalid_line_hides_totals_but_keeps_the_valid_card(
     )
 
     tab.rows[1].line.website_edit.setText("5.000,00")
-    assert tab.evaluation.valid and "İşlem toplamları" in titles(tab)
+    assert tab.evaluation.valid and "Toplam fiyat senaryoları" in titles(tab)
 
 
 # ---- comparison -----------------------------------------------------------
@@ -243,7 +252,8 @@ def test_panel_never_recommends_an_option(qtbot, repo) -> None:  # type: ignore[
 def test_pos_result_is_prominent_selectable_and_first(qtbot, repo) -> None:  # type: ignore[no-untyped-def]
     tab = CalculatorTab(repo)
     qtbot.addWidget(tab)
-    fill(tab.rows[0], "Fridge", "5.000,00", "4.000,00", manager="3.000,00")
+    fill(tab.rows[0], "Fridge", "5.000,00", "4.000,00")
+    tab.shared_manager_edit.setText("3.000,00")
 
     amount = tab.panel.findChild(QLabel, "posAmount")
     assert amount is not None and amount.text() == "4.000,00 TL"
@@ -268,7 +278,7 @@ def test_transaction_pos_total_precedes_multi_line_details(qtbot, repo) -> None:
     fill_two(tab)
 
     amounts = [label.text() for label in tab.panel.findChildren(QLabel, "posAmount")]
-    assert amounts == ["17.500,00 TL", "4.000,00 TL", "13.500,00 TL"]
+    assert amounts == ["17.500,00 TL", "4.586,96 TL", "12.913,04 TL"]
     discounts = [label.text() for label in tab.panel.findChildren(QLabel, "discountAmountValue")]
     assert discounts == ["1.000,00 TL", "3.000,00 TL"]
     labels = " ".join(label.text() for label in tab.panel.findChildren(QLabel))
@@ -344,7 +354,6 @@ def test_selecting_a_saved_product_copies_values_and_never_writes_back(
     assert tab.evaluation.valid
 
     line.gift_name_edit.setText("Toaster")
-    line.manager_edit.setText("3.000,00")
     assert repo.get(product.id) == product
 
 
@@ -494,4 +503,5 @@ def test_save_emits_the_transaction_evaluation_with_entered_text(
     sent = blocker.args[0]
     assert isinstance(sent, TransactionEvaluation) and sent.valid
     assert [f.product_name for f in sent.forms] == ["Fridge", "Washer"]
-    assert sent.forms[1].manager_value == "4.500,00"
+    assert sent.forms[1].manager_value == ""
+    assert sent.forms[1].manager_value_decimal is not None
