@@ -511,7 +511,9 @@ class CalculatorTab(QWidget):
 
         self.manager_total_row = QWidget()
         manager_total_row = QHBoxLayout(self.manager_total_row)
-        manager_total_row.addWidget(QLabel(T.LBL_SHARED_MANAGER_TOTAL))
+        manager_total_label = QLabel(T.LBL_SHARED_MANAGER_TOTAL)
+        manager_total_label.setBuddy(self.shared_manager_edit)
+        manager_total_row.addWidget(manager_total_label)
         manager_total_row.addWidget(self.shared_manager_edit, 1)
 
         self._rows_host = QWidget()
