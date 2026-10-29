@@ -82,7 +82,8 @@ _BUTTON_TEXT = {
 
 def localize_buttons(box: QDialogButtonBox | QMessageBox) -> None:
     """Qt only translates standard buttons when its .qm files are found, which
-    is not guaranteed in a packaged build. Set the Turkish text explicitly."""
+    is not guaranteed in a packaged build. Set the Turkish text explicitly.
+    """
     enum = (
         QMessageBox.StandardButton
         if isinstance(box, QMessageBox)

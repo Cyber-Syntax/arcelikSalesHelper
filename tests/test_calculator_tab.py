@@ -469,8 +469,8 @@ def test_batch_add_uses_latest_saved_product_values(qtbot, repo) -> None:  # typ
         product.id,
         ProductDraft(
             name=product.name,
-            regular_price=D("6000"),
-            website_price=D("5000"),
+            regular_price=D(6000),
+            website_price=D(5000),
             default_gift_name="Updated gift",
         ),
     )
@@ -530,7 +530,7 @@ def test_single_dot_three_digit_input_uses_turkish_thousands_value(
     line = tab.rows[0].line
     fill(tab.rows[0], "Fridge", "1.234", "1.000,00")
     assert tab.evaluation.lines[0].line is not None
-    assert tab.evaluation.lines[0].line.regular_price == D("1234")
+    assert tab.evaluation.lines[0].line.regular_price == D(1234)
     assert "1.234,00 TL" in line.blocks["regular_price"].hint_text
 
 

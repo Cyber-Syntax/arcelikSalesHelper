@@ -5,8 +5,8 @@ from arcelikSalesHelper.constants import (
     BACKUP_PREFIX,
     COMPANY_NAME,
     DATA_DIR_ENV_VAR,
-    DISPLAY_NAME,
     DB_FILENAME,
+    DISPLAY_NAME,
 )
 from arcelikSalesHelper.paths import ensure_dirs, resolve_paths
 

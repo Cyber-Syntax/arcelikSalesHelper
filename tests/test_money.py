@@ -58,7 +58,7 @@ def test_dot_followed_by_three_digits_is_read_as_thousands_and_flagged_ambiguous
     # "1.234" could be 1234 or 1.234; we choose thousands (Turkish convention).
     parsed = parse_money_ex("1.234")
     assert isinstance(parsed, Ok)
-    assert parsed.value.value == Decimal("1234")
+    assert parsed.value.value == Decimal(1234)
     assert parsed.value.ambiguous is True
 
 

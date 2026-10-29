@@ -7,9 +7,9 @@ from PySide6.QtCore import QSettings, Qt
 from PySide6.QtGui import QCloseEvent, QGuiApplication
 from PySide6.QtWidgets import (
     QApplication,
+    QInputDialog,
     QLabel,
     QMainWindow,
-    QInputDialog,
     QTabWidget,
     QVBoxLayout,
     QWidget,
@@ -33,9 +33,9 @@ from arcelikSalesHelper.infrastructure.repositories import (
 from arcelikSalesHelper.paths import AppPaths
 
 from .calculator_tab import CalculatorTab
+from .common import show_warning
 from .history_tab import HistoryTab
 from .products_tab import ProductsTab
-from .common import show_warning
 from .settings_tab import SettingsTab, describe_failure
 from .theme import FONT_SCALE_KEY, install_material_theme, load_font_scale
 

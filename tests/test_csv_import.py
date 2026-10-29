@@ -60,8 +60,8 @@ def test_turkish_and_plain_numbers_are_both_accepted() -> None:
     assert [
         (r.row, r.name, r.regular_price, r.website_price) for r in p.rows
     ] == [
-        (2, "Fridge", D("54999"), D("44999")),
-        (3, "Washer", D("54999"), D("44999.50")),
+        (2, "Fridge", D(54999), D(44999)),
+        (3, "Washer", D(54999), D("44999.50")),
     ]
 
 
@@ -74,8 +74,8 @@ def test_turkish_and_plain_numbers_are_both_accepted() -> None:
 )
 def test_missing_website_price_defaults_to_zero(text: str) -> None:
     row = parsed(text).rows[0]
-    assert row.regular_price == D("100")
-    assert row.website_price == D("0")
+    assert row.regular_price == D(100)
+    assert row.website_price == D(0)
 
 
 def test_nonblank_invalid_website_price_is_still_an_error() -> None:
@@ -101,7 +101,7 @@ def test_utf8_bom_is_accepted(tmp_path: Path) -> None:
         ("name,price\n", "eksik"),
         (f"{HEADER},extra\n", "beklenmeyen"),
         ("product_name,regular_price\n", "eksik"),
-        (f"{HEADER},{HEADER.split(',')[0]}\n", "birden fazla"),
+        (f"{HEADER},{HEADER.split(',', maxsplit=1)[0]}\n", "birden fazla"),
         (HEADER.replace(",", ";") + "\n", "noktalı virgül"),
     ],
 )
@@ -138,7 +138,7 @@ def test_extra_cells_are_an_error_unless_blank() -> None:
 
 def test_ambiguous_price_is_flagged_but_read_as_thousands() -> None:
     row = parsed(f"{HEADER}\nFridge,5.000,4000\n").rows[0]
-    assert row.regular_price == D("5000") and len(row.warnings) == 1
+    assert row.regular_price == D(5000) and len(row.warnings) == 1
 
 
 def test_quantity_column_is_optional_per_row_and_validated() -> None:
@@ -255,7 +255,7 @@ def test_apply_creates_updates_and_skips_per_decision(repo, db, clock) -> None: 
         f.regular_price,
         f.website_price,
         f.quantity,
-    ) == (D("5500"), D("4500"), 7)
+    ) == (D(5500), D(4500), 7)
     assert (f.default_gift_name, f.notes, f.name) == (
         "Vacuum",
         "check",
@@ -268,7 +268,7 @@ def test_apply_creates_updates_and_skips_per_decision(repo, db, clock) -> None: 
         "SELECT regular_price FROM pricing_history WHERE product_id = ? ORDER BY id",
         (fridge.id,),
     ).fetchall()
-    assert [D(r[0]) for r in history] == [D("5000"), D("5500")]
+    assert [D(r[0]) for r in history] == [D(5000), D(5500)]
     note = db.execute("SELECT DISTINCT note FROM stock_history").fetchone()[0]
     assert note == "csv: in.csv"
     assert not db.in_transaction
@@ -281,7 +281,7 @@ def test_apply_imports_regular_price_without_website_discount(
     result = apply_plan(db, plan, {})
     assert isinstance(result, Ok)
     [oven] = repo.search("oven")
-    assert (oven.regular_price, oven.website_price) == (D("100"), D("0"))
+    assert (oven.regular_price, oven.website_price) == (D(100), D(0))
 
 
 def test_every_conflict_needs_a_decision(repo, db) -> None:  # type: ignore[no-untyped-def]
@@ -315,7 +315,7 @@ def test_archived_match_is_updated_and_restored(repo, db) -> None:  # type: igno
     restored = repo.get(dryer.id)
     assert restored is not None and not restored.archived
     assert (restored.website_price, restored.default_gift_name) == (
-        D("1800"),
+        D(1800),
         "Hose",
     )
 

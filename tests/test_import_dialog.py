@@ -66,7 +66,7 @@ def test_preview_conflicts_need_a_decision_before_apply(
         dialog.summary.updated,
         dialog.summary.created,
     ) == (1, 1)
-    assert repo.get(fridge.id).regular_price == D("5500")  # type: ignore[union-attr]
+    assert repo.get(fridge.id).regular_price == D(5500)  # type: ignore[union-attr]
     assert [p.name for p in repo.search("oven")] == ["Oven"]
 
 
