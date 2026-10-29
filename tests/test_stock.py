@@ -16,7 +16,7 @@ from .conftest import FakeClock
 
 
 def product(repo):  # type: ignore[no-untyped-def]
-    result = repo.add(ProductDraft("Fridge", D("5000"), D("4000")))
+    result = repo.add(ProductDraft("Fridge", D(5000), D(4000)))
     assert isinstance(result, Ok)
     return result.value
 
@@ -113,7 +113,7 @@ def test_editing_a_product_keeps_its_count(repo) -> None:  # type: ignore[no-unt
     p = product(repo)
     repo.set_quantity(p.id, 9, StockSource.MANUAL)
     updated = repo.update(
-        p.id, ProductDraft("Fridge", D("5000"), D("3500"), "Gift", "n")
+        p.id, ProductDraft("Fridge", D(5000), D(3500), "Gift", "n")
     )
     assert isinstance(updated, Ok) and updated.value.quantity == 9
 

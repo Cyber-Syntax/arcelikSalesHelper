@@ -74,8 +74,8 @@ def test_zero_website_price_has_no_discount_in_transaction_pos():
     )
     ev = evaluate_transaction([line])
     assert ev.result is not None
-    assert ev.result.totals.discount_amount.value == D("0")
-    assert ev.result.totals.pos.value == D("32000")
+    assert ev.result.totals.discount_amount.value == D(0)
+    assert ev.result.totals.pos.value == D(32000)
     assert totals(ev)[T.LBL_TOTAL_DISCOUNT] == "0,00 TL"
     assert totals(ev)[T.LBL_TOTAL_POS] == "32.000,00 TL"
 

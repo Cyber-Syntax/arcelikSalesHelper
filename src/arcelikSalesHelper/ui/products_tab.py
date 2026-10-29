@@ -17,10 +17,10 @@ from PySide6.QtWidgets import (
     QCheckBox,
     QDialog,
     QDialogButtonBox,
-    QFormLayout,
     QFileDialog,
-    QHeaderView,
+    QFormLayout,
     QHBoxLayout,
+    QHeaderView,
     QLabel,
     QLineEdit,
     QPlainTextEdit,
@@ -37,11 +37,11 @@ from arcelikSalesHelper.domain.products import Product, ProductDraft
 from arcelikSalesHelper.domain.result import Err, Ok
 from arcelikSalesHelper.domain.stock import StockSource, parse_quantity
 from arcelikSalesHelper.infrastructure.backups import BackupManager
+from arcelikSalesHelper.infrastructure.csv_export import export_products_csv
 from arcelikSalesHelper.infrastructure.repositories import (
     ProductRepository,
     RepoError,
 )
-from arcelikSalesHelper.infrastructure.csv_export import export_products_csv
 
 from .common import (
     ERROR_STYLE,

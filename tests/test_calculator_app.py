@@ -1,11 +1,11 @@
 from decimal import Decimal as D
 
+from arcelikSalesHelper import strings as T
 from arcelikSalesHelper.application.calculator import (
     LineForm,
     evaluate_line,
     read_money,
 )
-from arcelikSalesHelper import strings as T
 from arcelikSalesHelper.domain.models import (
     POS_LABEL,
     ManagerMode,
@@ -26,9 +26,9 @@ def form(**kw: object) -> LineForm:
 def test_standard_calculation_and_pos_use_website_discounted_price():
     ev = evaluate_line(form(manager_value="112.000,00"))
     assert ev.valid and ev.result is not None and ev.line is not None
-    assert ev.result.ten_pct_base == D("132798")
+    assert ev.result.ten_pct_base == D(132798)
     assert ev.result.ten_pct_unit == D("119518.20")
-    assert ev.result.pos_amount == D("124500")
+    assert ev.result.pos_amount == D(124500)
     assert POS_LABEL in [section.title for section in ev.view.sections]
 
 
@@ -56,9 +56,9 @@ def test_zero_website_price_displays_regular_price_and_zero_discount():
         )
     )
     assert ev.result is not None and ev.view is not None
-    assert ev.result.website_discounted_total == D("38299")
-    assert ev.result.discount_amount == D("0")
-    assert ev.result.pos_amount == D("32000")
+    assert ev.result.website_discounted_total == D(38299)
+    assert ev.result.discount_amount == D(0)
+    assert ev.result.pos_amount == D(32000)
     assert ev.result.ten_pct_unit == D("34469.10")
     prices = {row.label: row.value for row in ev.view.card.prices.rows}
     assert prices[T.LBL_WEBSITE_UNIT] == T.NO_WEBSITE_DISCOUNT
@@ -74,7 +74,7 @@ def test_zero_website_price_displays_regular_price_and_zero_discount():
 def test_gift_uses_regular_price_for_ten_percent():
     ev = evaluate_line(form(gift_selected=True, gift_name="TKM 9961"))
     assert ev.result is not None and ev.view is not None
-    assert ev.result.ten_pct_base == D("145298")
+    assert ev.result.ten_pct_base == D(145298)
     assert ev.result.ten_pct_unit == D("130768.20")
     assert ev.view.card.gift_option is not None
     gift_rows = {row.label: row.value for row in ev.view.card.gift_option.rows}
@@ -84,7 +84,7 @@ def test_gift_uses_regular_price_for_ten_percent():
 
 def test_ambiguous_turkish_thousands_input_is_parsed_and_hinted():
     read = read_money("1.234")
-    assert read.value == D("1234")
+    assert read.value == D(1234)
     assert read.error is None
     assert read.hint is not None and "1.234,00 TL" in read.hint
 

@@ -1,16 +1,13 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from dataclasses import replace
-from decimal import Decimal
 
-from PySide6.QtCore import QSignalBlocker, QTimer, Qt, Signal
+from PySide6.QtCore import QSignalBlocker, Qt, QTimer, Signal
 from PySide6.QtGui import QColor, QResizeEvent
 from PySide6.QtWidgets import (
     QApplication,
     QBoxLayout,
     QCheckBox,
-    QComboBox,
     QFormLayout,
     QFrame,
     QGridLayout,
@@ -38,29 +35,22 @@ from arcelikSalesHelper.application.calculator import (
     LineForm,
     Section,
     TransactionEvaluation,
-    evaluate_line,
-    evaluate_transaction,
-    read_money,
+    evaluate_with_reduction,
 )
 from arcelikSalesHelper.domain.formatting import format_money_input
-from arcelikSalesHelper.domain.models import (
-    POS_LABEL,
-    ManagerMode,
-    PosCalculationMode,
-)
-from arcelikSalesHelper.domain.pricing import allocate_total_by_weight
+from arcelikSalesHelper.domain.models import POS_LABEL
 from arcelikSalesHelper.domain.products import Product
 from arcelikSalesHelper.infrastructure.repositories import ProductRepository
 
 from .common import HINT_STYLE, WARNING_STYLE, FieldBlock
 from .theme import DEFAULT_FONT_SCALE
 
+MAX_QUICK_ROWS = 50
+DEFAULT_QUICK_ROWS = 3
+
 
 class CalculatorLineWidget(QWidget):
-    """Inputs of one calculator line. Holds no formulas; emits ``changed``.
-
-    M4 reuses this class once per line.
-    """
+    """Inputs of one calculator line. Holds no formulas; emits ``changed``."""
 
     changed = Signal()
 
@@ -77,13 +67,8 @@ class CalculatorLineWidget(QWidget):
         self.website_edit.setPlaceholderText(T.PH_WEBSITE)
         self.gift_check = QCheckBox(T.CHK_GIFT)
         self.gift_name_edit = QLineEdit()
-        self.pos_mode_combo = QComboBox()
-        self.pos_mode_combo.addItem(
-            T.POS_MODE_FIXED, PosCalculationMode.FIXED_AMOUNT
-        )
-        self.pos_mode_combo.addItem(
-            T.POS_MODE_PERCENTAGE, PosCalculationMode.PERCENTAGE
-        )
+        self.lock_check = QCheckBox(T.CHK_LOCK_LINE)
+        self.lock_check.setToolTip(T.TIP_LOCK_LINE)
 
         self.blocks = {
             "product_name": FieldBlock(self.name_edit),
@@ -99,7 +84,7 @@ class CalculatorLineWidget(QWidget):
         form.addRow(T.FORM_WEBSITE, self.blocks["website_discounted_price"])
         form.addRow("", self.gift_check)
         form.addRow(T.FORM_GIFT_NAME, self.gift_name_edit)
-        form.addRow(T.FORM_POS_CALCULATION_MODE, self.pos_mode_combo)
+        form.addRow("", self.lock_check)
 
         for edit in (
             self.name_edit,
@@ -110,7 +95,7 @@ class CalculatorLineWidget(QWidget):
             edit.textChanged.connect(self._emit)
         self.quantity_spin.valueChanged.connect(self._emit)
         self.gift_check.toggled.connect(self._emit)
-        self.pos_mode_combo.currentIndexChanged.connect(self._emit)
+        self.lock_check.toggled.connect(self._emit)
 
     # ---- state -----------------------------------------------------------
 
@@ -130,14 +115,8 @@ class CalculatorLineWidget(QWidget):
             website_discounted_price=self.website_edit.text(),
             gift_selected=self.gift_check.isChecked(),
             gift_name=self.gift_name_edit.text(),
-            pos_calculation_mode=(
-                self.pos_mode_combo.currentData()
-                if isinstance(
-                    self.pos_mode_combo.currentData(), PosCalculationMode
-                )
-                else PosCalculationMode.FIXED_AMOUNT
-            ),
             product_id=None if product is None else product.id,
+            locked=self.lock_check.isChecked(),
         )
 
     def set_product(self, product: Product) -> None:
@@ -172,6 +151,44 @@ class CalculatorLineWidget(QWidget):
             block = self.blocks.get(hint.field)
             if block is not None:
                 block.set_hint(hint.message)
+
+
+class QuickRowWidget(QWidget):
+    """Hızlı toplam modunda bir ürün: ilk fiyat + sabit tut kutusu."""
+
+    changed = Signal()
+
+    def __init__(self, number: int, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.number = number
+        self.label = QLabel(T.quick_row_title(number))
+        self.price_edit = QLineEdit()
+        self.price_edit.setPlaceholderText(T.PH_REGULAR)
+        self.block = FieldBlock(self.price_edit)
+        self.lock_check = QCheckBox(T.CHK_LOCK_LINE)
+        self.lock_check.setToolTip(T.TIP_LOCK_LINE)
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(self.label)
+        layout.addWidget(self.block, 1)
+        layout.addWidget(self.lock_check)
+        self.price_edit.textChanged.connect(lambda _t: self.changed.emit())
+        self.lock_check.toggled.connect(lambda _c: self.changed.emit())
+
+    def form(self) -> LineForm:
+        # Web fiyatı 0 = indirim yok: net toplam doğrudan ilk fiyattan başlar.
+        return LineForm(
+            product_name=T.quick_row_title(self.number),
+            regular_price=self.price_edit.text(),
+            website_discounted_price="0",
+            locked=self.lock_check.isChecked(),
+        )
+
+    def set_feedback(self, errors: Sequence[FieldError]) -> None:
+        self.block.set_error(None)
+        for error in errors:
+            if error.field == "regular_price" and not error.incomplete:
+                self.block.set_error(error.message)
 
 
 def _clear(layout: QLayout) -> None:
@@ -429,11 +446,9 @@ def _pos_summary_box(section: Section) -> QFrame:
 
 
 class CalculatorTab(QWidget):
-    """Controller: rows -> LineForms -> evaluate_transaction -> render."""
+    """Controller: rows -> LineForms -> evaluate_with_reduction -> render."""
 
-    save_requested = Signal(
-        object
-    )  # TransactionEvaluation; wired to history in M5
+    save_requested = Signal(object)  # TransactionEvaluation
 
     def __init__(
         self, repo: ProductRepository, parent: QWidget | None = None
@@ -444,48 +459,42 @@ class CalculatorTab(QWidget):
             False  # suppress recalculation while all rows are updated at once
         )
         self.rows: list[LineRow] = []
+        self.quick_rows: list[QuickRowWidget] = []
         self.evaluation = TransactionEvaluation(lines=())
 
+        # ---- shared totals (both modes) ----
+        self.pos_shown_edit = QLineEdit()
+        self.pos_shown_edit.setPlaceholderText(T.PH_POS_SHOWN_TOTAL)
         self.shared_manager_edit = QLineEdit()
         self.shared_manager_edit.setPlaceholderText(T.PH_MANAGER_TOTAL)
-        self.quick_product_count_edit = QLineEdit()
-        self.quick_product_count_edit.setPlaceholderText(
-            T.PH_QUICK_PRODUCT_COUNT
+        self.totals_box = QGroupBox(T.GROUP_SPLIT)
+        totals_form = QFormLayout(self.totals_box)
+        totals_form.addRow(T.LBL_POS_SHOWN_TOTAL, self.pos_shown_edit)
+        totals_form.addRow(
+            T.LBL_SHARED_MANAGER_TOTAL, self.shared_manager_edit
         )
-        self.quick_product_prices_edit = QLineEdit()
-        self.quick_product_prices_edit.setPlaceholderText(
-            T.PH_QUICK_PRODUCT_PRICES
-        )
+
+        # ---- quick mode ----
         self.quick_mode_check = QCheckBox(T.CHK_TOTAL_ONLY_MODE)
-        self.quick_regular_edit = QLineEdit()
-        self.quick_regular_edit.setPlaceholderText(T.PH_REGULAR)
-        self.quick_website_edit = QLineEdit()
-        self.quick_website_edit.setPlaceholderText(T.PH_WEBSITE)
-        self.quick_manager_edit = QLineEdit()
-        self.quick_manager_edit.setPlaceholderText(T.PH_OPTIONAL)
-        self.quick_pos_mode = QComboBox()
-        self.quick_pos_mode.addItem(
-            T.POS_MODE_FIXED, PosCalculationMode.FIXED_AMOUNT
-        )
-        self.quick_pos_mode.addItem(
-            T.POS_MODE_PERCENTAGE, PosCalculationMode.PERCENTAGE
-        )
-        self.quick_product_count_row = QWidget()
-        quick_count_row = QHBoxLayout(self.quick_product_count_row)
-        quick_count_label = QLabel(T.LBL_QUICK_PRODUCT_COUNT)
-        quick_count_label.setBuddy(self.quick_product_count_edit)
-        quick_count_row.addWidget(quick_count_label)
-        quick_count_row.addWidget(self.quick_product_count_edit, 1)
+        self.quick_count_spin = QSpinBox()
+        self.quick_count_spin.setRange(1, MAX_QUICK_ROWS)
+        self.quick_count_spin.setValue(DEFAULT_QUICK_ROWS)
         self.quick_panel = QGroupBox(T.GROUP_TOTAL_ONLY)
-        quick_form = QFormLayout(self.quick_panel)
-        quick_form.addRow(T.FORM_TOTAL_REGULAR, self.quick_regular_edit)
-        quick_form.addRow(T.FORM_TOTAL_WEBSITE, self.quick_website_edit)
-        quick_form.addRow(T.FORM_TOTAL_MANAGER, self.quick_manager_edit)
-        quick_form.addRow(T.FORM_POS_CALCULATION_MODE, self.quick_pos_mode)
-        quick_form.addRow(
-            T.LBL_QUICK_PRODUCT_PRICES, self.quick_product_prices_edit
-        )
-        quick_form.addRow(self.quick_product_count_row)
+        quick_layout = QVBoxLayout(self.quick_panel)
+        count_row = QHBoxLayout()
+        count_label = QLabel(T.LBL_QUICK_PRODUCT_COUNT)
+        count_label.setBuddy(self.quick_count_spin)
+        count_row.addWidget(count_label)
+        count_row.addWidget(self.quick_count_spin)
+        count_row.addStretch(1)
+        quick_layout.addLayout(count_row)
+        self._quick_rows_layout = QVBoxLayout()
+        quick_layout.addLayout(self._quick_rows_layout)
+        quick_layout.addStretch(1)
+        self.quick_scroll = QScrollArea()
+        self.quick_scroll.setWidgetResizable(True)
+        self.quick_scroll.setWidget(self.quick_panel)
+        self.quick_scroll.hide()
 
         self.panel = TransactionPanel()
         self.product_search = QLineEdit()
@@ -534,12 +543,6 @@ class CalculatorTab(QWidget):
         selector_actions.addWidget(self.add_selected_button)
         selector_layout.addLayout(selector_actions)
 
-        self.manager_total_row = QWidget()
-        manager_total_row = QHBoxLayout(self.manager_total_row)
-        manager_total_label = QLabel(T.LBL_SHARED_MANAGER_TOTAL)
-        manager_total_label.setBuddy(self.shared_manager_edit)
-        manager_total_row.addWidget(manager_total_label)
-        manager_total_row.addWidget(self.shared_manager_edit, 1)
         self._rows_host = QWidget()
         self._rows_layout = QVBoxLayout(self._rows_host)
         self._rows_layout.addStretch(
@@ -552,10 +555,9 @@ class CalculatorTab(QWidget):
         left_layout = QVBoxLayout(left)
         left_layout.setContentsMargins(0, 0, 0, 0)
         left_layout.addWidget(selector)
-        left_layout.addWidget(self.manager_total_row)
-        self.quick_panel.hide()
+        left_layout.addWidget(self.totals_box)
         left_layout.addWidget(self.quick_mode_check)
-        left_layout.addWidget(self.quick_panel)
+        left_layout.addWidget(self.quick_scroll, 1)
         left_layout.addWidget(rows_scroll, 1)
         self._selector = selector
         self._rows_scroll = rows_scroll
@@ -591,19 +593,29 @@ class CalculatorTab(QWidget):
         self.save_button.clicked.connect(
             lambda _c=False: self.save_requested.emit(self.evaluation)
         )
+        self.pos_shown_edit.textChanged.connect(self.recalculate)
         self.shared_manager_edit.textChanged.connect(self.recalculate)
-        self.quick_product_count_edit.textChanged.connect(self.recalculate)
-        self.quick_product_prices_edit.textChanged.connect(self.recalculate)
         self.quick_mode_check.toggled.connect(self._quick_mode_changed)
-        for edit in (
-            self.quick_regular_edit,
-            self.quick_website_edit,
-            self.quick_manager_edit,
-        ):
-            edit.textChanged.connect(self.recalculate)
-        self.quick_pos_mode.currentIndexChanged.connect(self.recalculate)
+        self.quick_count_spin.valueChanged.connect(self._set_quick_rows)
+        self._set_quick_rows(DEFAULT_QUICK_ROWS, recalc=False)
         self._render_products()
         self.add_line()
+
+    # ---- quick rows --------------------------------------------------------
+
+    def _set_quick_rows(self, count: int, recalc: bool = True) -> None:
+        while len(self.quick_rows) < count:
+            row = QuickRowWidget(len(self.quick_rows) + 1)
+            row.changed.connect(self.recalculate)
+            self.quick_rows.append(row)
+            self._quick_rows_layout.addWidget(row)
+        while len(self.quick_rows) > count:
+            row = self.quick_rows.pop()
+            self._quick_rows_layout.removeWidget(row)
+            row.setParent(None)
+            row.deleteLater()
+        if recalc:
+            self.recalculate()
 
     # ---- rows ------------------------------------------------------------
 
@@ -640,6 +652,7 @@ class CalculatorTab(QWidget):
             and not line.gift_name_edit.text()
             and line.quantity_spin.value() == 1
             and not line.gift_check.isChecked()
+            and not line.lock_check.isChecked()
         )
 
     def add_one_off_line(self) -> LineRow:
@@ -790,129 +803,25 @@ class CalculatorTab(QWidget):
     def recalculate(self) -> None:
         if self._bulk:
             return
-        if self.quick_mode_check.isChecked():
-            count_text = self.quick_product_count_edit.text().strip()
-            prices_text = self.quick_product_prices_edit.text().strip()
-            prices: tuple[Decimal, ...] | None = None
-            price_error = False
-            if prices_text:
-                price_parts = [part.strip() for part in prices_text.split(";")]
-                price_reads = [read_money(part) for part in price_parts]
-                price_error = any(
-                    part == "" or read.error is not None or read.value is None
-                    for part, read in zip(price_parts, price_reads, strict=True)
-                )
-                if not price_error:
-                    prices = tuple(
-                        read.value
-                        for read in price_reads
-                        if read.value is not None
-                    )
-            form = LineForm(
-                product_name=T.QUICK_TOTAL_PRODUCT,
-                regular_price=self.quick_regular_edit.text(),
-                website_discounted_price=self.quick_website_edit.text(),
-                manager_value=self.quick_manager_edit.text(),
-                manager_mode=ManagerMode.LINE,
-                pos_calculation_mode=(
-                    self.quick_pos_mode.currentData()
-                    if isinstance(
-                        self.quick_pos_mode.currentData(), PosCalculationMode
-                    )
-                    else PosCalculationMode.FIXED_AMOUNT
-                ),
-            )
-            invalid_count = bool(count_text) and (
-                not count_text.isdigit() or not 1 <= int(count_text) <= 999
-            )
-            if price_error or invalid_count:
-                evaluation = evaluate_transaction((form,))
-                evaluation = replace(
-                    evaluation,
-                    result=None,
-                    totals_sections=(),
-                    pending_reason=(
-                        T.QUICK_PRODUCT_PRICES_INVALID
-                        if price_error
-                        else T.QUICK_PRODUCT_COUNT_INVALID
-                    ),
-                )
-                self.evaluation = evaluation
-                self.panel.show_evaluation(evaluation)
-                self.save_button.setEnabled(False)
-                return
-            count = int(count_text) if count_text else None
-            if prices is not None:
-                if count is not None and count != len(prices):
-                    evaluation = evaluate_transaction((form,))
-                    evaluation = replace(
-                        evaluation,
-                        result=None,
-                        totals_sections=(),
-                        pending_reason=T.QUICK_PRODUCT_COUNT_MISMATCH,
-                    )
-                    self.evaluation = evaluation
-                    self.panel.show_evaluation(evaluation)
-                    self.save_button.setEnabled(False)
-                    return
-                count = len(prices)
-            evaluation = evaluate_transaction((form,), count, prices)
-        else:
-            forms = [row.line.form() for row in self.rows]
-            total_text = self.shared_manager_edit.text().strip()
-            if total_text:
-                parsed = read_money(total_text)
-                if parsed.value is not None:
-                    weighted_evals = [
-                        evaluate_line(
-                            LineForm(
-                                product_name=form.product_name,
-                                quantity=form.quantity,
-                                regular_price=form.regular_price,
-                                website_discounted_price=form.website_discounted_price,
-                            )
-                        )
-                        for form in forms
-                    ]
-                    if all(item.result is not None for item in weighted_evals):
-                        allocations = allocate_total_by_weight(
-                            parsed.value,
-                            tuple(
-                                item.result.regular_total
-                                for item in weighted_evals
-                                if item.result is not None
-                            ),
-                        )
-                        forms = [
-                            replace(
-                                form,
-                                manager_value="",
-                                manager_value_decimal=allocation,
-                                manager_mode=ManagerMode.LINE,
-                            )
-                            for form, allocation in zip(
-                                forms, allocations, strict=True
-                            )
-                        ]
-                else:
-                    self.shared_manager_edit.setToolTip(
-                        parsed.error or T.MONEY_FORMAT
-                    )
-                    evaluation = evaluate_transaction(forms)
-                    evaluation = replace(
-                        evaluation,
-                        result=None,
-                        totals_sections=(),
-                        pending_reason=parsed.error or T.MONEY_FORMAT,
-                    )
-                    self.evaluation = evaluation
-                    self.panel.show_evaluation(evaluation)
-                    self.save_button.setEnabled(False)
-                    return
-            self.shared_manager_edit.setToolTip("")
-            evaluation = evaluate_transaction(forms)
+        quick = self.quick_mode_check.isChecked()
+        forms = (
+            [row.form() for row in self.quick_rows]
+            if quick
+            else [row.line.form() for row in self.rows]
+        )
+        evaluation = evaluate_with_reduction(
+            forms,
+            self.pos_shown_edit.text(),
+            self.shared_manager_edit.text(),
+            quick=quick,
+        )
         self.evaluation = evaluation
-        if not self.quick_mode_check.isChecked():
+        if quick:
+            for quick_row, line_eval in zip(
+                self.quick_rows, evaluation.lines, strict=True
+            ):
+                quick_row.set_feedback(line_eval.errors)
+        else:
             for row, line_eval in zip(
                 self.rows, evaluation.lines, strict=True
             ):
@@ -922,7 +831,6 @@ class CalculatorTab(QWidget):
 
     def _quick_mode_changed(self, quick: bool) -> None:
         self._selector.setVisible(not quick)
-        self.manager_total_row.setVisible(not quick)
         self._rows_scroll.setVisible(not quick)
-        self.quick_panel.setVisible(quick)
+        self.quick_scroll.setVisible(quick)
         self.recalculate()

@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from decimal import Decimal
 
 from arcelikSalesHelper import strings as T
+
 from .models import LineInput, LineWarning
 
 

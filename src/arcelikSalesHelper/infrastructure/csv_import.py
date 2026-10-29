@@ -238,7 +238,7 @@ def _parse_row(
         website = (
             _price(line, WEBSITE_PRICE_COLUMN, website_text, errors, warnings)
             if website_text
-            else Decimal("0")
+            else Decimal(0)
         )
 
     quantity: int | None = None
