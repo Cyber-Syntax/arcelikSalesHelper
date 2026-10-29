@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import replace
+from decimal import Decimal
 
 from PySide6.QtCore import QSignalBlocker, QTimer, Qt, Signal
 from PySide6.QtGui import QColor, QResizeEvent
@@ -447,6 +448,14 @@ class CalculatorTab(QWidget):
 
         self.shared_manager_edit = QLineEdit()
         self.shared_manager_edit.setPlaceholderText(T.PH_MANAGER_TOTAL)
+        self.quick_product_count_edit = QLineEdit()
+        self.quick_product_count_edit.setPlaceholderText(
+            T.PH_QUICK_PRODUCT_COUNT
+        )
+        self.quick_product_prices_edit = QLineEdit()
+        self.quick_product_prices_edit.setPlaceholderText(
+            T.PH_QUICK_PRODUCT_PRICES
+        )
         self.quick_mode_check = QCheckBox(T.CHK_TOTAL_ONLY_MODE)
         self.quick_regular_edit = QLineEdit()
         self.quick_regular_edit.setPlaceholderText(T.PH_REGULAR)
@@ -461,12 +470,22 @@ class CalculatorTab(QWidget):
         self.quick_pos_mode.addItem(
             T.POS_MODE_PERCENTAGE, PosCalculationMode.PERCENTAGE
         )
+        self.quick_product_count_row = QWidget()
+        quick_count_row = QHBoxLayout(self.quick_product_count_row)
+        quick_count_label = QLabel(T.LBL_QUICK_PRODUCT_COUNT)
+        quick_count_label.setBuddy(self.quick_product_count_edit)
+        quick_count_row.addWidget(quick_count_label)
+        quick_count_row.addWidget(self.quick_product_count_edit, 1)
         self.quick_panel = QGroupBox(T.GROUP_TOTAL_ONLY)
         quick_form = QFormLayout(self.quick_panel)
         quick_form.addRow(T.FORM_TOTAL_REGULAR, self.quick_regular_edit)
         quick_form.addRow(T.FORM_TOTAL_WEBSITE, self.quick_website_edit)
         quick_form.addRow(T.FORM_TOTAL_MANAGER, self.quick_manager_edit)
         quick_form.addRow(T.FORM_POS_CALCULATION_MODE, self.quick_pos_mode)
+        quick_form.addRow(
+            T.LBL_QUICK_PRODUCT_PRICES, self.quick_product_prices_edit
+        )
+        quick_form.addRow(self.quick_product_count_row)
 
         self.panel = TransactionPanel()
         self.product_search = QLineEdit()
@@ -521,7 +540,6 @@ class CalculatorTab(QWidget):
         manager_total_label.setBuddy(self.shared_manager_edit)
         manager_total_row.addWidget(manager_total_label)
         manager_total_row.addWidget(self.shared_manager_edit, 1)
-
         self._rows_host = QWidget()
         self._rows_layout = QVBoxLayout(self._rows_host)
         self._rows_layout.addStretch(
@@ -574,6 +592,8 @@ class CalculatorTab(QWidget):
             lambda _c=False: self.save_requested.emit(self.evaluation)
         )
         self.shared_manager_edit.textChanged.connect(self.recalculate)
+        self.quick_product_count_edit.textChanged.connect(self.recalculate)
+        self.quick_product_prices_edit.textChanged.connect(self.recalculate)
         self.quick_mode_check.toggled.connect(self._quick_mode_changed)
         for edit in (
             self.quick_regular_edit,
@@ -771,6 +791,23 @@ class CalculatorTab(QWidget):
         if self._bulk:
             return
         if self.quick_mode_check.isChecked():
+            count_text = self.quick_product_count_edit.text().strip()
+            prices_text = self.quick_product_prices_edit.text().strip()
+            prices: tuple[Decimal, ...] | None = None
+            price_error = False
+            if prices_text:
+                price_parts = [part.strip() for part in prices_text.split(";")]
+                price_reads = [read_money(part) for part in price_parts]
+                price_error = any(
+                    part == "" or read.error is not None or read.value is None
+                    for part, read in zip(price_parts, price_reads, strict=True)
+                )
+                if not price_error:
+                    prices = tuple(
+                        read.value
+                        for read in price_reads
+                        if read.value is not None
+                    )
             form = LineForm(
                 product_name=T.QUICK_TOTAL_PRODUCT,
                 regular_price=self.quick_regular_edit.text(),
@@ -785,7 +822,41 @@ class CalculatorTab(QWidget):
                     else PosCalculationMode.FIXED_AMOUNT
                 ),
             )
-            evaluation = evaluate_transaction((form,))
+            invalid_count = bool(count_text) and (
+                not count_text.isdigit() or not 1 <= int(count_text) <= 999
+            )
+            if price_error or invalid_count:
+                evaluation = evaluate_transaction((form,))
+                evaluation = replace(
+                    evaluation,
+                    result=None,
+                    totals_sections=(),
+                    pending_reason=(
+                        T.QUICK_PRODUCT_PRICES_INVALID
+                        if price_error
+                        else T.QUICK_PRODUCT_COUNT_INVALID
+                    ),
+                )
+                self.evaluation = evaluation
+                self.panel.show_evaluation(evaluation)
+                self.save_button.setEnabled(False)
+                return
+            count = int(count_text) if count_text else None
+            if prices is not None:
+                if count is not None and count != len(prices):
+                    evaluation = evaluate_transaction((form,))
+                    evaluation = replace(
+                        evaluation,
+                        result=None,
+                        totals_sections=(),
+                        pending_reason=T.QUICK_PRODUCT_COUNT_MISMATCH,
+                    )
+                    self.evaluation = evaluation
+                    self.panel.show_evaluation(evaluation)
+                    self.save_button.setEnabled(False)
+                    return
+                count = len(prices)
+            evaluation = evaluate_transaction((form,), count, prices)
         else:
             forms = [row.line.form() for row in self.rows]
             total_text = self.shared_manager_edit.text().strip()
