@@ -139,33 +139,48 @@ POS_FORMULA_FIXED = "Sabit yöntem: (ilk fiyat − web fiyatı) + yönetici fiya
 POS_FORMULA_PERCENTAGE = (
     "Yüzde yöntemi: yönetici fiyatı ÷ (web fiyatı / ilk fiyat)"
 )
-CHK_SHARED_MANAGER_TOTAL = "Tek yönetici toplamını ürünlere dağıt"
 CHK_TOTAL_ONLY_MODE = "Ürün seçmeden toplam hesapla"
 GROUP_TOTAL_ONLY = "Hızlı toplam hesabı"
-QUICK_TOTAL_PRODUCT = "Toplam hesaplama"
-FORM_TOTAL_REGULAR = "İlk fiyat toplamı"
-FORM_TOTAL_WEBSITE = "Web sitesi indirimli fiyat toplamı"
-FORM_TOTAL_MANAGER = "Yönetici toplam fiyatı"
 LBL_SHARED_MANAGER_TOTAL = "Yönetici toplam fiyatı"
 PH_MANAGER_TOTAL = "Örneğin 68.131,00"
+
+GROUP_SPLIT = "Toplam dağıtımı"
+LBL_POS_SHOWN_TOTAL = "POS'ta görünen indirimli toplam"
+PH_POS_SHOWN_TOTAL = "Örneğin 189.450,00"
+CHK_LOCK_LINE = "Sabit tut (düğün)"
+TIP_LOCK_LINE = (
+    "İşaretli ürün POS'a ilk fiyatıyla girilir. Fark yalnızca işaretsiz "
+    "(oliz) ürünlere bölünür."
+)
+LBL_QUICK_ROW_PRICE = "İlk fiyat"
+
+SPLIT_NEED_BOTH = (
+    "POS'ta görünen toplamı ve yönetici toplamını birlikte girin."
+)
+SPLIT_NO_FREE = (
+    "Fiyatı düşürülecek en az bir sabit olmayan (oliz) ürün bırakın."
+)
+SPLIT_NOT_ENOUGH = (
+    "Sabit olmayan ürünler bu farkı karşılayamıyor; fark, ürünlerin net "
+    "tutarını aşıyor."
+)
+SEC_SPLIT_SUMMARY = "Dağıtım özeti"
+LBL_SPLIT_POS_SHOWN = "POS'ta görünen indirimli toplam"
+LBL_SPLIT_TARGET = "Yönetici toplam fiyatı"
+LBL_SPLIT_CUT = "Sabit olmayan ürünlerden düşülen tutar"
+LBL_SPLIT_ADD = "Sabit olmayan ürünlere eklenen tutar"
+SPLIT_NOTE = (
+    "Sabit tutulan ürünler ilk fiyatıyla girilir. Fark, sabit olmayan "
+    "ürünlere ilk fiyat oranında bölündü. Sonucu POS'ta bir kez doğrulayın."
+)
+
+
+def quick_row_title(number: int) -> str:
+    return f"Ürün {number}"
+
+
 LBL_QUICK_PRODUCT_COUNT = "POS tutarını bölünecek ürün sayısı"
 PH_QUICK_PRODUCT_COUNT = "Örneğin 3"
-QUICK_PRODUCT_COUNT_INVALID = "Ürün sayısı 1 ile 999 arasında tam sayı olmalıdır."
-LBL_QUICK_PRODUCT_PRICES = "Ürün fiyatları (isteğe bağlı)"
-PH_QUICK_PRODUCT_PRICES = "Örneğin 18.000,00; 15.000,00; 12.000,00"
-QUICK_PRODUCT_PRICES_INVALID = (
-    "Ürün fiyatlarını noktalı virgülle ayırın; her fiyat sıfırdan büyük olmalıdır."
-)
-QUICK_PRODUCT_COUNT_MISMATCH = "Ürün sayısı, girilen ürün fiyatı adediyle aynı olmalıdır."
-POS_SPLIT_REAL_TITLE = "Girilen ürün fiyatlarına göre POS dağılımı"
-POS_SPLIT_REAL_NOTE = "Girilen fiyatlar, POS toplamını ürünlere orantılı bölmek için kullanıldı."
-POS_SPLIT_SIMILAR_TITLE = "Benzer fiyatlı ürün varsayımı (yakın paylar)"
-POS_SPLIT_SIMILAR_NOTE = "Örnek dağılım: 3 üründe 18.000 / 15.000 / 12.000 oranı."
-POS_SPLIT_MIXED_TITLE = "Farklı fiyatlı ürün varsayımı (yüksekten düşüğe)"
-POS_SPLIT_MIXED_NOTE = (
-    "3 ürün için örnek ağırlıklar 5:2:1; diğer sayılarda büyükten küçüğe "
-    "azalan ağırlıklar kullanılır. Gerçek ürün fiyatlarını temsil etmez."
-)
 LBL_DISCOUNT_AMOUNT = "İndirim tutarı"
 
 # transaction totals
@@ -180,10 +195,6 @@ LBL_TOTAL_EIGHTEEN = "%18 senaryo toplamı"
 LBL_TOTAL_TWENTY = "%20 senaryo toplamı"
 MISSING_PRICE = "fiyat"
 MISSING_MANAGER = "yönetici değeri"
-
-
-def pos_split_product(index: int) -> str:
-    return f"Ürün {index} POS tutarı"
 
 
 def total_missing(what: str, line_numbers: str, several: bool) -> str:

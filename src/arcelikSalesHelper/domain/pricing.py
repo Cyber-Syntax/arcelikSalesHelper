@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from decimal import Decimal, ROUND_HALF_UP, localcontext
+from decimal import ROUND_DOWN, ROUND_HALF_UP, Decimal, localcontext
 from functools import reduce
 
 from arcelikSalesHelper import strings as T
@@ -22,7 +22,7 @@ from .result import Err, Ok, Result
 from .validation import ValidationError, soft_warnings, validate_line
 
 TEN_PERCENT = Decimal("0.10")
-HUNDRED = Decimal("100")
+HUNDRED = Decimal(100)
 
 
 def allocate_total_by_weight(
@@ -53,6 +53,31 @@ def allocate_total_by_weight(
     return tuple(allocations)
 
 
+def distribute_cents(
+    total: Decimal, weights: Sequence[Decimal]
+) -> tuple[Decimal, ...]:
+    """Split a currency amount into whole-cent shares that add up exactly.
+
+    Negative totals are split by magnitude and negated.
+    """
+    if not weights:
+        return ()
+    cent = Decimal("0.01")
+    amount = abs(total).quantize(cent, rounding=ROUND_HALF_UP)
+    raw = allocate_total_by_weight(amount, weights)
+    floors = [
+        (share * 100).to_integral_value(rounding=ROUND_DOWN) for share in raw
+    ]
+    leftover = int((amount * 100 - sum(floors)).to_integral_value())
+    order = sorted(
+        range(len(raw)), key=lambda i: raw[i] * 100 - floors[i], reverse=True
+    )
+    for index in order[:leftover]:
+        floors[index] += 1
+    sign = -1 if total < ZERO else 1
+    return tuple((Decimal(sign * int(c)) / 100).quantize(cent) for c in floors)
+
+
 def ten_percent(base: Decimal) -> tuple[Decimal, Decimal]:
     discount = mul(base, TEN_PERCENT)
     return discount, sub(base, discount)
@@ -61,7 +86,7 @@ def ten_percent(base: Decimal) -> tuple[Decimal, Decimal]:
 def discount_scenario_total(
     base: Decimal, quantity: int, rate: Decimal
 ) -> Decimal:
-    return mul_qty(mul(base, sub(Decimal("1"), rate)), quantity)
+    return mul_qty(mul(base, sub(Decimal(1), rate)), quantity)
 
 
 def round_pos_amount(amount: Decimal) -> Decimal:
