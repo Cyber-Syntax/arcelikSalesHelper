@@ -5,7 +5,6 @@
 ### Products tab
 
 - [ ] ürün kategorisini yaz, ocak vb.
-- [ ] make product quantity/prices same database, history different.
 - [ ] "fiziksel stok", "teşhir", "fiziksel rezerve edilmişler", "kullanılabilir miktar" ekle, optional olsun
 - [ ] allow csv import without money, some products old but still selled on the company.
 
