@@ -121,6 +121,7 @@ SEC_PRICES = "Fiyatlar"
 SEC_WEBSITE_OPTION = "Web sitesi indirim seçeneği"
 SEC_GIFT_OPTION = "Hediye seçeneği"
 SEC_TOTALS = "İşlem toplamları"
+SEC_PRICE_SCENARIOS = "Toplam fiyat senaryoları"
 
 LBL_WEBSITE_OFFER_TOTAL = "%10 İndirim"
 LBL_FIRST_PRICE_TEN_PERCENT = "İlk fiyatın %10'u"
@@ -135,15 +136,54 @@ LBL_POS_DISCOUNT_RATE = "Hesaplanan indirim oranı"
 POS_MODE_FIXED = "Sabit indirim tutarı"
 POS_MODE_PERCENTAGE = "Yüzde indirimi"
 POS_FORMULA_FIXED = "Sabit yöntem: (ilk fiyat − web fiyatı) + yönetici fiyatı"
-POS_FORMULA_PERCENTAGE = "Yüzde yöntemi: yönetici fiyatı ÷ (web fiyatı / ilk fiyat)"
+POS_FORMULA_PERCENTAGE = (
+    "Yüzde yöntemi: yönetici fiyatı ÷ (web fiyatı / ilk fiyat)"
+)
+CHK_SHARED_MANAGER_TOTAL = "Tek yönetici toplamını ürünlere dağıt"
+CHK_TOTAL_ONLY_MODE = "Ürün seçmeden toplam hesapla"
+GROUP_TOTAL_ONLY = "Hızlı toplam hesabı"
+QUICK_TOTAL_PRODUCT = "Toplam hesaplama"
+FORM_TOTAL_REGULAR = "İlk fiyat toplamı"
+FORM_TOTAL_WEBSITE = "Web sitesi indirimli fiyat toplamı"
+FORM_TOTAL_MANAGER = "Yönetici toplam fiyatı"
+LBL_SHARED_MANAGER_TOTAL = "Yönetici toplam fiyatı"
+PH_MANAGER_TOTAL = "Örneğin 68.131,00"
+LBL_QUICK_PRODUCT_COUNT = "POS tutarını bölünecek ürün sayısı"
+PH_QUICK_PRODUCT_COUNT = "Örneğin 3"
+QUICK_PRODUCT_COUNT_INVALID = "Ürün sayısı 1 ile 999 arasında tam sayı olmalıdır."
+LBL_QUICK_PRODUCT_PRICES = "Ürün fiyatları (isteğe bağlı)"
+PH_QUICK_PRODUCT_PRICES = "Örneğin 18.000,00; 15.000,00; 12.000,00"
+QUICK_PRODUCT_PRICES_INVALID = (
+    "Ürün fiyatlarını noktalı virgülle ayırın; her fiyat sıfırdan büyük olmalıdır."
+)
+QUICK_PRODUCT_COUNT_MISMATCH = "Ürün sayısı, girilen ürün fiyatı adediyle aynı olmalıdır."
+POS_SPLIT_REAL_TITLE = "Girilen ürün fiyatlarına göre POS dağılımı"
+POS_SPLIT_REAL_NOTE = "Girilen fiyatlar, POS toplamını ürünlere orantılı bölmek için kullanıldı."
+POS_SPLIT_SIMILAR_TITLE = "Benzer fiyatlı ürün varsayımı (yakın paylar)"
+POS_SPLIT_SIMILAR_NOTE = "Örnek dağılım: 3 üründe 18.000 / 15.000 / 12.000 oranı."
+POS_SPLIT_MIXED_TITLE = "Farklı fiyatlı ürün varsayımı (yüksekten düşüğe)"
+POS_SPLIT_MIXED_NOTE = (
+    "3 ürün için örnek ağırlıklar 5:2:1; diğer sayılarda büyükten küçüğe "
+    "azalan ağırlıklar kullanılır. Gerçek ürün fiyatlarını temsil etmez."
+)
 LBL_DISCOUNT_AMOUNT = "İndirim tutarı"
 
 # transaction totals
 LBL_LINES = "Satırlar"
 LBL_TOTAL_POS = "POS giriş toplamı"
 LBL_TOTAL_DISCOUNT = "Toplam indirim tutarı"
+LBL_TOTAL_REGULAR = "İlk fiyat toplamı"
+LBL_TOTAL_WEBSITE = "Web sitesi indirimli fiyat toplamı"
+LBL_TOTAL_TEN = "%10 senaryo toplamı"
+LBL_TOTAL_FIFTEEN = "%15 senaryo toplamı"
+LBL_TOTAL_EIGHTEEN = "%18 senaryo toplamı"
+LBL_TOTAL_TWENTY = "%20 senaryo toplamı"
 MISSING_PRICE = "fiyat"
 MISSING_MANAGER = "yönetici değeri"
+
+
+def pos_split_product(index: int) -> str:
+    return f"Ürün {index} POS tutarı"
 
 
 def total_missing(what: str, line_numbers: str, several: bool) -> str:
@@ -166,14 +206,15 @@ def pending_lines(numbers: str) -> str:
 # ======================================================================
 
 HISTORY_CORRUPT = "Kayıtlı hesaplama verisi okunamadı."
+DLG_CUSTOMER_NAME = "Müşteri adını ekle"
+PROMPT_CUSTOMER_NAME = "İsteğe bağlı müşteri adı (boş bırakabilirsiniz):"
 HISTORY_ONLY_COMPLETE = (
     "Yalnızca eksiksiz ve geçerli bir hesaplama kaydedilebilir."
 )
 
+
 def confirmation_pos_unverified() -> str:
-    return (
-        f"Bu hesaplama kaydedildiğinde {POS_LABEL} doğrulanmamıştı."
-    )
+    return f"Bu hesaplama kaydedildiğinde {POS_LABEL} doğrulanmamıştı."
 
 
 def confirmation_other(state: str) -> str:
@@ -190,10 +231,29 @@ BTN_LOAD_OLDER = "Eski hesaplamaları yükle"
 HISTORY_NONE_YET = "Henüz kayıtlı hesaplama yok."
 HISTORY_SELECT = "Ayrıntılarını görmek için kayıtlı bir hesaplama seçin."
 HISTORY_GONE = "Bu hesaplama artık mevcut değil."
+PH_HISTORY_SEARCH = "Müşteri veya ürün adına göre ara"
+BTN_DELETE_HISTORY = "Hesaplamayı sil"
+DLG_DELETE_HISTORY = "Geçmiş kaydını sil"
+
+
+def history_customer(name: str) -> str:
+    return f"Müşteri: {name}"
+
+
+def history_summary(customer: str | None, products: str) -> str:
+    return f"{customer} · {products}" if customer else products
+
+
+def confirm_delete_history(snapshot_id: int) -> str:
+    return f"#{snapshot_id} numaralı hesaplama ve ürün satırları kalıcı olarak silinsin mi?"
+
+
 NOTE_HISTORY_FROZEN = (
     "Hesaplandığı ve kaydedildiği gibi gösterilir. Ürünlerde, fiyatlarda veya "
     "hediyelerde sonradan yapılan değişiklikler bunu etkilemez."
 )
+
+
 def history_header(
     snapshot_id: int, saved_at: str, app_version: str, schema: int
 ) -> str:
@@ -285,6 +345,37 @@ BTN_ARCHIVE = "Arşivle"
 BTN_RESTORE = "Geri yükle"
 BTN_UPDATE_QTY = "Adedi güncelle"
 BTN_IMPORT_CSV = "CSV'den içe aktar"
+BTN_EXPORT_CSV = "CSV'ye aktar"
+BTN_DELETE_PRODUCT = "Kalıcı olarak sil"
+DLG_DELETE_PRODUCT = "Ürünü kalıcı olarak sil"
+PRODUCT_IN_HISTORY = "Bu ürün hesaplama geçmişinde kullanılmış. Kalıcı olarak silinemez; arşivleyebilirsiniz."
+
+
+def confirm_delete_product(name: str) -> str:
+    return f"{name} ürünü ve fiyat/stok kayıtları kalıcı olarak silinsin mi?"
+
+
+BTN_ARCHIVE_SELECTED = "Seçilenleri arşivle"
+BTN_RESTORE_SELECTED = "Seçilenleri geri yükle"
+PH_QTY_OPTIONAL = "isteğe bağlı, tam sayı"
+DLG_BULK_PRODUCTS = "Ürünleri toplu güncelle"
+EXPORT_DIALOG_TITLE = "Ürünleri CSV'ye aktar"
+EXPORT_FAILED_TITLE = "Dışa aktarma başarısız"
+EXPORT_DONE_TITLE = "Dışa aktarma tamamlandı"
+
+
+def confirm_bulk_products(action: str, count: int) -> str:
+    return f"{count} ürün için “{action}” işlemi uygulansın mı?"
+
+
+def export_failed(message: str) -> str:
+    return f"CSV dosyası yazılamadı: {message}"
+
+
+def export_done(count: int) -> str:
+    return f"{count} ürün CSV dosyasına aktarıldı."
+
+
 CANNOT_CHANGE_TITLE = "Ürün değiştirilemiyor"
 
 PH_QTY = "tam sayı, örneğin 12"

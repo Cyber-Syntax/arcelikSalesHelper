@@ -124,7 +124,9 @@ class ImportDialog(QDialog):
         self.errors_label = QLabel(T.LBL_ROWS_WITH_ERRORS)
         self.errors_label.setStyleSheet(ERROR_STYLE)
         self.errors_table = QTableWidget(0, 3)
-        self.errors_table.setHorizontalHeaderLabels(list(T.IMPORT_ERROR_COLUMNS))
+        self.errors_table.setHorizontalHeaderLabels(
+            list(T.IMPORT_ERROR_COLUMNS)
+        )
         self.errors_table.setEditTriggers(
             QAbstractItemView.EditTrigger.NoEditTriggers
         )
@@ -288,9 +290,7 @@ class ImportDialog(QDialog):
             reason = T.IMPORT_DECIDE_ALL
         elif not plan.actionable:
             reason = T.IMPORT_NOTHING
-        self.status_label.setText(
-            reason or T.IMPORT_READY
-        )
+        self.status_label.setText(reason or T.IMPORT_READY)
         self.apply_button.setEnabled(reason is None)
 
     def _apply(self) -> None:

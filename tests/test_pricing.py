@@ -2,13 +2,29 @@ from decimal import Decimal as D
 
 import pytest
 
-from arcelikSalesHelper.domain.models import LineInput, ManagerMode, PosCalculationMode
-from arcelikSalesHelper.domain.pricing import build_options, calculate_line, calculate_transaction, effective_website_price, manager_totals, pos_amount
+from arcelikSalesHelper.domain.models import (
+    LineInput,
+    ManagerMode,
+    PosCalculationMode,
+)
+from arcelikSalesHelper.domain.pricing import (
+    build_options,
+    calculate_line,
+    calculate_transaction,
+    effective_website_price,
+    manager_totals,
+    pos_amount,
+)
 from arcelikSalesHelper.domain.result import Err, Ok
 
 
 def make(**kw: object) -> LineInput:
-    base: dict[str, object] = dict(product_name="Fridge", quantity=1, regular_price=D(5000), website_discounted_price=D(4000))
+    base: dict[str, object] = dict(
+        product_name="Fridge",
+        quantity=1,
+        regular_price=D(5000),
+        website_discounted_price=D(4000),
+    )
     base.update(kw)
     return LineInput(**base)  # type: ignore[arg-type]
 
@@ -20,12 +36,26 @@ def calc(line: LineInput):
 
 
 def test_real_world_examples_are_exact():
-    first = calc(make(regular_price=D("145298"), website_discounted_price=D("132798"), manager_value=D("112000"), manager_mode=ManagerMode.UNIT))
+    first = calc(
+        make(
+            regular_price=D("145298"),
+            website_discounted_price=D("132798"),
+            manager_value=D("112000"),
+            manager_mode=ManagerMode.UNIT,
+        )
+    )
     assert first.ten_pct_base == D("132798")
     assert first.ten_pct_discount_unit == D("13279.80")
     assert first.ten_pct_unit == D("119518.20")
     assert first.pos_amount == D("124500")
-    second = calc(make(regular_price=D("54299"), website_discounted_price=D("48299"), manager_value=D("43500"), manager_mode=ManagerMode.UNIT))
+    second = calc(
+        make(
+            regular_price=D("54299"),
+            website_discounted_price=D("48299"),
+            manager_value=D("43500"),
+            manager_mode=ManagerMode.UNIT,
+        )
+    )
     assert second.ten_pct_unit == D("43469.10")
     assert second.pos_amount == D("49500")
 
@@ -70,9 +100,13 @@ def test_zero_website_price_keeps_gift_scenario_on_regular_price():
 
 def test_manager_unit_and_authoritative_line_modes_with_quantity():
     assert manager_totals(D(4500), ManagerMode.UNIT, 3) == (D(4500), D(13500))
-    line = calc(make(quantity=3, manager_value=D(10), manager_mode=ManagerMode.LINE))
+    line = calc(
+        make(quantity=3, manager_value=D(10), manager_mode=ManagerMode.LINE)
+    )
     assert line.manager_line_total == D(10)
-    assert str(line.manager_unit).startswith("3.333333") and line.manager_unit != D("3.33")
+    assert str(line.manager_unit).startswith(
+        "3.333333"
+    ) and line.manager_unit != D("3.33")
     assert line.pos_amount == D(3010)
 
 
@@ -81,13 +115,15 @@ def test_pos_uses_normal_website_discounted_total():
 
 
 def test_percentage_pos_mode_grosses_up_manager_price_without_rounding():
-    line = calc(make(
-        regular_price=D("38299"),
-        website_discounted_price=D("34469.1"),
-        manager_value=D("30000"),
-        manager_mode=ManagerMode.UNIT,
-        pos_calculation_mode=PosCalculationMode.PERCENTAGE,
-    ))
+    line = calc(
+        make(
+            regular_price=D("38299"),
+            website_discounted_price=D("34469.1"),
+            manager_value=D("30000"),
+            manager_mode=ManagerMode.UNIT,
+            pos_calculation_mode=PosCalculationMode.PERCENTAGE,
+        )
+    )
     assert line.pos_calculation_mode is PosCalculationMode.PERCENTAGE
     assert line.pos_discount_percentage == D("10.0")
     assert str(line.pos_amount).startswith("33333.333333333333")
@@ -95,28 +131,37 @@ def test_percentage_pos_mode_grosses_up_manager_price_without_rounding():
 
 
 def test_percentage_pos_mode_respects_line_total_quantity_and_gift_pos():
-    line = calc(make(
-        quantity=2,
-        regular_price=D("100"),
-        website_discounted_price=D("90"),
-        manager_value=D("300"),
-        manager_mode=ManagerMode.LINE,
-        pos_calculation_mode=PosCalculationMode.PERCENTAGE,
-    ))
+    line = calc(
+        make(
+            quantity=2,
+            regular_price=D("100"),
+            website_discounted_price=D("90"),
+            manager_value=D("300"),
+            manager_mode=ManagerMode.LINE,
+            pos_calculation_mode=PosCalculationMode.PERCENTAGE,
+        )
+    )
     assert str(line.pos_amount).startswith("333.333333333333")
-    gift = calc(make(
-        regular_price=D("100"),
-        website_discounted_price=D("90"),
-        gift_selected=True,
-        manager_value=D("30"),
-        manager_mode=ManagerMode.UNIT,
-        pos_calculation_mode=PosCalculationMode.PERCENTAGE,
-    ))
+    gift = calc(
+        make(
+            regular_price=D("100"),
+            website_discounted_price=D("90"),
+            gift_selected=True,
+            manager_value=D("30"),
+            manager_mode=ManagerMode.UNIT,
+            pos_calculation_mode=PosCalculationMode.PERCENTAGE,
+        )
+    )
     assert gift.pos_amount == D("30")
 
 
 def test_options_keep_manager_value_on_selected_option_only():
-    line = make(gift_selected=True, gift_name="TKM 9961", manager_value=D(48000), manager_mode=ManagerMode.UNIT)
+    line = make(
+        gift_selected=True,
+        gift_name="TKM 9961",
+        manager_value=D(48000),
+        manager_mode=ManagerMode.UNIT,
+    )
     website, gift = build_options(line, calc(line))
     assert website.manager_line_total is None
     assert gift is not None and gift.manager_line_total == D(48000)
@@ -124,7 +169,9 @@ def test_options_keep_manager_value_on_selected_option_only():
 
 
 def test_quantity_scales_totals_and_transaction():
-    line = make(quantity=3, manager_value=D(4500), manager_mode=ManagerMode.UNIT)
+    line = make(
+        quantity=3, manager_value=D(4500), manager_mode=ManagerMode.UNIT
+    )
     result = calc(line)
     assert result.regular_total == D(15000)
     assert result.website_discounted_total == D(12000)

@@ -54,6 +54,9 @@ class LineResult:
     ten_pct_discount_unit: Decimal
     ten_pct_unit: Decimal
     ten_pct_total: Decimal
+    fifteen_pct_total: Decimal
+    eighteen_pct_total: Decimal
+    twenty_pct_total: Decimal
     manager_mode: ManagerMode | None
     manager_unit: Decimal | None
     manager_line_total: Decimal | None
@@ -75,6 +78,9 @@ class TransactionTotals:
     website_discounted: TotalValue
     discount_amount: TotalValue
     ten_pct: TotalValue
+    fifteen_pct: TotalValue
+    eighteen_pct: TotalValue
+    twenty_pct: TotalValue
     manager: TotalValue
     pos: TotalValue
 

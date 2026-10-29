@@ -7,7 +7,10 @@ import pytest
 from arcelikSalesHelper.domain.products import ProductDraft
 from arcelikSalesHelper.domain.result import Err, Ok
 from arcelikSalesHelper.domain.stock import StockSource, parse_quantity
-from arcelikSalesHelper.infrastructure.database import load_migrations, open_database
+from arcelikSalesHelper.infrastructure.database import (
+    load_migrations,
+    open_database,
+)
 
 from .conftest import FakeClock
 
@@ -28,14 +31,27 @@ def stock_rows(db: sqlite3.Connection) -> list[tuple]:  # type: ignore[type-arg]
 
 
 @pytest.mark.parametrize(
-    "text, expected", [("0", 0), ("12", 12), (" 7 ", 7), ("007", 7), ("1000000", 1_000_000)]
+    "text, expected",
+    [("0", 0), ("12", 12), (" 7 ", 7), ("007", 7), ("1000000", 1_000_000)],
 )
 def test_parse_quantity_accepts(text: str, expected: int) -> None:
     assert parse_quantity(text) == Ok(expected)
 
 
 @pytest.mark.parametrize(
-    "text", ["", "  ", "-1", "1.5", "1,5", "1.000", "abc", "１２", "1000001", "9" * 5000]
+    "text",
+    [
+        "",
+        "  ",
+        "-1",
+        "1.5",
+        "1,5",
+        "1.000",
+        "abc",
+        "１２",
+        "1000001",
+        "9" * 5000,
+    ],
 )
 def test_parse_quantity_rejects(text: str) -> None:
     assert isinstance(parse_quantity(text), Err)
@@ -46,7 +62,9 @@ def test_new_products_have_no_count(repo) -> None:  # type: ignore[no-untyped-de
     assert p.quantity is None and p.quantity_updated_at is None
 
 
-def test_set_quantity_records_value_time_and_history(repo, db, clock: FakeClock) -> None:  # type: ignore[no-untyped-def]
+def test_set_quantity_records_value_time_and_history(
+    repo, db, clock: FakeClock
+) -> None:  # type: ignore[no-untyped-def]
     p = product(repo)
     clock.advance(60)
     first = repo.set_quantity(p.id, 5, StockSource.MANUAL, "  photo  ")
@@ -55,15 +73,23 @@ def test_set_quantity_records_value_time_and_history(repo, db, clock: FakeClock)
     assert first.value.quantity_updated_at == "2026-01-01T12:01:00Z"
     assert first.value.updated_at == p.updated_at  # product data untouched
     repo.set_quantity(p.id, 3, StockSource.CSV)
-    assert stock_rows(db) == [(5, None, "manual", "photo"), (3, 5, "csv", None)]
+    assert stock_rows(db) == [
+        (5, None, "manual", "photo"),
+        (3, 5, "csv", None),
+    ]
 
 
-def test_the_same_quantity_is_recorded_again_and_refreshes_the_time(repo, db, clock) -> None:  # type: ignore[no-untyped-def]
+def test_the_same_quantity_is_recorded_again_and_refreshes_the_time(
+    repo, db, clock
+) -> None:  # type: ignore[no-untyped-def]
     p = product(repo)
     repo.set_quantity(p.id, 5, StockSource.MANUAL)
     clock.advance(3600)
     again = repo.set_quantity(p.id, 5, StockSource.MANUAL)
-    assert isinstance(again, Ok) and again.value.quantity_updated_at == "2026-01-01T13:00:00Z"
+    assert (
+        isinstance(again, Ok)
+        and again.value.quantity_updated_at == "2026-01-01T13:00:00Z"
+    )
     assert len(stock_rows(db)) == 2
 
 
@@ -86,7 +112,9 @@ def test_archived_products_can_be_counted(repo) -> None:  # type: ignore[no-unty
 def test_editing_a_product_keeps_its_count(repo) -> None:  # type: ignore[no-untyped-def]
     p = product(repo)
     repo.set_quantity(p.id, 9, StockSource.MANUAL)
-    updated = repo.update(p.id, ProductDraft("Fridge", D("5000"), D("3500"), "Gift", "n"))
+    updated = repo.update(
+        p.id, ProductDraft("Fridge", D("5000"), D("3500"), "Gift", "n")
+    )
     assert isinstance(updated, Ok) and updated.value.quantity == 9
 
 
@@ -110,7 +138,9 @@ def test_stock_history_is_immutable_and_constrained(repo, db) -> None:  # type: 
         )
 
 
-def test_upgrade_from_v2_keeps_products_and_leaves_counts_unknown(tmp_path: Path) -> None:
+def test_upgrade_from_v2_keeps_products_and_leaves_counts_unknown(
+    tmp_path: Path,
+) -> None:
     migrations = load_migrations()
     assert len(migrations) >= 3
     path = tmp_path / "a.sqlite"
@@ -124,6 +154,8 @@ def test_upgrade_from_v2_keeps_products_and_leaves_counts_unknown(tmp_path: Path
 
     new = open_database(path, migrations=migrations)
     assert isinstance(new, Ok)
-    row = new.value.execute("SELECT name, quantity, quantity_updated_at FROM products").fetchone()
+    row = new.value.execute(
+        "SELECT name, quantity, quantity_updated_at FROM products"
+    ).fetchone()
     assert tuple(row) == ("Fridge", None, None)
     new.value.close()

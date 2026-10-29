@@ -13,7 +13,11 @@ from arcelikSalesHelper.application.history import (
     summarize,
     to_jsonable,
 )
-from arcelikSalesHelper.domain.models import POS_LABEL, ManagerMode, PosCalculationMode
+from arcelikSalesHelper.domain.models import (
+    POS_LABEL,
+    ManagerMode,
+    PosCalculationMode,
+)
 from arcelikSalesHelper.domain.result import Err, Ok
 
 from .test_transaction_app import form, two_forms
@@ -61,9 +65,9 @@ def test_snapshot_columns_hold_normalized_values_and_entered_text() -> None:
         "Fridge",
         1,
     )
-    assert D(first.regular_price) == D(5000) and D(first.website_discounted_price) == D(
-        4000
-    )
+    assert D(first.regular_price) == D(5000) and D(
+        first.website_discounted_price
+    ) == D(4000)
     assert (
         first.manager_value_entered == "3.000,00"
         and first.manager_mode == "unit"
@@ -82,13 +86,20 @@ def test_snapshot_columns_hold_normalized_values_and_entered_text() -> None:
 
 
 def test_snapshot_preserves_percentage_pos_mode():
-    _, rec = snapshot([form(
-        regular_price="38.299,00",
-        website_discounted_price="34.469,10",
-        manager_value="30.000,00",
-        pos_calculation_mode=PosCalculationMode.PERCENTAGE,
-    )])
-    assert rec.lines[0].pos_calculation_mode == PosCalculationMode.PERCENTAGE.value
+    _, rec = snapshot(
+        [
+            form(
+                regular_price="38.299,00",
+                website_discounted_price="34.469,10",
+                manager_value="30.000,00",
+                pos_calculation_mode=PosCalculationMode.PERCENTAGE,
+            )
+        ]
+    )
+    assert (
+        rec.lines[0].pos_calculation_mode
+        == PosCalculationMode.PERCENTAGE.value
+    )
 
 
 def test_snapshot_level_fields() -> None:

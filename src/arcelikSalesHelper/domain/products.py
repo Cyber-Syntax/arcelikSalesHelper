@@ -70,9 +70,7 @@ def validate_draft(draft: ProductDraft) -> tuple[ValidationError, ...]:
     errors: list[ValidationError] = []
     if not draft.name:
         errors.append(
-            ValidationError(
-                "name_required", "name", T.VAL_NAME_REQUIRED
-            )
+            ValidationError("name_required", "name", T.VAL_NAME_REQUIRED)
         )
     elif len(draft.name) > MAX_NAME_LENGTH:
         errors.append(

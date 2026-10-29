@@ -30,7 +30,9 @@ def parsed(text: str):  # type: ignore[no-untyped-def]
 
 
 def plan_for(text: str, repo: ProductRepository):  # type: ignore[no-untyped-def]
-    return plan_import(parsed(text), index_products(repo.search("", include_archived=True)))
+    return plan_import(
+        parsed(text), index_products(repo.search("", include_archived=True))
+    )
 
 
 def add(repo, name, regular="5000", website="4000", gift=None, notes=None):  # type: ignore[no-untyped-def]
@@ -51,9 +53,13 @@ def update_all(plan) -> dict[int, Decision]:  # type: ignore[no-untyped-def]
 
 
 def test_turkish_and_plain_numbers_are_both_accepted() -> None:
-    p = parsed(f'{HEADER}\nFridge,"54.999,00","44.999,00"\nWasher,54999,44999.50\n')
+    p = parsed(
+        f'{HEADER}\nFridge,"54.999,00","44.999,00"\nWasher,54999,44999.50\n'
+    )
     assert p.format is ImportFormat.PRICES and p.errors == ()
-    assert [(r.row, r.name, r.regular_price, r.website_price) for r in p.rows] == [
+    assert [
+        (r.row, r.name, r.regular_price, r.website_price) for r in p.rows
+    ] == [
         (2, "Fridge", D("54999"), D("44999")),
         (3, "Washer", D("54999"), D("44999.50")),
     ]
@@ -73,7 +79,9 @@ def test_missing_website_price_defaults_to_zero(text: str) -> None:
 
 
 def test_nonblank_invalid_website_price_is_still_an_error() -> None:
-    result = parsed("product_name,regular_price,website_discounted_price\nOven,100,abc\n")
+    result = parsed(
+        "product_name,regular_price,website_discounted_price\nOven,100,abc\n"
+    )
     assert [(error.row, error.column) for error in result.errors] == [
         (2, "website_discounted_price")
     ]
@@ -103,7 +111,9 @@ def test_bad_headers_are_file_level_errors(text: str, fragment: str) -> None:
 
 
 def test_blank_lines_are_skipped_and_errors_carry_row_and_column() -> None:
-    p = parsed(f"{HEADER}\nFridge,5000,4000\n\n,5000,4000\nWasher,abc,4000\nDryer,-5,\n")
+    p = parsed(
+        f"{HEADER}\nFridge,5000,4000\n\n,5000,4000\nWasher,abc,4000\nDryer,-5,\n"
+    )
     assert [r.name for r in p.rows] == ["Fridge"] and p.blank_rows == 1
     assert [(e.row, e.column) for e in p.errors] == [
         (4, "product_name"),
@@ -121,7 +131,9 @@ def test_duplicate_names_in_the_file_reference_the_first_row() -> None:
 
 def test_extra_cells_are_an_error_unless_blank() -> None:
     p = parsed(f"{HEADER}\nA,1,2,3\nB,1,2,\n")
-    assert [e.row for e in p.errors] == [2] and [r.name for r in p.rows] == ["B"]
+    assert [e.row for e in p.errors] == [2] and [r.name for r in p.rows] == [
+        "B"
+    ]
 
 
 def test_ambiguous_price_is_flagged_but_read_as_thousands() -> None:
@@ -132,20 +144,32 @@ def test_ambiguous_price_is_flagged_but_read_as_thousands() -> None:
 def test_quantity_column_is_optional_per_row_and_validated() -> None:
     p = parsed(f"{HEADER_Q}\nA,1,1,12\nB,1,1,\nC,1,1,x\nD,1,1,-1\nE,1,1,1.5\n")
     assert [(r.name, r.quantity) for r in p.rows] == [("A", 12), ("B", None)]
-    assert [(e.row, e.column) for e in p.errors] == [(4, "quantity"), (5, "quantity"), (6, "quantity")]
+    assert [(e.row, e.column) for e in p.errors] == [
+        (4, "quantity"),
+        (5, "quantity"),
+        (6, "quantity"),
+    ]
 
 
-def test_stock_format_needs_a_quantity_on_every_row_and_any_column_order() -> None:
+def test_stock_format_needs_a_quantity_on_every_row_and_any_column_order() -> (
+    None
+):
     p = parsed("quantity,product_name\n5,Fridge\n,Washer\n")
     assert p.format is ImportFormat.STOCK
-    assert [(r.name, r.quantity, r.regular_price) for r in p.rows] == [("Fridge", 5, None)]
+    assert [(r.name, r.quantity, r.regular_price) for r in p.rows] == [
+        ("Fridge", 5, None)
+    ]
     assert [(e.row, e.column) for e in p.errors] == [(3, "quantity")]
 
 
-def test_row_and_size_limits(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_row_and_size_limits(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     monkeypatch.setattr(csv_import, "MAX_ROWS", 2)
     result = parse_csv_text(f"{HEADER}\nA,1,1\nB,1,1\nC,1,1\n")
-    assert isinstance(result, Err) and "çok fazla satır" in result.error.lower()
+    assert (
+        isinstance(result, Err) and "çok fazla satır" in result.error.lower()
+    )
 
     path = tmp_path / "big.csv"
     path.write_text(f"{HEADER}\nA,1,1\n", encoding="utf-8")
@@ -184,13 +208,18 @@ def test_plan_classifies_every_row(repo) -> None:  # type: ignore[no-untyped-def
     assert [i.restores for i in plan.items if i.row.name == "Dryer"] == [True]
 
 
-def test_stock_plan_never_creates_and_rejects_unknown_or_archived(repo) -> None:  # type: ignore[no-untyped-def]
+def test_stock_plan_never_creates_and_rejects_unknown_or_archived(
+    repo,
+) -> None:  # type: ignore[no-untyped-def]
     fridge = add(repo, "Fridge")
     old = add(repo, "Old")
     repo.archive(old.id)
     plan = plan_for("product_name,quantity\nFridge,5\nGhost,1\nOld,2\n", repo)
     assert kinds(plan) == {"Fridge": Kind.STOCK_UPDATE}
-    assert [(e.row, e.column) for e in plan.errors] == [(3, "product_name"), (4, "product_name")]
+    assert [(e.row, e.column) for e in plan.errors] == [
+        (3, "product_name"),
+        (4, "product_name"),
+    ]
 
     repo.set_quantity(fridge.id, 5, csv_import.StockSource.MANUAL)
     plan = plan_for("product_name,quantity\nFridge,5\n", repo)
@@ -222,13 +251,22 @@ def test_apply_creates_updates_and_skips_per_decision(repo, db, clock) -> None: 
     assert (s.created, s.updated, s.skipped, s.stock_updated) == (1, 1, 1, 2)
 
     f = repo.get(fridge.id)
-    assert f is not None and (f.regular_price, f.website_price, f.quantity) == (D("5500"), D("4500"), 7)
-    assert (f.default_gift_name, f.notes, f.name) == ("Vacuum", "check", "Fridge")
+    assert f is not None and (
+        f.regular_price,
+        f.website_price,
+        f.quantity,
+    ) == (D("5500"), D("4500"), 7)
+    assert (f.default_gift_name, f.notes, f.name) == (
+        "Vacuum",
+        "check",
+        "Fridge",
+    )
     assert repo.get(washer.id) == washer  # skipped: nothing changed
     [oven] = repo.search("oven")
     assert oven.quantity == 4
     history = db.execute(
-        "SELECT regular_price FROM pricing_history WHERE product_id = ? ORDER BY id", (fridge.id,)
+        "SELECT regular_price FROM pricing_history WHERE product_id = ? ORDER BY id",
+        (fridge.id,),
     ).fetchall()
     assert [D(r[0]) for r in history] == [D("5000"), D("5500")]
     note = db.execute("SELECT DISTINCT note FROM stock_history").fetchone()[0]
@@ -236,7 +274,9 @@ def test_apply_creates_updates_and_skips_per_decision(repo, db, clock) -> None: 
     assert not db.in_transaction
 
 
-def test_apply_imports_regular_price_without_website_discount(repo, db) -> None:  # type: ignore[no-untyped-def]
+def test_apply_imports_regular_price_without_website_discount(
+    repo, db
+) -> None:  # type: ignore[no-untyped-def]
     plan = plan_for("product_name,regular_price\nOven,100\n", repo)
     result = apply_plan(db, plan, {})
     assert isinstance(result, Ok)
@@ -268,13 +308,21 @@ def test_archived_match_is_updated_and_restored(repo, db) -> None:  # type: igno
     repo.archive(dryer.id)
     plan = plan_for(f"{HEADER}\nDryer,2500,1800\n", repo)
     result = apply_plan(db, plan, update_all(plan))
-    assert isinstance(result, Ok) and (result.value.updated, result.value.restored) == (1, 1)
+    assert isinstance(result, Ok) and (
+        result.value.updated,
+        result.value.restored,
+    ) == (1, 1)
     restored = repo.get(dryer.id)
     assert restored is not None and not restored.archived
-    assert (restored.website_price, restored.default_gift_name) == (D("1800"), "Hose")
+    assert (restored.website_price, restored.default_gift_name) == (
+        D("1800"),
+        "Hose",
+    )
 
 
-def test_a_failure_in_the_middle_rolls_everything_back(repo, db, monkeypatch) -> None:  # type: ignore[no-untyped-def]
+def test_a_failure_in_the_middle_rolls_everything_back(
+    repo, db, monkeypatch
+) -> None:  # type: ignore[no-untyped-def]
     fridge = add(repo, "Fridge")
     plan = plan_for(f"{HEADER}\nFridge,6000,4000\nA,1,1\nB,2,2\n", repo)
     original = ProductRepository.add
@@ -304,7 +352,9 @@ def test_a_stale_plan_rolls_back_instead_of_half_applying(repo, db) -> None:  # 
     assert repo.get(fridge.id) == fridge
 
 
-def test_stock_only_import_updates_counts_without_touching_prices(repo, db) -> None:  # type: ignore[no-untyped-def]
+def test_stock_only_import_updates_counts_without_touching_prices(
+    repo, db
+) -> None:  # type: ignore[no-untyped-def]
     fridge = add(repo, "Fridge")
     washer = add(repo, "Washer")
     repo.set_quantity(washer.id, 4, csv_import.StockSource.MANUAL)
@@ -314,4 +364,7 @@ def test_stock_only_import_updates_counts_without_touching_prices(repo, db) -> N
     assert (result.value.stock_updated, result.value.unchanged) == (1, 1)
     updated = repo.get(fridge.id)
     assert updated is not None and updated.quantity == 5
-    assert (updated.regular_price, updated.updated_at) == (fridge.regular_price, fridge.updated_at)
+    assert (updated.regular_price, updated.updated_at) == (
+        fridge.regular_price,
+        fridge.updated_at,
+    )

@@ -37,7 +37,9 @@ class MigrationError(Exception):
 
 class SchemaTooNewError(Exception):
     def __init__(self, db_version: int, app_version: int) -> None:
-        super().__init__(f"database schema {db_version} is newer than supported {app_version}")
+        super().__init__(
+            f"database schema {db_version} is newer than supported {app_version}"
+        )
         self.db_version = db_version
         self.app_version = app_version
 
@@ -92,13 +94,17 @@ def transaction(conn: sqlite3.Connection) -> Iterator[sqlite3.Connection]:
 
 
 def load_migrations() -> tuple[Migration, ...]:
-    root = resources.files("arcelikSalesHelper.infrastructure").joinpath("migrations")
+    root = resources.files("arcelikSalesHelper.infrastructure").joinpath(
+        "migrations"
+    )
     found: list[Migration] = []
     for entry in root.iterdir():
         match = _MIGRATION_FILE.fullmatch(entry.name)
         if match:
             found.append(
-                Migration(int(match[1]), match[2], entry.read_text(encoding="utf-8"))
+                Migration(
+                    int(match[1]), match[2], entry.read_text(encoding="utf-8")
+                )
             )
     found.sort(key=lambda m: m.version)
     _check_contiguous(found)
@@ -108,7 +114,9 @@ def load_migrations() -> tuple[Migration, ...]:
 def _check_contiguous(migrations: Sequence[Migration]) -> None:
     versions = [m.version for m in migrations]
     if versions != list(range(1, len(versions) + 1)):
-        raise MigrationError(f"Migration versions must be 1..N without gaps, got {versions}")
+        raise MigrationError(
+            f"Migration versions must be 1..N without gaps, got {versions}"
+        )
 
 
 def schema_version(conn: sqlite3.Connection) -> int:
@@ -156,7 +164,9 @@ def migrate(
         try:
             on_before_migrate(current, latest)
         except Exception as exc:
-            raise MigrationError(T.db_pre_migration_backup_failed(str(exc))) from exc
+            raise MigrationError(
+                T.db_pre_migration_backup_failed(str(exc))
+            ) from exc
 
     applied: list[int] = []
     for migration in pending:

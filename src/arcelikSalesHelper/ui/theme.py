@@ -112,4 +112,6 @@ def install_material_theme(
         invert_secondary=True,
         extra={"font_size": font_size, "line_height": font_size},
     )
-    app.setStyleSheet(app.styleSheet() + readability_styles(font_scale_percent))
+    app.setStyleSheet(
+        app.styleSheet() + readability_styles(font_scale_percent)
+    )

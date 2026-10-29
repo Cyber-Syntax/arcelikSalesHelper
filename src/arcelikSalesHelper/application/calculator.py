@@ -7,10 +7,13 @@ recomputed here (only formatted).
 
 from collections.abc import Sequence
 from dataclasses import dataclass
-from decimal import Decimal
+from decimal import Decimal, ROUND_DOWN
 
 from arcelikSalesHelper import strings as T
-from arcelikSalesHelper.domain.formatting import format_decimal_exact, format_try
+from arcelikSalesHelper.domain.formatting import (
+    format_decimal_exact,
+    format_try,
+)
 from arcelikSalesHelper.domain.models import (
     POS_LABEL,
     GiftOption,
@@ -24,6 +27,7 @@ from arcelikSalesHelper.domain.models import (
 )
 from arcelikSalesHelper.domain.money import parse_money_ex
 from arcelikSalesHelper.domain.pricing import (
+    allocate_total_by_weight,
     build_options,
     calculate_line,
     calculate_transaction,
@@ -45,6 +49,7 @@ class LineForm:
     gift_selected: bool = False
     gift_name: str = ""
     manager_value: str = ""
+    manager_value_decimal: Decimal | None = None
     manager_mode: ManagerMode = ManagerMode.UNIT
     pos_calculation_mode: PosCalculationMode = PosCalculationMode.FIXED_AMOUNT
     product_id: int | None = None
@@ -189,7 +194,13 @@ def evaluate_line(form: LineForm, line_index: int = 0) -> Evaluation:
         return Evaluation(errors=errors, hints=hints)
 
     manager_read = reads["manager_value"]
-    manager_value = None if manager_read.empty else _need(manager_read)
+    manager_value = (
+        form.manager_value_decimal
+        if form.manager_value_decimal is not None
+        else None
+        if manager_read.empty
+        else _need(manager_read)
+    )
     line = LineInput(
         product_name=name,
         quantity=form.quantity,
@@ -233,6 +244,29 @@ def _money_row(label: str, amount: Decimal) -> Row:
 def _format_percentage(value: Decimal) -> str:
     exact = format_decimal_exact(value)
     return exact.rstrip("0").rstrip(".") if "." in exact else exact
+
+
+def _split_pos_total(
+    total: Decimal, weights: Sequence[Decimal]
+) -> tuple[Decimal, ...]:
+    """Split POS currency into cent amounts whose displayed sum is exact."""
+    if not weights:
+        return ()
+    negative = total < 0
+    amount = abs(total).quantize(Decimal("0.01"))
+    raw = allocate_total_by_weight(amount, weights)
+    cents = [
+        (share * 100).to_integral_value(rounding=ROUND_DOWN)
+        for share in raw
+    ]
+    remaining = int((amount * 100 - sum(cents)).to_integral_value())
+    order = sorted(
+        range(len(raw)), key=lambda i: raw[i] * 100 - cents[i], reverse=True
+    )
+    for index in order[:remaining]:
+        cents[index] += 1
+    sign = Decimal(-1) if negative else Decimal(1)
+    return tuple(sign * value / 100 for value in cents)
 
 
 def present_result(line: LineInput, r: LineResult) -> ResultView:
@@ -301,11 +335,7 @@ def present_result(line: LineInput, r: LineResult) -> ResultView:
             no_website_discount=line.website_discounted_price == 0,
             discount_amount=r.discount_amount,
         ),
-        gift_option=(
-            None
-            if gift_opt is None
-            else _gift_section(gift_opt)
-        ),
+        gift_option=(None if gift_opt is None else _gift_section(gift_opt)),
         pos=pos,
     )
     return ResultView(
@@ -316,6 +346,7 @@ def present_result(line: LineInput, r: LineResult) -> ResultView:
 
 
 # ---- option panels --------------------------------------------------------
+
 
 def _website_section(
     w: WebsiteOption,
@@ -383,10 +414,23 @@ def _total_row(label: str, total: TotalValue, what: str) -> Row:
 
 def present_totals(result: TransactionResult) -> tuple[Section, ...]:
     t = result.totals
-    main = Section(T.SEC_TOTALS, (
-        Row(T.LBL_LINES, str(len(result.lines))),
-        _total_row(T.LBL_TOTAL_DISCOUNT, t.discount_amount, T.MISSING_PRICE),
-    ))
+    main = Section(
+        T.SEC_PRICE_SCENARIOS,
+        (
+            Row(T.LBL_LINES, str(len(result.lines))),
+            _total_row(T.LBL_TOTAL_REGULAR, t.regular, T.MISSING_PRICE),
+            _total_row(
+                T.LBL_TOTAL_WEBSITE, t.website_discounted, T.MISSING_PRICE
+            ),
+            _total_row(
+                T.LBL_TOTAL_DISCOUNT, t.discount_amount, T.MISSING_PRICE
+            ),
+            _total_row(T.LBL_TOTAL_TEN, t.ten_pct, T.MISSING_PRICE),
+            _total_row(T.LBL_TOTAL_FIFTEEN, t.fifteen_pct, T.MISSING_PRICE),
+            _total_row(T.LBL_TOTAL_EIGHTEEN, t.eighteen_pct, T.MISSING_PRICE),
+            _total_row(T.LBL_TOTAL_TWENTY, t.twenty_pct, T.MISSING_PRICE),
+        ),
+    )
     pos = Section(
         POS_LABEL,
         (_total_row(T.LBL_TOTAL_POS, t.pos, T.MISSING_MANAGER),),
@@ -394,8 +438,31 @@ def present_totals(result: TransactionResult) -> tuple[Section, ...]:
     return (main, pos)
 
 
-def evaluate_transaction(forms: Sequence[LineForm]) -> TransactionEvaluation:
+def evaluate_transaction(
+    forms: Sequence[LineForm],
+    pos_split_count: int | None = None,
+    pos_split_prices: Sequence[Decimal] | None = None,
+) -> TransactionEvaluation:
     kept = tuple(forms)
+    if pos_split_prices is not None and (
+        not 1 <= len(pos_split_prices) <= 999
+        or any(price <= 0 for price in pos_split_prices)
+    ):
+        return TransactionEvaluation(
+            (), kept, pending_reason=T.QUICK_PRODUCT_PRICES_INVALID
+        )
+    if pos_split_count is not None and not 1 <= pos_split_count <= 999:
+        return TransactionEvaluation(
+            (), kept, pending_reason=T.QUICK_PRODUCT_COUNT_INVALID
+        )
+    if (
+        pos_split_count is not None
+        and pos_split_prices is not None
+        and pos_split_count != len(pos_split_prices)
+    ):
+        return TransactionEvaluation(
+            (), kept, pending_reason=T.QUICK_PRODUCT_COUNT_MISMATCH
+        )
     evals = tuple(evaluate_line(f, i) for i, f in enumerate(kept))
     if not evals:
         return TransactionEvaluation(
@@ -411,9 +478,74 @@ def evaluate_transaction(forms: Sequence[LineForm]) -> TransactionEvaluation:
     inputs = [e.line for e in evals if e.line is not None]
     match calculate_transaction(inputs):
         case Ok(result):
-            return TransactionEvaluation(
-                evals, kept, result, present_totals(result)
-            )
+            totals = present_totals(result)
+            if result.totals.pos.value is not None:
+                if pos_split_prices is not None:
+                    real_split = _split_pos_total(
+                        result.totals.pos.value, pos_split_prices
+                    )
+                    totals += (
+                        Section(
+                            T.POS_SPLIT_REAL_TITLE,
+                            tuple(
+                                _money_row(
+                                    T.pos_split_product(i + 1), value
+                                )
+                                for i, value in enumerate(real_split)
+                            ),
+                            T.POS_SPLIT_REAL_NOTE,
+                        ),
+                    )
+                elif pos_split_count is not None:
+                    count = pos_split_count
+                    similar_weights = (
+                        (Decimal(1),)
+                        if count == 1
+                        else tuple(
+                            Decimal("1.2")
+                            - Decimal("0.4")
+                            * Decimal(i)
+                            / Decimal(count - 1)
+                            for i in range(count)
+                        )
+                    )
+                    similar = _split_pos_total(
+                        result.totals.pos.value, similar_weights
+                    )
+                    mixed_weights = (
+                        (Decimal(5), Decimal(2), Decimal(1))
+                        if count == 3
+                        else tuple(
+                            Decimal(weight)
+                            for weight in range(count, 0, -1)
+                        )
+                    )
+                    mixed = _split_pos_total(
+                        result.totals.pos.value, mixed_weights
+                    )
+                    totals += (
+                        Section(
+                            T.POS_SPLIT_SIMILAR_TITLE,
+                            tuple(
+                                _money_row(
+                                    T.pos_split_product(i + 1), value
+                                )
+                                for i, value in enumerate(similar)
+                            ),
+                            T.POS_SPLIT_SIMILAR_NOTE,
+                        ),
+                        Section(
+                            T.POS_SPLIT_MIXED_TITLE,
+                            tuple(
+                                _money_row(
+                                    T.pos_split_product(i + 1), value
+                                )
+                                for i, value in enumerate(mixed)
+                            ),
+                            T.POS_SPLIT_MIXED_NOTE,
+                        ),
+                    )
+            return TransactionEvaluation(evals, kept, result, totals)
         case Err(problems):
             return TransactionEvaluation(
                 evals, kept, pending_reason=problems[0].message

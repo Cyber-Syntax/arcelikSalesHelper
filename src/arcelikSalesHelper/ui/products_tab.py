@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sqlite3
+from pathlib import Path
 
 from PySide6.QtCore import (
     QAbstractTableModel,
@@ -17,6 +18,7 @@ from PySide6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
     QFormLayout,
+    QFileDialog,
     QHeaderView,
     QHBoxLayout,
     QLabel,
@@ -39,10 +41,12 @@ from arcelikSalesHelper.infrastructure.repositories import (
     ProductRepository,
     RepoError,
 )
+from arcelikSalesHelper.infrastructure.csv_export import export_products_csv
 
 from .common import (
     ERROR_STYLE,
     FieldBlock,
+    ask_yes_no,
     format_local_timestamp,
     localize_buttons,
     show_warning,
@@ -160,7 +164,9 @@ class ProductDialog(QDialog):
         self._repo = repo
         self._product = product
         self.saved: Product | None = None
-        self.setWindowTitle(T.DLG_EDIT_PRODUCT if product else T.DLG_ADD_PRODUCT)
+        self.setWindowTitle(
+            T.DLG_EDIT_PRODUCT if product else T.DLG_ADD_PRODUCT
+        )
         self.setMinimumWidth(420)
 
         self.name_edit = QLineEdit()
@@ -171,12 +177,15 @@ class ProductDialog(QDialog):
         self.gift_edit = QLineEdit()
         self.notes_edit = QPlainTextEdit()
         self.notes_edit.setFixedHeight(80)
+        self.quantity_edit = QLineEdit()
+        self.quantity_edit.setPlaceholderText(T.PH_QTY_OPTIONAL)
 
         self.blocks = {
             "name": FieldBlock(self.name_edit),
             "regular_price": FieldBlock(self.regular_edit),
             "website_price": FieldBlock(self.website_edit),
         }
+        self.quantity_block = FieldBlock(self.quantity_edit)
         self._general = QLabel()
         self._general.setStyleSheet(ERROR_STYLE)
         self._general.setWordWrap(True)
@@ -188,6 +197,7 @@ class ProductDialog(QDialog):
         form.addRow(T.LBL_WEBSITE_DISCOUNTED, self.blocks["website_price"])
         form.addRow(T.LBL_DEFAULT_GIFT, self.gift_edit)
         form.addRow(T.LBL_NOTES, self.notes_edit)
+        form.addRow(T.LBL_COUNTED_QTY, self.quantity_block)
 
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Save
@@ -212,6 +222,8 @@ class ProductDialog(QDialog):
             )
             self.gift_edit.setText(product.default_gift_name or "")
             self.notes_edit.setPlainText(product.notes or "")
+            if product.quantity is not None:
+                self.quantity_edit.setText(str(product.quantity))
 
         self.regular_edit.textChanged.connect(lambda _t: self._update_hints())
         self.website_edit.textChanged.connect(lambda _t: self._update_hints())
@@ -227,6 +239,9 @@ class ProductDialog(QDialog):
     def _clear_errors(self) -> None:
         for block in self.blocks.values():
             block.set_error(None)
+        self.quantity_block.set_error(None)
+        self.quantity_edit.setToolTip("")
+        self.quantity_edit.setStyleSheet("")
         self._general.hide()
 
     def accept(self) -> None:
@@ -247,6 +262,15 @@ class ProductDialog(QDialog):
         if problems or regular.value is None or website.value is None:
             return
 
+        quantity: int | None = None
+        if self.quantity_edit.text().strip():
+            match parse_quantity(self.quantity_edit.text()):
+                case Err(message):
+                    self.quantity_block.set_error(message)
+                    return
+                case Ok(value):
+                    quantity = value
+
         draft = ProductDraft(
             self.name_edit.text(),
             regular.value,
@@ -263,6 +287,24 @@ class ProductDialog(QDialog):
             case Err(error):
                 self._show_repo_error(error)
             case Ok(saved):
+                if quantity is not None and saved.quantity != quantity:
+                    stock = self._repo.set_quantity(
+                        saved.id, quantity, StockSource.MANUAL
+                    )
+                    if isinstance(stock, Err):
+                        self._show_repo_error(stock.error)
+                        return
+                    saved = stock.value
+                elif (
+                    self._product is not None
+                    and self._product.quantity is not None
+                    and quantity is None
+                ):
+                    cleared = self._repo.clear_quantity(saved.id)
+                    if isinstance(cleared, Err):
+                        self._show_repo_error(cleared.error)
+                        return
+                    saved = cleared.value
                 self.saved = saved
                 super().accept()
 
@@ -279,75 +321,6 @@ class ProductDialog(QDialog):
         if not shown:
             self._general.setText(error.message)
             self._general.show()
-
-
-class StockDialog(QDialog):
-    """Record a counted quantity for one product. Inline errors; stays open on failure."""
-
-    def __init__(
-        self,
-        repo: ProductRepository,
-        product: Product,
-        parent: QWidget | None = None,
-    ) -> None:
-        super().__init__(parent)
-        self._repo = repo
-        self._product = product
-        self.saved: Product | None = None
-        self.setWindowTitle(T.stock_title(product.name))
-        self.setMinimumWidth(440)
-
-        self.quantity_edit = QLineEdit()
-        self.quantity_edit.setPlaceholderText(T.PH_QTY)
-        self.note_edit = QLineEdit()
-        self.note_edit.setPlaceholderText(T.PH_QTY_NOTE)
-        self.block = FieldBlock(self.quantity_edit)
-
-        if product.quantity is None or product.quantity_updated_at is None:
-            current = T.STOCK_NO_COUNT
-        else:
-            current = T.stock_current(
-                product.quantity,
-                format_local_timestamp(product.quantity_updated_at),
-            )
-            self.quantity_edit.setText(str(product.quantity))
-        info = QLabel(T.stock_info(current))
-        info.setWordWrap(True)
-
-        form = QFormLayout()
-        form.addRow(T.LBL_COUNTED_QTY, self.block)
-        form.addRow(T.LBL_NOTE, self.note_edit)
-        buttons = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Save
-            | QDialogButtonBox.StandardButton.Cancel
-        )
-        localize_buttons(buttons)
-        buttons.accepted.connect(self.accept)
-        buttons.rejected.connect(self.reject)
-        layout = QVBoxLayout(self)
-        layout.addWidget(info)
-        layout.addLayout(form)
-        layout.addWidget(buttons)
-
-    def accept(self) -> None:
-        self.block.set_error(None)
-        match parse_quantity(self.quantity_edit.text()):
-            case Err(message):
-                self.block.set_error(message)
-                return
-            case Ok(quantity):
-                outcome = self._repo.set_quantity(
-                    self._product.id,
-                    quantity,
-                    StockSource.MANUAL,
-                    self.note_edit.text(),
-                )
-        match outcome:
-            case Err(error):
-                self.block.set_error(error.message)
-            case Ok(saved):
-                self.saved = saved
-                super().accept()
 
 
 class ProductsTab(QWidget):
@@ -383,7 +356,7 @@ class ProductsTab(QWidget):
             QAbstractItemView.SelectionBehavior.SelectRows
         )
         self.table.setSelectionMode(
-            QAbstractItemView.SelectionMode.SingleSelection
+            QAbstractItemView.SelectionMode.ExtendedSelection
         )
         self.table.setEditTriggers(
             QAbstractItemView.EditTrigger.NoEditTriggers
@@ -401,9 +374,11 @@ class ProductsTab(QWidget):
         self.add_button = QPushButton(T.BTN_ADD_PRODUCT)
         self.edit_button = QPushButton(T.BTN_EDIT)
         self.archive_button = QPushButton(T.BTN_ARCHIVE)
-        self.stock_button = QPushButton(T.BTN_UPDATE_QTY)
         self.import_button = QPushButton(T.BTN_IMPORT_CSV)
         self.import_button.setEnabled(conn is not None)
+        self.bulk_archive_button = QPushButton(T.BTN_ARCHIVE_SELECTED)
+        self.export_button = QPushButton(T.BTN_EXPORT_CSV)
+        self.delete_button = QPushButton(T.BTN_DELETE_PRODUCT)
 
         top = QHBoxLayout()
         top.addWidget(self.search_edit, 1)
@@ -412,7 +387,9 @@ class ProductsTab(QWidget):
         bottom.addWidget(self.add_button)
         bottom.addWidget(self.edit_button)
         bottom.addWidget(self.archive_button)
-        bottom.addWidget(self.stock_button)
+        bottom.addWidget(self.bulk_archive_button)
+        bottom.addWidget(self.export_button)
+        bottom.addWidget(self.delete_button)
         bottom.addStretch(1)
         bottom.addWidget(self.import_button)
         layout = QVBoxLayout(self)
@@ -425,8 +402,14 @@ class ProductsTab(QWidget):
         self.add_button.clicked.connect(self._add)
         self.edit_button.clicked.connect(self._edit)
         self.archive_button.clicked.connect(self._toggle_archive)
-        self.stock_button.clicked.connect(lambda _c=False: self._update_stock())
         self.import_button.clicked.connect(lambda _c=False: self._import_csv())
+        self.bulk_archive_button.clicked.connect(
+            lambda _c=False: self._bulk_archive()
+        )
+        self.export_button.clicked.connect(lambda _c=False: self._export_csv())
+        self.delete_button.clicked.connect(
+            lambda _c=False: self._delete_product()
+        )
         self.table.doubleClicked.connect(lambda _i: self._edit())
         self.table.selectionModel().selectionChanged.connect(
             lambda _s, _d: self._update_buttons()
@@ -449,36 +432,44 @@ class ProductsTab(QWidget):
         rows = self.table.selectionModel().selectedRows()
         return self.table_model.product_at(rows[0].row()) if rows else None
 
+    def selected_products(self) -> list[Product]:
+        return [
+            product
+            for index in self.table.selectionModel().selectedRows()
+            if (product := self.table_model.product_at(index.row()))
+            is not None
+        ]
+
     def _select_id(self, product_id: int) -> None:
         row = self.table_model.row_of(product_id)
         if row is not None:
             self.table.selectRow(row)
 
     def _update_buttons(self) -> None:
-        product = self.selected_product()
+        products = self.selected_products()
+        product = products[0] if len(products) == 1 else None
         self.edit_button.setEnabled(product is not None)
         self.archive_button.setEnabled(product is not None)
-        self.stock_button.setEnabled(product is not None)
+        self.delete_button.setEnabled(product is not None)
         self.archive_button.setText(
             T.BTN_RESTORE
             if product is not None and product.archived
             else T.BTN_ARCHIVE
         )
         self.add_button.setEnabled(product is None or not product.archived)
-
-    def _update_stock(self) -> None:
-        product = self.selected_product()
-        if product is None:
-            return
-        dialog = StockDialog(self._repo, product, parent=self)
-        if dialog.exec() == QDialog.DialogCode.Accepted:
-            self.reload()
-            self._select_id(product.id)
+        self.bulk_archive_button.setEnabled(bool(products))
+        self.bulk_archive_button.setText(
+            T.BTN_RESTORE_SELECTED
+            if products and all(p.archived for p in products)
+            else T.BTN_ARCHIVE_SELECTED
+        )
 
     def _import_csv(self) -> None:
         if self._conn is None:
             return
-        dialog = ImportDialog(self._repo, self._conn, self._backups, parent=self)
+        dialog = ImportDialog(
+            self._repo, self._conn, self._backups, parent=self
+        )
         dialog.exec()
         self.reload()
         if dialog.summary is not None:
@@ -513,6 +504,70 @@ class ProductsTab(QWidget):
             if product.archived
             else self._repo.archive(product.id)
         )
+        match outcome:
+            case Err(error):
+                show_warning(self, T.CANNOT_CHANGE_TITLE, error.message)
+            case Ok(_):
+                self.reload()
+                self.products_changed.emit()
+
+    def _bulk_archive(self) -> None:
+        products = self.selected_products()
+        if not products:
+            return
+        restoring = all(product.archived for product in products)
+        action = (
+            T.BTN_RESTORE_SELECTED if restoring else T.BTN_ARCHIVE_SELECTED
+        )
+        if not ask_yes_no(
+            self,
+            T.DLG_BULK_PRODUCTS,
+            T.confirm_bulk_products(action, len(products)),
+        ):
+            return
+        errors: list[str] = []
+        for product in products:
+            outcome = (
+                self._repo.restore(product.id)
+                if restoring
+                else self._repo.archive(product.id)
+            )
+            if isinstance(outcome, Err):
+                errors.append(outcome.error.message)
+        self.reload()
+        self.products_changed.emit()
+        if errors:
+            show_warning(self, T.CANNOT_CHANGE_TITLE, "\n".join(errors))
+
+    def _export_csv(self) -> None:
+        path, _filter = QFileDialog.getSaveFileName(
+            self, T.EXPORT_DIALOG_TITLE, "products.csv", T.FILE_DIALOG_FILTER
+        )
+        if not path:
+            return
+        try:
+            count = export_products_csv(
+                self._repo.search(
+                    self.search_edit.text(), self.show_archived.isChecked()
+                ),
+                Path(path),
+            )
+        except OSError as exc:
+            show_warning(
+                self, T.EXPORT_FAILED_TITLE, T.export_failed(str(exc))
+            )
+            return
+        show_warning(self, T.EXPORT_DONE_TITLE, T.export_done(count))
+
+    def _delete_product(self) -> None:
+        product = self.selected_product()
+        if product is None:
+            return
+        if not ask_yes_no(
+            self, T.DLG_DELETE_PRODUCT, T.confirm_delete_product(product.name)
+        ):
+            return
+        outcome = self._repo.delete_if_unused(product.id)
         match outcome:
             case Err(error):
                 show_warning(self, T.CANNOT_CHANGE_TITLE, error.message)

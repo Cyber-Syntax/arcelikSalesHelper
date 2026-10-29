@@ -1,23 +1,60 @@
 # Technical Implementation Plan (agent-facing)
 
-Source: PRD v0.4. This file is the working contract. Do not start a milestone until the previous one passes its exit checks.
+Source: PRD v0.5. This file is the working contract. Prioritize calculator productivity, then catalog productivity; keep scraping and shared PostgreSQL as later architectural milestones.
+
+## Feedback implementation status
+
+Status reflects code and documentation currently present. “Implemented” describes scope, not a claim that the acceptance tests or employee workflow review have passed.
+
+| Feedback area | Status | Implemented / remaining |
+| --- | --- | --- |
+| Shared manager total in calculator | Implemented | Enter one manager total and allocate it by each line's regular total; per-line manager input remains available. |
+| Product-free total calculator | Implemented | Aggregate regular, website, manager, and POS mode inputs work without selecting catalog products. |
+| POS amount precision | Implemented | Each line POS-entry amount rounds half-up to two decimals; transaction POS total sums the rounded line amounts. |
+| POS total allocation target | Remaining | Current allocation splits the manager total. A separate mode that accepts a final POS-entry target and distributes that exact target across product lines has not been implemented. Confirm which total employees intend to enter before building it. |
+| Fixed and percentage POS modes | Implemented; detection remaining | Both modes remain selectable per line, including in the total-only workflow. Automatic detection of percentage offers is not implemented. |
+| Third-party combined offers | Partial | The percentage POS formula remains available. A transaction-wide combined-offer rule and its input/source semantics still need employee confirmation; individual website prices remain unchanged. |
+| Transaction price scenarios | Implemented | Regular and website totals plus 10%, 15%, 18%, and 20% totals appear in a collapsible section that opens by default. |
+| Unit-price / line-total inputs | Implemented; clarity remaining | Both modes affect calculations. Review with employees whether the unit value and selected mode are clear enough in the result cards. |
+| Product quantity / stock | Partial | On-hand count can be edited with product details or the count workflow; the dedicated count action remains a shortcut with count notes. Reserved and available quantities, reservations, and live stock synchronization remain deferred. |
+| Bulk product actions | Implemented | Multi-select archive/restore is available. |
+| Product deletion | Implemented | Confirmation is required; products referenced by calculation history cannot be permanently deleted and should be archived. |
+| Product CSV export/import | Implemented | Export includes prices and known quantity; import supports the exported columns. |
+| History customer/search/delete | Implemented | Customer display name is optional; history search matches customer/product names; confirmed deletion removes a whole snapshot and its lines. |
+| Shared laptops / PostgreSQL | Deferred | Hosting, authentication, permissions, backup ownership, and offline behavior need a design before implementation. |
+| Website scraping | Deferred | Requires authorized-source review, request limits, source-change handling, and failure behavior before implementation. |
+| Product save from calculator | Remaining | One-off calculator products cannot yet be saved directly to the catalog. |
+| POS operational verification | Remaining | Two-decimal entry formatting is implemented, but the formulas and exact AX/POS fields still need validation against a real, non-sensitive workflow example. |
+
+## Milestone status
+
+- **M1–M4: Implemented.** Localization, calculator/domain rules, exact arithmetic, SQLite migrations, catalog persistence, and stock-count foundations are present. Test/acceptance review remains outstanding.
+- **M5: Implemented.** Shared manager total, weighted allocation, total-only calculation, retained per-line mode, and scenario totals are present.
+- **M6: Implemented.** Quantity editing, multi-select archive/restore, safe deletion, and CSV export are present.
+- **M7: Implemented with one remaining item.** Customer name, search, and whole-entry deletion are present; saving a one-off product directly from the calculator remains.
+- **M8–M9: Implemented.** Verified backups and CSV import/export are present.
+- **M10: Deferred.** Reservations, sale/open-account workflow, and reserved/available quantities.
+- **M11: Partial.** Windows packaging runs in GitHub Actions. Linux packaging, platform validation, a reusable PyInstaller spec, and `scripts/smoke.py` remain.
+- **Future architecture: Deferred.** Scraper integration and managed PostgreSQL sharing remain later milestones.
 
 ## 0. Locked decisions
 
-| Topic | Decision |
-| --- | --- |
-| Python | 3.11+; `pyproject.toml`; deps: `PySide6`, `platformdirs`; dev: `pytest`, `pytest-qt`, `ruff`, `mypy` |
-| Money type | `decimal.Decimal` only. Never `float`. |
-| Rounding | **None in calculations or display.** Display preserves the exact `Decimal` value so employees can copy the exact amount into the POS. Thousands use `.`, the lira/fraction separator is `,`, and the ` TL` suffix is appended. Ordinary lira/kuruş inputs use two fractional digits (`00`–`99`); exact derived values may show more fractional digits when division requires them. |
-| Decimal context | Module-level `localcontext` with `prec=60`, used for all arithmetic, so divisions such as `line / qty` stay effectively exact. |
-| Storage of money | SQLite `TEXT` holding `str(Decimal)`, never REAL. Reload with `Decimal(s)`. |
-| UI language | Turkish only for the first release; all user-visible text must be Turkish. Internal identifiers, database schema names, and source-code comments may remain English. A language selector is deferred to a later enhancement. |
-| CSV | Comma-delimited, UTF-8 (accept BOM via `utf-8-sig`), required columns `product_name,regular_price`; optional `website_discounted_price` (blank or absent means zero) |
-| CSV conflict key | `product_name.strip().casefold()` |
-| Packaging | PyInstaller (one-folder), Windows and Linux |
-| Style | Pure functions in `domain/`, with no imports from `PySide6`, `sqlite3`, or `infrastructure`. Frozen dataclasses for models. |
+| Topic            | Decision                                                                                                                                                                                                                            |
+| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Python           | 3.11+; `pyproject.toml`; deps: `PySide6`, `platformdirs`; dev: `pytest`, `pytest-qt`, `ruff`, `mypy`                                                                                                                                |
+| Money type       | `decimal.Decimal` only. Never `float`.                                                                                                                                                                                              |
+| Rounding         | General calculation details preserve exact `Decimal` values. POS-entry line amounts are rounded half-up to two fractional digits because the POS accepts kuruş precision only; transaction POS totals sum the rounded line amounts. |
+| Decimal context  | Module-level `localcontext` with `prec=60`, used for all arithmetic, so divisions such as `line / qty` stay effectively exact.                                                                                                      |
+| Storage of money | SQLite `TEXT` holding `str(Decimal)`, never REAL. Reload with `Decimal(s)`.                                                                                                                                                         |
+| UI language      | Turkish only for the first release; all user-visible text must be Turkish. Internal identifiers, database schema names, and source-code comments may remain English. A language selector is deferred to a later enhancement.        |
+| CSV              | Comma-delimited, UTF-8 (accept BOM via `utf-8-sig`); import requires `product_name,regular_price`, accepts optional `website_discounted_price,quantity`; export writes the same fields                                              |
+| CSV conflict key | `product_name.strip().casefold()`                                                                                                                                                                                                   |
+| Packaging        | PyInstaller (one-folder), Windows and Linux                                                                                                                                                                                         |
+| Style            | Pure functions in `domain/`, with no imports from `PySide6`, `sqlite3`, or `infrastructure`. Frozen dataclasses for models.                                                                                                         |
 
 **Design rule for exactness:** line totals are authoritative. In manager total-line mode, `manager_line_total` is the entered value, and `manager_unit_value = line / qty` is a derived display value. It never feeds back into totals or the POS formula. A non-terminating unit value is displayed exactly to the available `Decimal` precision; it is never rounded or silently shortened.
+
+**Calculator workflow decision:** keep fixed-amount and percentage POS modes per line, with fixed amount as the default. Percentage mode remains available for third-party offers where the regular website discount does not describe the offer. Round each final line POS amount half-up to two fractional digits, then sum those entry amounts for the displayed transaction POS total. In shared-total mode, allocate the entered manager total by each line's regular total (`regular_price × quantity`) and place any finite-precision residue on the final nonzero-weight line so the allocation sum equals the input exactly. Per-line manager input and product-free total-only calculation remain available.
 
 ## 1. Repository layout
 
@@ -32,7 +69,7 @@ src/arcelikSalesHelper/infrastructure/migrations/0001_initial.sql
 tests/conftest.py                   # tmp_path DB fixtures, Qt app fixture
 ```
 
-## 2. Milestone 1: Turkish localization
+## 2. Milestone 1: Turkish localization (DONE)
 
 - Centralize user-visible strings instead of scattering translated text across widgets and application services.
 - Translate tab names, window titles, labels, buttons, placeholders, validation errors, warnings, tooltips, formula explanations, backup/settings messages, import/export dialogs, and history presentation.
@@ -80,7 +117,7 @@ tests/conftest.py                   # tmp_path DB fixtures, Qt app fixture
 - `100` kuruş is represented as `1,00 TL`, never as a kuruş value of `100`. Derived values such as `Decimal("100") / 3` must remain visibly exact rather than becoming a rounded two-digit currency value.
 - Add formatting tests for `0,00 TL`, `0,01 TL`, `54.999,99 TL`, an exact value with more than two fractional digits, and carry behavior without display rounding.
 - No locale dependency, so Windows and Linux behave identically.
-- Also `format_decimal_exact(d)` for snapshot/debug views and exact-value display. Calculator and POS-facing result fields must use the exact formatter, not a rounded currency formatter.
+- Also `format_decimal_exact(d)` for snapshot/debug views and exact-value display. General calculation fields preserve exact values; POS-entry amounts use the domain's half-up two-decimal result.
 
 **`domain/models.py`** (frozen dataclasses)
 
@@ -100,7 +137,7 @@ tests/conftest.py                   # tmp_path DB fixtures, Qt app fixture
 - `ten_percent(base) -> (discount, price)` using `base * Decimal("0.10")`
 - `discount_base(line)`: gift → `regular_price`; no gift → `website_discounted_price`
 - `manager_totals(value, mode, qty) -> (unit, line)`
-- `pos_amount(regular_total, website_discounted_total, manager_line_total, mode)`: supports fixed-amount and percentage gross-up modes
+- `pos_amount(regular_total, website_discounted_total, manager_line_total, mode)`: supports fixed-amount and percentage gross-up modes; round the final line result half-up to two digits for POS entry
 - `calculate_line(LineInput) -> LineResult`
 - `calculate_transaction(Sequence[LineInput]) -> TransactionResult`
 - Option comparison: `build_options(result) -> (WebsiteOption, GiftOption | None)`. It only presents the two options; it never ranks them.
@@ -140,7 +177,7 @@ calculation_lines(id, snapshot_id FK ON DELETE RESTRICT, line_index,
    result_json TEXT NOT NULL);        -- full LineResult, exact strings
 ```
 
-- Immutability: `CREATE TRIGGER` that `RAISE(ABORT)` on `UPDATE`/`DELETE` of `calculation_snapshots` and `calculation_lines`. This is tested.
+- Immutability: triggers reject `UPDATE` of `calculation_snapshots` and `calculation_lines`. The repository may delete a complete snapshot and its lines together after explicit user confirmation; individual lines cannot be deleted independently.
 - Timestamps: UTC ISO-8601 stored; displayed in local time.
 
 **`infrastructure/repositories.py`**
@@ -152,37 +189,40 @@ calculation_lines(id, snapshot_id FK ON DELETE RESTRICT, line_index,
 
 **Exit checks (M4):** migration test from empty DB; refusal on a newer version; unique-name constraint; archive/restore; pricing_history written; triggers block mutation.
 
-## 6. Milestone 5: Products and single-product calculator
+## 6. Milestone 5: Calculator productivity workflows
 
 - `main.py`: create `QApplication`, resolve paths, open DB (migrations), build `MainWindow` with 4 tabs (Products, Calculator, History, Settings). Set the app name and org via `QCoreApplication` before `platformdirs` calls.
-- `ui/products_tab.py`: search box, table (`QAbstractTableModel`), add/edit dialog using `parse_money` with inline error text, an archive/restore toggle, and a "show archived" checkbox.
 - `ui/calculator_tab.py`:
   - `CalculatorLineWidget` emits a `changed` signal. A controller builds a `LineInput` and calls the pure `calculate_line`. **No formulas inside widgets.**
-  - A top-of-pane searchable, checkable list of active saved products. Filtering uses `ProductRepository.search(query)`; checked products remain staged across queries. “Add selected” creates one line per selected product in selection order and then clears the selection.
-  - A “one-off product” action creates an editable line for a product outside the catalog. Calculator lines contain the copied name and prices, quantity spinbox (≥1), gift checkbox, gift name, manager value and mode (Unit/Total line), with no per-line product picker.
+  - Keep searchable multi-select product staging, one-off lines, quantity and gift choices.
+  - Add a shared manager-total field. Allocate by regular line total and display the allocated manager line total on each card. Keep a switch to per-line manager value entry.
+  - Add a product-free total-only mode with aggregate regular price, website discounted price, manager total, and the existing fixed/percentage POS mode choice.
+  - Percentage POS mode remains available for third-party offers; do not remove or silently reinterpret either existing POS formula.
   - Result panel shows: regular, website discounted, 10% base/discount/unit/total, manager mode and totals, and the POS block labeled exactly `POS-entry calculation (verify before use)`.
+  - Show transaction totals for regular, website discounted, 10%, 15%, 18%, 20%, and POS; keep price scenarios collapsible.
   - Formulas are shown as a collapsible "How this was calculated" section, generated from the `LineResult`.
   - Errors are shown inline, and results are hidden (not stale) while the input is invalid.
 - Adding a saved product copies its name, prices, and default gift into the line. Later catalog edits or refreshes never change existing calculator lines; edits to gift name or manager value never write back to the product.
-- "Save calculation" is enabled only when the input is valid (history is wired in M5).
+- "Save calculation" is enabled only when inputs are valid; total-only calculations are saved as a one-line snapshot.
 
-## 7. Milestone 6: Multi-line calculator and comparison
+## 7. Milestone 6: Catalog productivity
 
-- Lines created from the top multi-select catalog or one-off action; remove and reorder controls remain available (move up/down buttons; drag-reorder is optional).
-- Per-line gift state is independent. Per-line result card plus side-by-side **Website option | Gift option** panel (gift panel is visible only if the line has a gift selected or a gift name).
-- No "recommended" badge and no coloring that implies a winner.
-- Transaction totals panel (from `calculate_transaction`), with explicit "n/a" reasons.
-- Extra tests: reordering preserves per-line state; removing a line recomputes totals; mixed gift/no-gift; the quantity > 1 examples from the PRD.
+- Product edit includes optional counted on-hand quantity and preserves the stock count log.
+- Support extended row selection and confirmed bulk archive/restore.
+- Product CSV export writes the currently filtered products and is import-compatible, including quantity when known.
+- Offer confirmed permanent deletion for one product only when no calculation snapshot references it; delete its product and stock audit rows in the same transaction. Archive remains the normal removal path.
+- Retain existing multi-line behavior, gift comparison, line ordering, and exact transaction totals.
 
 ## 8. Milestone 7: History and calculator save actions
 
 - `application/history.py`: `build_snapshot(inputs, result, warnings, app_version) -> SnapshotRecord` (pure) and `HistoryRepository.save(...)`, which writes the snapshot and all lines in one transaction.
 - The snapshot stores both the entered text and the normalized `Decimal` strings.
 - `confirmation_state`: record what the UI displayed at save time. For the MVP this is the fixed value `"pos_unverified"`, plus warnings. Define it as an enum in `models.py` so it can be extended later.
-- `ui/history_tab.py`: list by date, detail view rebuilt **only from stored snapshot rows**. It must never recompute using current product data. Render with the stored formatting, so changing the formatter later does not alter facts.
-- No edit or delete UI for history. Optional "Load into calculator as new copy" is out of scope unless trivial.
+- Add an optional customer display name when saving; do not collect customer account or contact data.
+- `ui/history_tab.py`: searchable list by customer/product name, detail view rebuilt **only from stored snapshot rows**. It must never recompute using current product data.
+- Add confirmed deletion of one whole snapshot and all its lines in one transaction. Calculation facts cannot be edited; update triggers remain, while delete triggers are removed only as required for this explicit workflow.
 - Add explicit "Save product" and "Save calculation/history" actions to the calculator. A one-off product may be saved to the product catalog; an existing product's price must not be silently overwritten. If entered prices differ, require an explicit update decision and write pricing history.
-- Tests: save, edit the product afterwards, and reload; the snapshot is unchanged. Triggers block UPDATE/DELETE.
+- Verify customer name persistence, search, deletion confirmation, and whole-entry deletion. Triggers block UPDATE; whole-entry DELETE is available only through the repository transaction.
 
 ## 9. Milestone 8: Backups
 
@@ -192,7 +232,7 @@ calculation_lines(id, snapshot_id FK ON DELETE RESTRICT, line_index,
   1. Write to `backup_dir/.tmp-<ts>.sqlite` using `sqlite3.Connection.backup()` (source = live connection).
   2. Open the temp file, then run `PRAGMA integrity_check`, and require `"ok"`. Also check that `user_version` equals the live one.
   3. `fsync`, then `os.replace` to `src/arcelikSalesHelper-<UTC ts>-<reason>.sqlite`. Use a unique name; on collision append a counter.
-  4. Only after success, rotate: keep the newest 30 *verified* backups. Never touch the live DB. Rotation errors are logged but do not mark the backup as failed.
+  4. Only after success, rotate: keep the newest 30 _verified_ backups. Never touch the live DB. Rotation errors are logged but do not mark the backup as failed.
   5. On any failure, delete the temp file, record the failure, and return an error result.
 - Policy functions (pure, tested with a fake clock): `needs_startup_backup(last_success, now)` (none exists, or older than 24h), `needs_close_backup(db_changed)`.
 - Track "database changed" with `PRAGMA data_version` or a dirty flag set by repositories. Prefer a dirty flag plus an `app_metadata` counter.
@@ -212,11 +252,12 @@ calculation_lines(id, snapshot_id FK ON DELETE RESTRICT, line_index,
 
 **Tests:** corrupted-temp detection (monkeypatch integrity result), retention (create 35, keep 30, newest preserved), failed backup does not delete old ones, live DB untouched, policy functions around the 24h boundary, and the failure banner state.
 
-## 10. Milestone 9: CSV import and export
+## 10. Milestone 9: CSV export and import
 
-**`infrastructure/csv_import.py`** (parse and plan are pure; apply is transactional)
+**`infrastructure/csv_export.py` and `infrastructure/csv_import.py`** (export is deterministic; import parsing/planning are pure and apply is transactional)
 
-- `parse_csv(path) -> ParsedCsv`: open with `utf-8-sig`, `csv.DictReader` with `,` delimiter. The header must equal exactly the 3 required columns after strip (any missing or extra column is a file-level error naming the problem). Cap the file size and row count (for example 50 MB / 100k rows) to avoid freezing.
+- Export `product_name,regular_price,website_discounted_price,quantity`; unknown quantities are blank and prices are exact canonical decimals.
+- `parse_csv(path) -> ParsedCsv`: open with `utf-8-sig`, `csv.DictReader` with `,` delimiter. Require `product_name,regular_price`; allow `website_discounted_price,quantity`; reject unknown columns. Cap the file size and row count (for example 50 MB / 100k rows).
 - Per-row validation using `parse_money` and the same product rules (non-negative, name non-empty). Errors carry the row number (1-based, counting the header as row 1), the column, and the message.
 - Duplicate names inside the file (by `name_key`) are flagged as row errors that reference the first occurrence.
 - `plan_import(rows, existing_by_key) -> ImportPlan` classifies each valid row as `NEW`, `CONFLICT`, or `UNCHANGED` (same prices, so auto-skip but still listed).
@@ -230,13 +271,12 @@ calculation_lines(id, snapshot_id FK ON DELETE RESTRICT, line_index,
 
 **Tests:** both numeric styles, BOM, bad header, extra columns, blank lines, duplicates in file, row-specific errors, conflict update vs skip, rollback on a forced mid-apply failure, archived-product collision handling (define: an archived match is treated as a conflict with the option to update and restore, and confirm this in the UI text).
 
-## 11. Milestone 10: Selling, reservations, and POS price division
+## 11. Later milestones: reservations, scraping, and shared data
 
-- Add explicit sale types such as offer, sale, and open account.
-- Add reservation records for sold products awaiting pickup.
-- Enforce the 13-month reservation period and make expired reservations visible without silently deleting them.
-- Add a deterministic, auditable POS price-division algorithm that allocates a target POS total across product lines while preserving the exact total.
-- Test sale types, reservation expiry boundaries, state changes, and multi-line allocation.
+- Add reservations, sale/open-account states, and reserved/available quantity after the on-hand counting workflow is established and reservation lifecycle details are agreed.
+- Evaluate authorized scraper integration separately, with bounded update frequency, source-change handling, and clear failures. Do not rely on anti-bot workarounds.
+- Design multi-laptop PostgreSQL access after choosing hosting, authentication/permissions, backups, and offline behavior. Do not share a live SQLite file over a network drive.
+- If employees need a target POS-total allocator, first distinguish whether its target is manager sale value or final POS-entry amount. This is separate from allocation of one shared manager total.
 
 ## 12. Milestone 11: Packaging and validation
 
@@ -259,12 +299,6 @@ calculation_lines(id, snapshot_id FK ON DELETE RESTRICT, line_index,
 6. The POS label text is a constant used in the UI, history view, and tests: `POS-entry calculation (verify before use)`.
 7. Never present results as official, approved, or recommended. Don't add wording like "best option".
 
-## 15. Remaining open items (not blocking early milestones)
-
-- Final company and app name for the Windows data directory (placeholder in use).
-- Whether "Import valid rows only" should be offered (default: blocked until all rows are valid).
-- Real, non-sensitive AX/POS example to validate the POS formula (PRD section 12). Capture it as a fixture test once available.
-
 ---
 
-The next implementation milestone is M1: Turkish localization.
+The immediate calculator priority is shared manager-total entry and product-free total-only calculation. Preserve fixed and percentage POS modes throughout.

@@ -10,7 +10,7 @@ from arcelikSalesHelper.application.history import (
 
 from .database import transaction
 
-_SNAPSHOT_COLS = "id, created_at, app_version, schema_version, totals_json, confirmation_state, warnings_json"
+_SNAPSHOT_COLS = "id, created_at, app_version, schema_version, totals_json, confirmation_state, warnings_json, customer_name"
 _LINE_COLS = (
     "line_index, product_id, product_name, quantity, regular_price, website_price, coupon, "
     "effective_website_unit, gift_selected, gift_name, manager_value_entered, manager_mode, "
@@ -52,7 +52,8 @@ class HistoryRepository:
         with transaction(self._conn):
             cur = self._conn.execute(
                 "INSERT INTO calculation_snapshots (created_at, app_version, schema_version, "
-                "totals_json, confirmation_state, warnings_json) VALUES (?, ?, ?, ?, ?, ?)",
+                "totals_json, confirmation_state, warnings_json, customer_name) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?)",
                 (
                     record.created_at,
                     record.app_version,
@@ -60,6 +61,7 @@ class HistoryRepository:
                     record.totals_json,
                     record.confirmation_state,
                     record.warnings_json,
+                    record.customer_name,
                 ),
             )
             snapshot_id = cur.lastrowid
@@ -113,28 +115,51 @@ class HistoryRepository:
             confirmation_state=row["confirmation_state"] or "",
             warnings_json=row["warnings_json"],
             lines=tuple(_to_line(r) for r in lines),
+            customer_name=row["customer_name"],
         )
 
-    def count(self) -> int:
+    def count(self, query: str = "") -> int:
+        if not query.strip():
+            return int(
+                self._conn.execute(
+                    "SELECT COUNT(*) FROM calculation_snapshots"
+                ).fetchone()[0]
+            )
+        pattern = f"%{query.strip()}%"
         return int(
             self._conn.execute(
-                "SELECT COUNT(*) FROM calculation_snapshots"
+                "SELECT COUNT(*) FROM calculation_snapshots s WHERE "
+                "s.customer_name LIKE ? COLLATE NOCASE OR EXISTS ("
+                "SELECT 1 FROM calculation_lines f WHERE f.snapshot_id = s.id "
+                "AND f.product_name LIKE ? COLLATE NOCASE)",
+                (pattern, pattern),
             ).fetchone()[0]
         )
 
     def list_headers(
-        self, limit: int = 100, before_id: int | None = None
+        self, limit: int = 100, before_id: int | None = None, query: str = ""
     ) -> list[SnapshotHeader]:
         """Newest first. ``before_id`` pages backwards and stays stable while new ones arrive."""
         sql = (
-            "SELECT s.id, s.created_at, s.totals_json, "
+            "SELECT s.id, s.created_at, s.totals_json, s.customer_name, "
             "(SELECT COUNT(*) FROM calculation_lines l WHERE l.snapshot_id = s.id) AS line_count "
             "FROM calculation_snapshots s"
         )
         params: list[object] = []
+        conditions: list[str] = []
         if before_id is not None:
-            sql += " WHERE s.id < ?"
+            conditions.append("s.id < ?")
             params.append(before_id)
+        if query.strip():
+            pattern = f"%{query.strip()}%"
+            conditions.append(
+                "(s.customer_name LIKE ? COLLATE NOCASE OR EXISTS ("
+                "SELECT 1 FROM calculation_lines f WHERE f.snapshot_id = s.id "
+                "AND f.product_name LIKE ? COLLATE NOCASE))"
+            )
+            params.extend((pattern, pattern))
+        if conditions:
+            sql += " WHERE " + " AND ".join(conditions)
         sql += " ORDER BY s.id DESC LIMIT ?"
         params.append(limit)
         rows = self._conn.execute(sql, params).fetchall()
@@ -156,6 +181,26 @@ class HistoryRepository:
                 line_count=int(r["line_count"]),
                 product_names=tuple(names[int(r["id"])]),
                 totals_json=r["totals_json"],
+                customer_name=r["customer_name"],
             )
             for r in rows
         ]
+
+    def delete(self, snapshot_id: int) -> bool:
+        """Permanently remove one whole history entry and its lines atomically."""
+        with transaction(self._conn):
+            exists = self._conn.execute(
+                "SELECT 1 FROM calculation_snapshots WHERE id = ?",
+                (snapshot_id,),
+            ).fetchone()
+            if exists is None:
+                return False
+            self._conn.execute(
+                "DELETE FROM calculation_lines WHERE snapshot_id = ?",
+                (snapshot_id,),
+            )
+            self._conn.execute(
+                "DELETE FROM calculation_snapshots WHERE id = ?",
+                (snapshot_id,),
+            )
+        return True

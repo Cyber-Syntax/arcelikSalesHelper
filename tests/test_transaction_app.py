@@ -62,9 +62,7 @@ def test_missing_manager_value_gives_explicit_na_with_line_numbers() -> None:
         )
     )
     t = totals(evaluate_transaction(forms))
-    assert (
-        t[T.LBL_TOTAL_DISCOUNT] == "4.500,00 TL"
-    )
+    assert t[T.LBL_TOTAL_DISCOUNT] == "4.500,00 TL"
     assert t[T.LBL_TOTAL_POS] == "Yok: yönetici değeri eksik (satır 3)"
 
 
@@ -120,14 +118,15 @@ def test_warning_carries_its_line_index() -> None:
 # ---- options --------------------------------------------------------------
 
 
-def test_no_gift_line_shows_only_final_website_offer_amounts() -> (
-    None
-):
+def test_no_gift_line_shows_only_final_website_offer_amounts() -> None:
     ev = evaluate_transaction([form(manager_value="3.000,00")])
     assert ev.lines[0].view is not None
     card = ev.lines[0].view.card
     assert card.gift_option is None
-    assert val(card.website_option, "Web sitesi indirimli toplam") == "4.000,00 TL"
+    assert (
+        val(card.website_option, "Web sitesi indirimli toplam")
+        == "4.000,00 TL"
+    )
     assert val(card.website_option, T.LBL_WEBSITE_OFFER_TOTAL) == "3.600,00 TL"
     assert val(card.website_option, T.LBL_DISCOUNT_AMOUNT) == "1.000,00 TL"
     assert val(card.prices, "Yönetici toplamı") == "3.000,00 TL"
@@ -136,12 +135,12 @@ def test_no_gift_line_shows_only_final_website_offer_amounts() -> (
         T.FORM_POS_CALCULATION_MODE,
         T.POS_FORMULA_LABEL,
     ]
-    assert all("baz" not in row.label.lower() for row in card.website_option.rows)
+    assert all(
+        "baz" not in row.label.lower() for row in card.website_option.rows
+    )
 
 
-def test_gift_line_compares_both_final_offer_amounts() -> (
-    None
-):
+def test_gift_line_compares_both_final_offer_amounts() -> None:
     ev = evaluate_transaction(two_forms())
     view = ev.lines[1].view
     assert view is not None and view.card.gift_option is not None
@@ -172,7 +171,10 @@ def test_named_but_unselected_gift_shows_only_final_amounts() -> None:
     )
     view = ev.lines[0].view
     assert view is not None and view.card.gift_option is not None
-    assert val(view.card.gift_option, T.LBL_FIRST_PRICE_TEN_PERCENT) == "4.500,00 TL"
+    assert (
+        val(view.card.gift_option, T.LBL_FIRST_PRICE_TEN_PERCENT)
+        == "4.500,00 TL"
+    )
     assert val(view.card.prices, "Yönetici toplamı") == "3.000,00 TL"
     assert view.card.gift_option.note is None
 

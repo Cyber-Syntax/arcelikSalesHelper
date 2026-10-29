@@ -106,7 +106,9 @@ def test_products_tab_lists_filters_and_archives(qtbot, repo) -> None:  # type: 
 
 
 def test_products_table_shows_yok_for_zero_website_price(qtbot, repo) -> None:  # type: ignore[no-untyped-def]
-    product = add_product(repo, "No website offer", regular="38299", website="0")
+    product = add_product(
+        repo, "No website offer", regular="38299", website="0"
+    )
     tab = ProductsTab(repo)
     qtbot.addWidget(tab)
 
