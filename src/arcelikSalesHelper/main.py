@@ -56,7 +56,25 @@ def install_excepthook(log_path: Path) -> None:
     sys.excepthook = hook
 
 
+def self_check() -> int:
+    """Packaged-build smoke test: `app --self-check` exits 0 when the
+    scraper stack imports.
+    """
+    try:
+        import curl_cffi  # noqa: F401
+        import selectolax  # noqa: F401
+
+        from .infrastructure.scrapper import crawler, parser  # noqa: F401
+    except ImportError as exc:
+        print(f"self-check failed: {exc}", file=sys.stderr)
+        return 1
+    print("self-check ok")
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
+    if "--self-check" in (sys.argv if argv is None else argv):
+        return self_check()
     app = QApplication(list(argv) if argv is not None else sys.argv)
     app.setApplicationName(APP_NAME)
     app.setOrganizationName(COMPANY_NAME)

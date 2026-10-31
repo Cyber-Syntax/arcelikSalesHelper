@@ -13,7 +13,7 @@ from arcelikSalesHelper.infrastructure.backups import (
     list_backups,
 )
 from arcelikSalesHelper.ui.import_dialog import ImportDialog
-from arcelikSalesHelper.ui.products_tab import ProductsTab, StockDialog
+from arcelikSalesHelper.ui.products_tab import ProductsTab
 
 HEADER = "product_name,regular_price,website_discounted_price"
 

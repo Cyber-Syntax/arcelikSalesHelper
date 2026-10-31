@@ -1,12 +1,18 @@
 [project]
 name = "arcelikSalesHelper"
-version = "0.4.0"
+version = "0.5.0-alpha"
 license = "GPL-3.0-or-later"
 description = "Desktop sales helper for Arcelik product pricing and calculations."
 keywords = ["arcelik", "sales", "pricing", "desktop"]
 requires-python = ">=3.11"
 authors = [{ name = "Cyber-Syntax" }]
-dependencies = ["PySide6>=6.8", "platformdirs>=4.3", "qt-material>=2.17"]
+dependencies = [
+  "PySide6>=6.8",
+  "curl-cffi>=0.16.3",
+  "platformdirs>=4.3",
+  "qt-material>=2.17",
+  "selectolax>=1.0.2",
+]
 classifiers = [
   "Development Status :: 3 - Alpha",
   "Environment :: X11 Applications",
@@ -196,3 +202,7 @@ check_untyped_defs = true
 warn_redundant_casts = true
 warn_unreachable = true
 show_error_codes = true
+
+[[tool.mypy.overrides]]
+module = ["curl_cffi.*", "selectolax.*"]
+ignore_missing_imports = true

@@ -743,3 +743,185 @@ def unexpected_error(detail: object, log_path: object) -> str:
 
 def cannot_create_data_dir(detail: object) -> str:
     return f"Veri klasörü oluşturulamıyor:\n{detail}"
+
+
+# ======================================================================
+# Web update ("Güncelle"): scraper, mapping, report
+# ======================================================================
+
+FORMAT_SCRAPE = "Web sitesi taraması"
+NO_PRICE = "—"
+PH_PRICE_OPTIONAL = "boş bırakılırsa bilinmiyor"
+
+UPDATE_STATUS_UPDATED = "Güncellendi"
+UPDATE_STATUS_CREATED = "Yeni eklendi"
+UPDATE_STATUS_RESTORED = "Geri yüklendi"
+UPDATE_STATUS_SKIPPED = "Atlandı"
+UPDATE_STATUS_UNCHANGED = "Değişmedi"
+
+UPDATE_WARN_NO_PRICE = "Sitede fiyat yok; mevcut fiyat korunacak."
+UPDATE_WARN_NO_REGULAR = (
+    "Sitede normal fiyat yok; mevcut normal fiyat korunacak."
+)
+UPDATE_WARN_NO_WEBSITE = (
+    "Sitede indirimli fiyat yok; mevcut web fiyatı korunacak."
+)
+UPDATE_WARN_NEW_NO_REGULAR = (
+    "Sitede normal fiyat yok; bilinmiyor (—) olarak eklenecek."
+)
+UPDATE_WARN_ARCHIVED = "Bu ürün arşivde; güncellemek geri yükler."
+UPDATE_WARN_PARTIAL = "Tarama tamamlanmadı; bu sonuçlar eksik olabilir."
+
+UPDATE_SCRAPER_MISSING = (
+    "Güncelleme bileşeni yüklenemedi. Uygulamayı yeniden kurun."
+)
+UPDATE_BLOCKED = "Site isteği reddetti (403/429). Daha sonra tekrar deneyin."
+UPDATE_NO_PRODUCTS = (
+    "Siteden hiç ürün alınamadı. Site yapısı değişmiş olabilir."
+)
+UPDATE_NETWORK = "Siteye bağlanılamadı. İnternet bağlantınızı kontrol edin."
+UPDATE_SITE_CHANGED = (
+    "Siteden beklenenden az ürün geldi. Site yapısı değişmiş olabilir; "
+    "güncelleme durduruldu."
+)
+
+
+def update_cooldown(when: str, remaining: str) -> str:
+    return (
+        f"Bir sonraki güncelleme {when} tarihinden sonra yapılabilir "
+        f"({remaining} kaldı)."
+    )
+
+
+def update_quota(used: int, limit: int) -> str:
+    return f"Son 30 günde {used}/{limit} güncelleme kullanıldı."
+
+
+# ======================================================================
+# Web update dialog (ui/update_dialog.py, ui/plan_preview.py)
+# ======================================================================
+
+BTN_UPDATE_FROM_SITE = "Güncelle"
+TIP_UPDATE_FROM_SITE = "Web sitesinden ürün adlarını ve fiyatları güncelle"
+UPDATE_TITLE = "Web sitesinden güncelle"
+UPDATE_INTRO = (
+    "Arçelik web sitesine bağlanılarak ürün adları ve fiyatlar okunur. "
+    "Önizlemede onaylamadan hiçbir şey değiştirilmez."
+)
+UPDATE_SCOPE_NOTE = (
+    "Mevcut ürünlerin fiyatları siz “Güncelle” seçmedikçe değişmez. Sitede "
+    "olup listenizde olmayan yeni ürünler varsayılan olarak eklenir; "
+    "istemediklerinizi “Atla” yapın. Ürün adları, hediyeler, notlar ve "
+    "adetler hiçbir zaman değişmez."
+)
+UPDATE_BACKUP_NOTE = (
+    "Değişiklikler uygulanmadan önce doğrulanmış bir yedek alınır."
+)
+UPDATE_DURATION_NOTE = (
+    "İşlem birkaç dakika sürebilir ve istediğiniz zaman iptal edilebilir."
+)
+UPDATE_NEVER_RUN = "Henüz web sitesinden güncelleme yapılmadı."
+UPDATE_START = "Taramayı başlat"
+UPDATE_CANCEL = "Taramayı iptal et"
+UPDATE_CANCELLING = "İptal ediliyor…"
+UPDATE_CANCELLED = "Tarama iptal edildi; hiçbir değişiklik yapılmadı."
+UPDATE_PROGRESS_START = "Site haritası okunuyor…"
+
+UPDATE_PREVIEW_COLUMNS = (
+    "Ürün", "Durum", "Eski normal", "Yeni normal", "Eski web", "Yeni web",
+    "Karar", "Notlar",
+)  # fmt: skip
+UPDATE_RESULT_COLUMNS = (
+    "Ürün", "Durum", "Eski normal", "Yeni normal", "Eski web", "Yeni web",
+)  # fmt: skip
+UPDATE_APPLY_ALL = "Tümünü güncelle"
+UPDATE_SKIP_ALL = "Tümünü atla"
+UPDATE_SKIP_NEW = "Yeni ürünleri atla"
+UPDATE_ADD_NEW = "Yeni ürünleri ekle"
+COMBO_ADD = "Ekle"
+UPDATE_APPLY = "Değişiklikleri uygula"
+UPDATE_CONFIRM_TITLE = "Güncellemeyi uygula"
+UPDATE_BACKUP_FAILED_TITLE = "Yedekleme başarısız"
+UPDATE_NOTHING = "Değişiklik yok; güncelleme uygulanmadı."
+UPDATE_READY = "Hazır. Uygulamadan önce doğrulanmış bir yedek alınır."
+UPDATE_FIX_ROWS = (
+    "Hatalı satırlar var. “Yalnızca geçerli satırları içe aktar” kutusunu "
+    "işaretleyin."
+)
+UPDATE_PARTIAL_CHECK = "Kısmi sonuçları uygula"
+UPDATE_NEED_PARTIAL = "Kısmi sonuçları uygulamak için kutuyu işaretleyin."
+UPDATE_DONE_TITLE = "Güncelleme tamamlandı"
+UPDATE_SHOW_UNCHANGED = "Değişmeyenleri ve atlananları da göster"
+UPDATE_EXPORT_REPORT = "Raporu CSV olarak kaydet"
+UPDATE_EXPORT_TITLE = "Değişiklik raporunu kaydet"
+UPDATE_EXPORT_FAILED_TITLE = "Rapor kaydedilemedi"
+
+
+def update_last_run(when: str) -> str:
+    return f"Son başarılı güncelleme: {when}"
+
+
+def update_progress(category: str, done: int, total: int) -> str:
+    return f"Taranıyor: {category} ({done}/{total} kategori)"
+
+
+def update_progress_detail(count: int) -> str:
+    return f"{count} ürün bulundu"
+
+
+def update_unexpected(detail: str) -> str:
+    return f"Güncelleme sırasında beklenmeyen bir hata oluştu: {detail}"
+
+
+def update_counts(
+    scraped: int, new: int, conflicts: int, unchanged: int,
+    without_price: int, errors: int,
+) -> str:  # fmt: skip
+    return (
+        f"{scraped} ürün tarandı · {new} yeni · {conflicts} fiyat farkı "
+        f"(varsayılan: atla) · {unchanged} değişmedi · {without_price} ürünün "
+        f"sitede fiyatı yok · {errors} hatalı satır"
+    )
+
+
+def update_confirm(updated: int, created: int, restored: int) -> str:
+    return (
+        f"{updated} ürün güncellenecek, {created} yeni ürün eklenecek, "
+        f"{restored} arşivli ürün geri yüklenecek. Önce doğrulanmış bir "
+        "yedek alınacak. Devam edilsin mi?"
+    )
+
+
+def update_backup_failed(message: str) -> str:
+    return (
+        f"Doğrulanmış yedek alınamadığı için güncelleme uygulanmadı. {message}"
+    )
+
+
+def update_partial(done: int, total: int) -> str:
+    return (
+        f"Tarama tamamlanmadı ({done}/{total} kategori). Kısmi sonuçlar "
+        "uygulanabilir ama eksik olabilir."
+    )
+
+
+def update_export_done(path: object) -> str:
+    return f"Değişiklik raporu kaydedildi: {path}"
+
+
+def update_export_failed(detail: str) -> str:
+    return f"Rapor yazılamadı: {detail}"
+
+
+def duration_text(total_seconds: int) -> str:
+    minutes = (max(total_seconds, 0) + 59) // 60  # round up
+    days, rest = divmod(minutes, 1440)
+    hours, mins = divmod(rest, 60)
+    parts: list[str] = []
+    if days:
+        parts.append(f"{days} gün")
+    if hours:
+        parts.append(f"{hours} sa")
+    if mins or not parts:
+        parts.append(f"{mins} dk")
+    return " ".join(parts)

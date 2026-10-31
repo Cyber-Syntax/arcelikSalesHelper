@@ -113,6 +113,8 @@ class MainWindow(QMainWindow):
         )
         self.products_tab.import_finished.connect(self.refresh_backup_banner)
         self.products_tab.import_finished.connect(self.settings_tab.refresh)
+        self.products_tab.update_finished.connect(self.refresh_backup_banner)
+        self.products_tab.update_finished.connect(self.settings_tab.refresh)
         self.refresh_backup_banner()
 
     def _set_font_scale(self, percent: int) -> None:

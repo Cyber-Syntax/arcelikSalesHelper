@@ -52,9 +52,21 @@ from .common import (
     show_warning,
 )
 from .import_dialog import ImportDialog
+from .update_dialog import UpdateDialog
 
 _ROOT = QModelIndex()
 _Index = QModelIndex | QPersistentModelIndex
+
+
+def _read_optional_price(text: str) -> MoneyRead:
+    """Blank = unknown / no discount, stored as 0 (shown as — / YOK)."""
+    if not text.strip():
+        return MoneyRead(Decimal(0), None, T.PH_PRICE_OPTIONAL, True)
+    return read_money(text)
+
+
+def _price_input(value: Decimal) -> str:
+    return "" if value == 0 else format_money_input(value)
 
 
 class ProductTableModel(QAbstractTableModel):
@@ -124,7 +136,11 @@ class ProductTableModel(QAbstractTableModel):
                     T.ARCHIVED_SUFFIX if product.archived else ""
                 )
             case 1:
-                return format_try(product.regular_price)
+                return (
+                    T.NO_PRICE
+                    if product.regular_price == 0
+                    else format_try(product.regular_price)
+                )
             case 2:
                 return (
                     T.NO_WEBSITE_DISCOUNT
@@ -190,6 +206,8 @@ class ProductDialog(QDialog):
         self._general.setStyleSheet(ERROR_STYLE)
         self._general.setWordWrap(True)
         self._general.hide()
+        self.regular_edit.setText(_price_input(product.regular_price))
+        self.website_edit.setText(_price_input(product.website_price))
 
         form = QFormLayout()
         form.addRow(T.LBL_PRODUCT_NAME, self.blocks["name"])
@@ -234,7 +252,7 @@ class ProductDialog(QDialog):
             ("regular_price", self.regular_edit),
             ("website_price", self.website_edit),
         ):
-            self.blocks[key].set_hint(read_money(edit.text()).hint)
+            self.blocks[key].set_hint(_read_optional_price(edit.text()).hint)
 
     def _clear_errors(self) -> None:
         for block in self.blocks.values():
@@ -328,6 +346,9 @@ class ProductsTab(QWidget):
     import_finished = (
         Signal()
     )  # the import dialog closed (a backup may have run)
+    update_finished = (
+        Signal()
+    )  # the update dialog closed (a backup may have run)
 
     def __init__(
         self,
@@ -379,6 +400,10 @@ class ProductsTab(QWidget):
         self.bulk_archive_button = QPushButton(T.BTN_ARCHIVE_SELECTED)
         self.export_button = QPushButton(T.BTN_EXPORT_CSV)
         self.delete_button = QPushButton(T.BTN_DELETE_PRODUCT)
+        self._update_running = False
+        self.update_button = QPushButton(T.BTN_UPDATE_FROM_SITE)
+        self.update_button.setToolTip(T.TIP_UPDATE_FROM_SITE)
+        self.update_button.setEnabled(conn is not None and backups is not None)
 
         top = QHBoxLayout()
         top.addWidget(self.search_edit, 1)
@@ -392,6 +417,7 @@ class ProductsTab(QWidget):
         bottom.addWidget(self.delete_button)
         bottom.addStretch(1)
         bottom.addWidget(self.import_button)
+        bottom.addWidget(self.update_button)  # next to the CSV button
         layout = QVBoxLayout(self)
         layout.addLayout(top)
         layout.addWidget(self.table, 1)
@@ -413,6 +439,9 @@ class ProductsTab(QWidget):
         self.table.doubleClicked.connect(lambda _i: self._edit())
         self.table.selectionModel().selectionChanged.connect(
             lambda _s, _d: self._update_buttons()
+        )
+        self.update_button.clicked.connect(
+            lambda _c=False: self._update_from_site()
         )
         self.reload()
 
@@ -574,3 +603,19 @@ class ProductsTab(QWidget):
             case Ok(_):
                 self.reload()
                 self.products_changed.emit()
+
+    def _update_from_site(self) -> None:
+        if self._conn is None or self._backups is None or self._update_running:
+            return
+        self._update_running = True
+        try:
+            dialog = UpdateDialog(
+                self._repo, self._conn, self._backups, parent=self
+            )
+            dialog.exec()
+        finally:
+            self._update_running = False
+        self.reload()
+        if dialog.applied_summary is not None:
+            self.products_changed.emit()
+        self.update_finished.emit()
