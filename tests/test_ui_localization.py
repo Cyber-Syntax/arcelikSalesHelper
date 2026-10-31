@@ -32,7 +32,7 @@ from arcelikSalesHelper.infrastructure.repositories import ProductRepository
 from arcelikSalesHelper.paths import ensure_dirs, resolve_paths
 from arcelikSalesHelper.ui.import_dialog import ImportDialog
 from arcelikSalesHelper.ui.main_window import MainWindow
-from arcelikSalesHelper.ui.products_tab import ProductDialog, StockDialog
+from arcelikSalesHelper.ui.products_tab import ProductDialog
 
 # Capitalised label words of the old English UI (case-sensitive on purpose).
 ENGLISH_LABELS = re.compile(

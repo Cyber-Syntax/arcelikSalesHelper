@@ -9,6 +9,13 @@ from arcelikSalesHelper.infrastructure.repositories import ProductRepository
 from arcelikSalesHelper.ui.products_tab import ProductDialog, ProductsTab
 
 
+def test_update_button(qapp, conn):
+    repo = ProductRepository(conn)
+    assert ProductsTab(repo).update_button.text() == "Güncelle"
+    assert not ProductsTab(repo).update_button.isEnabled()  # no conn/backups
+    assert not ProductsTab(repo, conn, None).update_button.isEnabled()
+
+
 def add_product(
     repo: ProductRepository,
     name: str = "Fridge",
