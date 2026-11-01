@@ -1,5 +1,13 @@
 # todo.md
 
+- [ ] replace brittle implementation tests with behavior-focused integration tests
+  - [ ] keep stable domain-rule tests for calculations, validation, matching, price handling, and scrape policy
+  - [ ] add realistic fixture tests for CSV import and web update workflows
+  - [ ] verify preview, apply, skip, backup failure, cancellation, partial-result, and rollback behavior
+  - [ ] add representative calculator and history behavior scenarios
+  - [ ] remove or rewrite tests coupled to obsolete UI, database, or module structure
+  - [ ] revisit persistence integration tests when PostgreSQL replaces SQLite
+
 ## new scope
 
 ### Products tab
