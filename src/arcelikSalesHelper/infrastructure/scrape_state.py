@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 import json
+import logging
 import sqlite3
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
 from .database import transaction
 from .scrape_policy import SCRAPE_QUOTA_WINDOW, ScrapeGate, is_scrape_allowed
+
+log = logging.getLogger(__name__)
 
 _K_ATTEMPT = "last_scrape_attempt_at"
 _K_SUCCESS = "last_scrape_success_at"
@@ -85,7 +88,14 @@ def load_state(conn: sqlite3.Connection) -> ScrapeState:
 def current_gate(conn: sqlite3.Connection, now: datetime) -> ScrapeGate:
     """Read-only gate for the intro page."""
     state = load_state(conn)
-    return is_scrape_allowed(state.last_attempt, state.attempts, now)
+    gate = is_scrape_allowed(state.last_attempt, state.attempts, now)
+    log.info(
+        "scrape gate: %s (used %d/%d)",
+        gate.reason.value,
+        gate.used,
+        gate.limit,
+    )
+    return gate
 
 
 def try_begin_attempt(conn: sqlite3.Connection, now: datetime) -> ScrapeGate:
@@ -98,10 +108,21 @@ def try_begin_attempt(conn: sqlite3.Connection, now: datetime) -> ScrapeGate:
         state = load_state(conn)
         gate = is_scrape_allowed(state.last_attempt, state.attempts, now)
         if gate.allowed:
+            log.info(
+                "scrape attempt started (%d/%d in window)",
+                gate.used + 1,
+                gate.limit,
+            )
             kept = [t for t in state.attempts if t > now - SCRAPE_QUOTA_WINDOW]
             kept.append(now)
             _set(conn, _K_ATTEMPT, _fmt(now))
             _set(conn, _K_ATTEMPTS, json.dumps([_fmt(t) for t in kept]))
+        else:
+            log.info(
+                "scrape attempt started (%d/%d in window)",
+                gate.used + 1,
+                gate.limit,
+            )
     return gate
 
 
@@ -116,9 +137,11 @@ def record_crawl_success(
     with transaction(conn):
         _set(conn, _K_SUCCESS, _fmt(now))
         if complete:
-            _set(conn, _K_COUNT, str(product_count))
+            with transaction(conn):
+                _set(conn, _K_COUNT, str(product_count))
 
 
 def record_applied(conn: sqlite3.Connection, change_count: int) -> None:
     with transaction(conn):
+        _set(conn, _K_SUCCESS, _fmt(now))
         _set(conn, _K_CHANGES, str(change_count))

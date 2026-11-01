@@ -64,6 +64,9 @@ def quota_remaining(
     window: timedelta = SCRAPE_QUOTA_WINDOW,
 ) -> timedelta | None:
     """Wait until a quota slot frees up, or None when under the limit."""
+    if limit < 1:
+        raise ValueError("quota limit must be at least 1")
+
     recent = attempts_in_window(attempts, now, window)
     if len(recent) < limit:
         return None

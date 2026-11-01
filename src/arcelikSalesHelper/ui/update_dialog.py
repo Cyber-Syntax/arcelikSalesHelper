@@ -390,10 +390,7 @@ class UpdateDialog(QDialog):
         self._partial = not outcome.complete
         try:
             record_crawl_success(
-                self._conn,
-                self._clock(),
-                count,
-                complete=outcome.complete and not self._drop,
+                self._conn, count, complete=outcome.complete and not self._drop
             )
         except sqlite3.Error:
             log.exception("could not record the crawl result")
@@ -412,6 +409,7 @@ class UpdateDialog(QDialog):
                 info.conflicts,
                 info.unchanged,
                 info.without_price,
+                info.duplicate_names,
                 info.errors,
             ),
         )
@@ -491,7 +489,7 @@ class UpdateDialog(QDialog):
                     plan, decisions, skipped_new
                 )
                 try:
-                    record_applied(self._conn, counts.total)
+                    record_applied(self._conn, self._clock(), counts.total)
                 except sqlite3.Error:
                     log.exception("could not record the change count")
                 self.result_summary.setText("\n".join(summary.lines()))

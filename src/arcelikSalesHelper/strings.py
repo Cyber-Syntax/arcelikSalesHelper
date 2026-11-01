@@ -874,13 +874,22 @@ def update_unexpected(detail: str) -> str:
 
 
 def update_counts(
-    scraped: int, new: int, conflicts: int, unchanged: int,
-    without_price: int, errors: int,
-) -> str:  # fmt: skip
-    return (
+    scraped, new, conflicts, unchanged, without_price, duplicates, errors
+):
+    text = (
         f"{scraped} ürün tarandı · {new} yeni · {conflicts} fiyat farkı "
         f"(varsayılan: atla) · {unchanged} değişmedi · {without_price} ürünün "
         f"sitede fiyatı yok · {errors} hatalı satır"
+    )
+    return text + (
+        f" · {duplicates} aynı adlı ürün atlandı" if duplicates else ""
+    )
+
+
+def update_read_problems(count: int) -> str:
+    return (
+        f"{count} ürün kartı veya sayfa okunamadı ya da sayfa sınırına takıldı. "
+        "Sonuçlar eksik olabilir."
     )
 
 

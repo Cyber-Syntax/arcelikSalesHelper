@@ -28,7 +28,9 @@ SEL_DISCOUNTED = ".prd-row-price-third .prc-third"
 
 _NUMBER = re.compile(r"\d[\d.,]*")
 _HAS_DIGIT = re.compile(r"\d")
-_LOC = re.compile(r"<loc>\s*(.*?)\s*</loc>", re.DOTALL)
+_LOC = re.compile(
+    r"<(?:[\w-]+:)?loc\b[^>]*>\s*(.*?)\s*</(?:[\w-]+:)?loc>", re.DOTALL
+)
 
 
 @dataclass(frozen=True)
@@ -78,11 +80,8 @@ def parse_listing(html: str, base_url: str = BASE_URL) -> ListingPage:
         url = urljoin(base_url, href).split("?")[0]
         if url in found:
             continue
-        label = _clean(
-            (link.attributes.get("aria-label") or "")
-            .strip()
-            .removesuffix(LABEL_SUFFIX)
-        )
+        label = _clean(link.attributes.get("aria-label") or "")
+        label = label.removesuffix(LABEL_SUFFIX.strip()).strip()
         title_node = card.css_first(SEL_TITLE)
         title = _clean(title_node.text(strip=True)) if title_node else ""
         name = label or title

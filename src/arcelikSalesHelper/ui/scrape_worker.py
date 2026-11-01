@@ -6,7 +6,7 @@ import asyncio
 import logging
 import threading
 
-from PySide6.QtCore import QThread, Signal
+from PySide6.QtCore import QObject, QThread, Signal
 
 from arcelikSalesHelper import strings as T
 from arcelikSalesHelper.infrastructure.scraper.models import ScrapeConfig
@@ -22,9 +22,9 @@ class ScrapeWorker(QThread):
     failed = Signal(str)
 
     def __init__(
-        self, config: ScrapeConfig | None = None, parent: object = None
+        self, config: ScrapeConfig | None = None, parent: QObject | None = None
     ) -> None:
-        super().__init__(parent)  # type: ignore[arg-type]
+        super().__init__(parent)
         self._config = config
         self._cancel = threading.Event()
 

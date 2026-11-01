@@ -66,13 +66,21 @@ class ScrapeOutcome:
     elapsed_seconds: float
     cancelled: bool = False
     error: ScrapeError | None = None
+    capped_categories: int = 0
+    nameless_cards: int = 0
+
+    @property
+    def read_problems(self) -> int:
+        return (
+            self.price_failures + self.nameless_cards + self.capped_categories
+        )
 
     @property
     def complete(self) -> bool:
-        """True only when nothing was cancelled, failed or skipped by error."""
         return (
             self.error is None
             and not self.cancelled
             and self.categories_failed == 0
             and self.failed_requests == 0
+            and self.read_problems == 0
         )

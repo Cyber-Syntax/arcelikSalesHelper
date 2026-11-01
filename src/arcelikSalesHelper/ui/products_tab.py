@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sqlite3
+from decimal import Decimal
 from pathlib import Path
 
 from PySide6.QtCore import (
@@ -31,7 +32,7 @@ from PySide6.QtWidgets import (
 )
 
 from arcelikSalesHelper import strings as T
-from arcelikSalesHelper.application.calculator import read_money
+from arcelikSalesHelper.application.calculator import MoneyRead, read_money
 from arcelikSalesHelper.domain.formatting import format_money_input, format_try
 from arcelikSalesHelper.domain.products import Product, ProductDraft
 from arcelikSalesHelper.domain.result import Err, Ok
@@ -205,9 +206,9 @@ class ProductDialog(QDialog):
         self._general = QLabel()
         self._general.setStyleSheet(ERROR_STYLE)
         self._general.setWordWrap(True)
-        self._general.hide()
-        self.regular_edit.setText(_price_input(product.regular_price))
-        self.website_edit.setText(_price_input(product.website_price))
+        if product is not None:
+            self.regular_edit.setText(_price_input(product.regular_price))
+            self.website_edit.setText(_price_input(product.website_price))
 
         form = QFormLayout()
         form.addRow(T.LBL_PRODUCT_NAME, self.blocks["name"])
@@ -264,8 +265,8 @@ class ProductDialog(QDialog):
 
     def accept(self) -> None:
         self._clear_errors()
-        regular = read_money(self.regular_edit.text())
-        website = read_money(self.website_edit.text())
+        regular = _read_optional_price(self.regular_edit.text())
+        website = _read_optional_price(self.website_edit.text())
         problems = False
         for key, read in (
             ("regular_price", regular),

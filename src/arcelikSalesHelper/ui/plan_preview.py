@@ -267,10 +267,8 @@ class PlanPreviewWidget(QWidget):
         return self.valid_only_check.isChecked()
 
     def _has_effect(self, plan: ImportPlan) -> bool:
-        if not self._choose_new:
-            return plan.actionable
         decisions = self.decisions()
-        skipped = self.new_skipped()
+        skipped = self.new_skipped()  # empty when choose_new is False
         for item in plan.items:
             if item.kind is Kind.NEW and item.row.row not in skipped:
                 return True

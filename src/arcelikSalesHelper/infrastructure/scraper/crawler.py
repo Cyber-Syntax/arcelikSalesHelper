@@ -59,6 +59,8 @@ class _Stats:
     failed_categories: int = 0
     failed_requests: int = 0
     price_failures: int = 0
+    capped_categories: int = 0
+    nameless_cards: int = 0
 
 
 @dataclass
@@ -66,6 +68,8 @@ class _CategoryResult:
     products: dict[str, ScrapedProduct] = field(default_factory=dict)
     price_failures: int = 0
     loaded: bool = False  # first page loaded
+    capped: bool = False
+    nameless: int = 0
 
 
 def _curl_session(config: ScrapeConfig) -> Any:
@@ -150,7 +154,8 @@ class _Fetcher:
                     log.warning("HTTP %s (not retried)", status)
                     self._stats.failed_requests += 1
                     return None
-            await self._nap(2**attempt * 2)
+            if attempt < cfg.retries - 1:
+                await self._nap(2**attempt * 2)
         self._stats.failed_requests += 1
         return None
 
@@ -180,11 +185,15 @@ async def _crawl_category(
             result.loaded = True
         listing = parser.parse_listing(html, config.base_url)
         result.price_failures += listing.price_failures
+        result.nameless += listing.nameless_cards
         fresh = [p for p in listing.products if p.url not in result.products]
         if not fresh:  # no cards, or a repeated page: legitimate end
             break
         for product in fresh:
             result.products[product.url] = product
+    else:  # loop ended without a break: the page cap truncated the category
+        result.capped = True
+        log.warning("category %s hit the %d page cap", slug, config.max_pages)
     return result
 
 
@@ -208,6 +217,8 @@ async def _run_categories(
             stats.failed_categories += 1
         else:
             stats.price_failures += result.price_failures
+            stats.nameless_cards += result.nameless
+            stats.capped_categories += int(result.capped)
             if not result.loaded:
                 stats.failed_categories += 1
             for product in result.products.values():
@@ -281,6 +292,8 @@ async def crawl(
         products=tuple(products.values()),
         categories_total=total,
         categories_done=stats.done,
+        capped_categories=stats.capped_categories,
+        nameless_cards=stats.nameless_cards,
         categories_failed=stats.failed_categories,
         failed_requests=stats.failed_requests,
         price_failures=stats.price_failures,
