@@ -9,7 +9,7 @@ import threading
 from PySide6.QtCore import QThread, Signal
 
 from arcelikSalesHelper import strings as T
-from arcelikSalesHelper.infrastructure.scrapper.models import ScrapeConfig
+from arcelikSalesHelper.infrastructure.scraper.models import ScrapeConfig
 
 log = logging.getLogger(__name__)
 
@@ -34,7 +34,7 @@ class ScrapeWorker(QThread):
     def run(self) -> None:
         try:
             # Imported here so a missing native library cannot stop the app.
-            from arcelikSalesHelper.infrastructure.scrapper import crawler
+            from arcelikSalesHelper.infrastructure.scraper import crawler
 
             outcome = asyncio.run(
                 crawler.crawl(self._config, self.progress.emit, self._cancel)

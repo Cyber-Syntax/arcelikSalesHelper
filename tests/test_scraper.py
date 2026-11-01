@@ -2,16 +2,16 @@ import asyncio
 from dataclasses import dataclass
 from decimal import Decimal
 
-from arcelikSalesHelper.infrastructure.scrapper.crawler import (
+from arcelikSalesHelper.infrastructure.scraper.crawler import (
     crawl,
     filter_categories,
 )
-from arcelikSalesHelper.infrastructure.scrapper.models import (
+from arcelikSalesHelper.infrastructure.scraper.models import (
     BASE_URL,
     ScrapeConfig,
     ScrapeErrorCode,
 )
-from arcelikSalesHelper.infrastructure.scrapper.parser import (
+from arcelikSalesHelper.infrastructure.scraper.parser import (
     category_slugs,
     parse_listing,
     parse_price,

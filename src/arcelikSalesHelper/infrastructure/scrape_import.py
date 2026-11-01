@@ -14,7 +14,7 @@ from arcelikSalesHelper.domain.products import (
     Product,
     name_key,
 )
-from arcelikSalesHelper.infrastructure.scrapper.models import ScrapedProduct
+from arcelikSalesHelper.infrastructure.scraper.models import ScrapedProduct
 
 from .csv_import import (
     Decision,

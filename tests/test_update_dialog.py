@@ -7,7 +7,7 @@ from arcelikSalesHelper.infrastructure.scrape_state import (
     record_crawl_success,
     try_begin_attempt,
 )
-from arcelikSalesHelper.infrastructure.scrapper.models import (
+from arcelikSalesHelper.infrastructure.scraper.models import (
     ScrapedProduct,
     ScrapeError,
     ScrapeErrorCode,

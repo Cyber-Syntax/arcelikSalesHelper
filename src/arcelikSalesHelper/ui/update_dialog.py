@@ -65,7 +65,7 @@ from arcelikSalesHelper.infrastructure.scrape_state import (
     record_crawl_success,
     try_begin_attempt,
 )
-from arcelikSalesHelper.infrastructure.scrapper.models import ScrapeOutcome
+from arcelikSalesHelper.infrastructure.scraper.models import ScrapeOutcome
 
 from .common import (
     ERROR_STYLE,

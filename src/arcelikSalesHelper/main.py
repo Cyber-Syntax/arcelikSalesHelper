@@ -64,7 +64,7 @@ def self_check() -> int:
         import curl_cffi  # noqa: F401
         import selectolax  # noqa: F401
 
-        from .infrastructure.scrapper import crawler, parser  # noqa: F401
+        from .infrastructure.scraper import crawler, parser  # noqa: F401
     except ImportError as exc:
         print(f"self-check failed: {exc}", file=sys.stderr)
         return 1
