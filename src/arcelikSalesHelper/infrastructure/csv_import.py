@@ -50,6 +50,7 @@ MAX_ROWS = 100_000
 class ImportFormat(Enum):
     PRICES = "prices"
     STOCK = "stock"
+    SCRAPE = "scrape"  # built in memory by scrape_import, never parsed
 
 
 class Kind(Enum):

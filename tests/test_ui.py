@@ -6,7 +6,23 @@ from PySide6.QtWidgets import QHeaderView
 from arcelikSalesHelper.domain.products import ProductDraft
 from arcelikSalesHelper.domain.result import Ok
 from arcelikSalesHelper.infrastructure.repositories import ProductRepository
+from arcelikSalesHelper.ui.calculator_tab import CalculatorLineWidget
 from arcelikSalesHelper.ui.products_tab import ProductDialog, ProductsTab
+
+
+def test_update_button(qapp, db):
+    repo = ProductRepository(db)
+    assert ProductsTab(repo).update_button.text() == "Güncelle"
+    assert not ProductsTab(repo).update_button.isEnabled()
+    assert not ProductsTab(repo, db, None).update_button.isEnabled()
+
+
+def test_update_button_requires_settings_opt_in(qapp, db):
+    repo = ProductRepository(db)
+    assert not ProductsTab(repo, db, object()).update_button.isEnabled()
+    assert ProductsTab(
+        repo, db, object(), scraping_enabled=True
+    ).update_button.isEnabled()
 
 
 def add_product(
@@ -45,7 +61,7 @@ def test_dialog_shows_inline_errors_and_stays_open(qtbot, repo) -> None:  # type
     assert dialog.saved is None
     assert dialog.blocks["name"].error_text != ""
     assert dialog.blocks["regular_price"].error_text != ""
-    assert dialog.blocks["website_price"].error_text != ""
+    assert dialog.blocks["website_price"].error_text == ""
     assert repo.search() == []
 
 
@@ -68,6 +84,17 @@ def test_edit_dialog_prefills_without_rounding(qtbot, repo) -> None:  # type: ig
     assert dialog.regular_edit.text() == "1.234,567"
     dialog.accept()
     assert repo.get(product.id) == product  # unchanged value -> no-op update
+
+
+def test_calculator_preserves_no_discount_but_requires_unknown_regular(
+    qtbot, repo
+) -> None:  # type: ignore[no-untyped-def]
+    product = add_product(repo, regular="0", website="0")
+    line = CalculatorLineWidget()
+    qtbot.addWidget(line)
+    line.set_product(product)
+    assert line.regular_edit.text() == ""
+    assert line.website_edit.text() == "0,00"
 
 
 def test_products_tab_lists_filters_and_archives(qtbot, repo) -> None:  # type: ignore[no-untyped-def]

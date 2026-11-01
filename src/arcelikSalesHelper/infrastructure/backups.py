@@ -53,6 +53,7 @@ class BackupReason(Enum):
     PRE_MIGRATION = "pre_migration"
     PRE_IMPORT = "pre_import"  # used by M7
     MANUAL = "manual"
+    PRE_SCRAPE = "pre_scrape"
 
 
 @dataclass(frozen=True)

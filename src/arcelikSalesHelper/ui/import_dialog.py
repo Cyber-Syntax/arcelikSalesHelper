@@ -6,16 +6,11 @@ from pathlib import Path
 
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import (
-    QAbstractItemView,
-    QCheckBox,
-    QComboBox,
     QDialog,
     QFileDialog,
     QHBoxLayout,
     QLabel,
     QPushButton,
-    QTableWidget,
-    QTableWidgetItem,
     QVBoxLayout,
     QWidget,
 )
@@ -48,18 +43,13 @@ from .common import (
     show_critical,
     show_info,
 )
+from .plan_preview import STATUS, PlanPreviewWidget
 
-_COLUMNS = T.IMPORT_COLUMNS
 _DECISION_COLUMN = 6
-_STATUS = {
-    Kind.NEW: T.STATUS_NEW,
-    Kind.CONFLICT: T.STATUS_CONFLICT,
-    Kind.STOCK_UPDATE: T.STATUS_STOCK_UPDATE,
-    Kind.UNCHANGED: T.STATUS_UNCHANGED,
-}
 _FORMAT_TEXT = {
     ImportFormat.PRICES: T.FORMAT_PRICES,
     ImportFormat.STOCK: T.FORMAT_STOCK,
+    ImportFormat.SCRAPE: T.FORMAT_SCRAPE,
 }
 
 
@@ -79,6 +69,27 @@ def _quantity_text(old: int | None, new: int | None) -> str:
     return f"{T.NONE_DASH if old is None else old} → {new}"
 
 
+def _csv_cells(item: PlanItem) -> tuple[str, ...]:
+    row, existing = item.row, item.existing
+    return (
+        str(row.row),
+        STATUS[item.kind],
+        row.name + (T.ARCHIVED_SUFFIX if item.restores else ""),
+        _price_text(
+            None if existing is None else existing.regular_price,
+            row.regular_price,
+        ),
+        _price_text(
+            None if existing is None else existing.website_price,
+            row.website_price,
+        ),
+        _quantity_text(
+            None if existing is None else existing.quantity, row.quantity
+        ),
+        "; ".join(row.warnings),  # replaced by the combo on conflict rows
+    )
+
+
 class ImportDialog(QDialog):
     imported = Signal()
 
@@ -96,9 +107,6 @@ class ImportDialog(QDialog):
         self._path: Path | None = None
         self.plan: ImportPlan | None = None
         self.summary: ImportSummary | None = None
-        self.decision_combos: dict[
-            int, QComboBox
-        ] = {}  # keyed by CSV row number
 
         self.setWindowTitle(T.IMPORT_TITLE)
         self.resize(980, 620)
@@ -110,30 +118,16 @@ class ImportDialog(QDialog):
         self.file_error.setStyleSheet(ERROR_STYLE)
         self.file_error.setWordWrap(True)
         self.file_error.hide()
-        self.counts_label = QLabel()
-        self.table = QTableWidget(0, len(_COLUMNS))
-        self.table.setHorizontalHeaderLabels(list(_COLUMNS))
-        self.table.setEditTriggers(
-            QAbstractItemView.EditTrigger.NoEditTriggers
+        self.preview = PlanPreviewWidget(
+            T.IMPORT_COLUMNS, _csv_cells, _DECISION_COLUMN
         )
-        self.table.setSelectionBehavior(
-            QAbstractItemView.SelectionBehavior.SelectRows
-        )
-        self.table.verticalHeader().hide()
-        self.table.horizontalHeader().setStretchLastSection(True)
-        self.errors_label = QLabel(T.LBL_ROWS_WITH_ERRORS)
-        self.errors_label.setStyleSheet(ERROR_STYLE)
-        self.errors_table = QTableWidget(0, 3)
-        self.errors_table.setHorizontalHeaderLabels(
-            list(T.IMPORT_ERROR_COLUMNS)
-        )
-        self.errors_table.setEditTriggers(
-            QAbstractItemView.EditTrigger.NoEditTriggers
-        )
-        self.errors_table.verticalHeader().hide()
-        self.errors_table.horizontalHeader().setStretchLastSection(True)
-        self.errors_table.setMaximumHeight(160)
-        self.valid_only_check = QCheckBox(T.CHK_VALID_ONLY)
+        # Members of the shared widget, kept under their historical names.
+        self.counts_label = self.preview.counts_label
+        self.table = self.preview.table
+        self.errors_label = self.preview.errors_label
+        self.errors_table = self.preview.errors_table
+        self.valid_only_check = self.preview.valid_only_check
+        self.decision_combos = self.preview.decision_combos
         self.status_label = QLabel()
         self.status_label.setWordWrap(True)
         self.status_label.setStyleSheet(HINT_STYLE)
@@ -151,18 +145,13 @@ class ImportDialog(QDialog):
         layout = QVBoxLayout(self)
         layout.addLayout(top)
         layout.addWidget(self.file_error)
-        layout.addWidget(self.counts_label)
-        layout.addWidget(self.table, 3)
-        layout.addWidget(self.errors_label)
-        layout.addWidget(self.errors_table, 1)
-        layout.addWidget(self.valid_only_check)
+        layout.addWidget(self.preview, 1)
         layout.addLayout(bottom)
-        self._set_error_widgets_visible(False)
 
         self.choose_button.clicked.connect(lambda _c=False: self.choose_file())
         self.apply_button.clicked.connect(lambda _c=False: self._apply())
         self.close_button.clicked.connect(self.reject)
-        self.valid_only_check.toggled.connect(lambda _c: self._update_apply())
+        self.preview.changed.connect(self._update_apply)
 
     # ---- loading ---------------------------------------------------------
 
@@ -184,33 +173,19 @@ class ImportDialog(QDialog):
             self._update_apply()
             return
         existing = index_products(self._repo.search("", include_archived=True))
-        self.plan = plan_import(parsed.value, existing)
-        self._show_plan(self.plan, _FORMAT_TEXT[parsed.value.format])
-        self._update_apply()
+        self.show_plan(
+            plan_import(parsed.value, existing),
+            _FORMAT_TEXT[parsed.value.format],
+        )
 
-    def _reset(self) -> None:
-        self.plan = None
-        self.decision_combos.clear()
-        self.table.setRowCount(0)
-        self.errors_table.setRowCount(0)
-        self.file_error.hide()
-        self.counts_label.setText("")
-        self.valid_only_check.setChecked(False)
-        self._set_error_widgets_visible(False)
-
-    def _set_error_widgets_visible(self, visible: bool) -> None:
-        self.errors_label.setVisible(visible)
-        self.errors_table.setVisible(visible)
-        self.valid_only_check.setVisible(visible)
-
-    def _show_plan(self, plan: ImportPlan, format_text: str) -> None:
-        self.table.setRowCount(len(plan.items))
-        for r, item in enumerate(plan.items):
-            self._fill_row(r, item)
+    def show_plan(self, plan: ImportPlan, format_text: str) -> None:
+        """Preview a prebuilt plan (no file needed)."""
+        self.plan = plan
         n = {
             kind: sum(1 for i in plan.items if i.kind is kind) for kind in Kind
         }
-        self.counts_label.setText(
+        self.preview.set_plan(
+            plan,
             T.import_counts(
                 format_text,
                 n[Kind.NEW],
@@ -218,78 +193,28 @@ class ImportDialog(QDialog):
                 n[Kind.STOCK_UPDATE],
                 n[Kind.UNCHANGED],
                 len(plan.errors),
-            )
+            ),
         )
-        self.table.resizeColumnsToContents()
-        if plan.errors:
-            self.errors_table.setRowCount(len(plan.errors))
-            for r, err in enumerate(plan.errors):
-                for c, text in enumerate(
-                    (str(err.row), err.column or "", err.message)
-                ):
-                    self.errors_table.setItem(r, c, QTableWidgetItem(text))
-            self._set_error_widgets_visible(True)
+        self.decision_combos = self.preview.decision_combos
+        self._update_apply()
 
-    def _fill_row(self, r: int, item: PlanItem) -> None:
-        row, existing = item.row, item.existing
-        name = row.name + (T.ARCHIVED_SUFFIX if item.restores else "")
-        cells = (
-            str(row.row),
-            _STATUS[item.kind],
-            name,
-            _price_text(
-                None if existing is None else existing.regular_price,
-                row.regular_price,
-            ),
-            _price_text(
-                None if existing is None else existing.website_price,
-                row.website_price,
-            ),
-            _quantity_text(
-                None if existing is None else existing.quantity, row.quantity
-            ),
-        )
-        for c, text in enumerate(cells):
-            self.table.setItem(r, c, QTableWidgetItem(text))
-        if item.kind is Kind.CONFLICT:
-            combo = QComboBox()
-            combo.addItem(T.COMBO_CHOOSE, None)
-            combo.addItem(
-                T.COMBO_UPDATE_RESTORE if item.restores else T.COMBO_UPDATE,
-                Decision.UPDATE,
-            )
-            combo.addItem(T.COMBO_SKIP, Decision.SKIP)
-            combo.currentIndexChanged.connect(lambda _i: self._update_apply())
-            self.decision_combos[row.row] = combo
-            self.table.setCellWidget(r, _DECISION_COLUMN, combo)
-        else:
-            self.table.setItem(
-                r, _DECISION_COLUMN, QTableWidgetItem("; ".join(row.warnings))
-            )
+    def _reset(self) -> None:
+        self.plan = None
+        self.preview.clear()
+        self.decision_combos = self.preview.decision_combos
+        self.file_error.hide()
 
     # ---- applying --------------------------------------------------------
 
     def decisions(self) -> dict[int, Decision]:
-        out: dict[int, Decision] = {}
-        for row, combo in self.decision_combos.items():
-            data = combo.currentData()
-            if isinstance(data, Decision):
-                out[row] = data
-        return out
+        return self.preview.decisions()
 
     def _update_apply(self) -> None:
-        plan = self.plan
-        if plan is None:
+        if self.plan is None:
             self.apply_button.setEnabled(False)
             self.status_label.setText("")
             return
-        reason: str | None = None
-        if plan.errors and not self.valid_only_check.isChecked():
-            reason = T.IMPORT_FIX_FILE
-        elif len(self.decisions()) < len(plan.conflicts):
-            reason = T.IMPORT_DECIDE_ALL
-        elif not plan.actionable:
-            reason = T.IMPORT_NOTHING
+        reason = self.preview.blocking_reason()
         self.status_label.setText(reason or T.IMPORT_READY)
         self.apply_button.setEnabled(reason is None)
 
@@ -310,7 +235,7 @@ class ImportDialog(QDialog):
             self._conn,
             plan,
             self.decisions(),
-            import_valid_only=self.valid_only_check.isChecked(),
+            import_valid_only=self.preview.valid_only(),
             note=note,
         )
         match result:

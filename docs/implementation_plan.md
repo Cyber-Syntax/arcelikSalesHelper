@@ -22,7 +22,7 @@ Status reflects code and documentation currently present. “Implemented” desc
 | Product CSV export/import | Implemented | Export includes prices and known quantity; import supports the exported columns. |
 | History customer/search/delete | Implemented | Customer display name is optional; history search matches customer/product names; confirmed deletion removes a whole snapshot and its lines. |
 | Shared laptops / PostgreSQL | Deferred | Hosting, authentication, permissions, backup ownership, and offline behavior need a design before implementation. |
-| Website scraping | Deferred | Requires authorized-source review, request limits, source-change handling, and failure behavior before implementation. |
+| Website scraping | Partial, pending authorization | The employee-triggered, rate-limited implementation exists, but it must remain disabled for production until the source authorizes access or an approved API/feed is available. |
 | Product save from calculator | Remaining | One-off calculator products cannot yet be saved directly to the catalog. |
 | POS operational verification | Remaining | Two-decimal entry formatting is implemented, but the formulas and exact AX/POS fields still need validation against a real, non-sensitive workflow example. |
 
@@ -35,7 +35,7 @@ Status reflects code and documentation currently present. “Implemented” desc
 - **M8–M9: Implemented.** Verified backups and CSV import/export are present.
 - **M10: Deferred.** Reservations, sale/open-account workflow, and reserved/available quantities.
 - **M11: Partial.** Windows packaging runs in GitHub Actions. Linux packaging, platform validation, a reusable PyInstaller spec, and `scripts/smoke.py` remain.
-- **Future architecture: Deferred.** Scraper integration and managed PostgreSQL sharing remain later milestones.
+- **Future architecture: Deferred.** Managed PostgreSQL sharing remains a later milestone; website scraping remains pending source authorization.
 
 ## 0. Locked decisions
 

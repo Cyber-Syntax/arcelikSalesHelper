@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sqlite3
+from decimal import Decimal
 from pathlib import Path
 
 from PySide6.QtCore import (
@@ -31,7 +32,7 @@ from PySide6.QtWidgets import (
 )
 
 from arcelikSalesHelper import strings as T
-from arcelikSalesHelper.application.calculator import read_money
+from arcelikSalesHelper.application.calculator import MoneyRead, read_money
 from arcelikSalesHelper.domain.formatting import format_money_input, format_try
 from arcelikSalesHelper.domain.products import Product, ProductDraft
 from arcelikSalesHelper.domain.result import Err, Ok
@@ -52,9 +53,21 @@ from .common import (
     show_warning,
 )
 from .import_dialog import ImportDialog
+from .update_dialog import UpdateDialog
 
 _ROOT = QModelIndex()
 _Index = QModelIndex | QPersistentModelIndex
+
+
+def _read_optional_price(text: str) -> MoneyRead:
+    """Blank = unknown / no discount, stored as 0 (shown as — / YOK)."""
+    if not text.strip():
+        return MoneyRead(Decimal(0), None, T.PH_PRICE_OPTIONAL, True)
+    return read_money(text)
+
+
+def _price_input(value: Decimal) -> str:
+    return "" if value == 0 else format_money_input(value)
 
 
 class ProductTableModel(QAbstractTableModel):
@@ -124,7 +137,11 @@ class ProductTableModel(QAbstractTableModel):
                     T.ARCHIVED_SUFFIX if product.archived else ""
                 )
             case 1:
-                return format_try(product.regular_price)
+                return (
+                    T.NO_PRICE
+                    if product.regular_price == 0
+                    else format_try(product.regular_price)
+                )
             case 2:
                 return (
                     T.NO_WEBSITE_DISCOUNT
@@ -189,7 +206,9 @@ class ProductDialog(QDialog):
         self._general = QLabel()
         self._general.setStyleSheet(ERROR_STYLE)
         self._general.setWordWrap(True)
-        self._general.hide()
+        if product is not None:
+            self.regular_edit.setText(_price_input(product.regular_price))
+            self.website_edit.setText(_price_input(product.website_price))
 
         form = QFormLayout()
         form.addRow(T.LBL_PRODUCT_NAME, self.blocks["name"])
@@ -215,10 +234,10 @@ class ProductDialog(QDialog):
         if product is not None:
             self.name_edit.setText(product.name)
             self.regular_edit.setText(
-                format_money_input(product.regular_price)
+                _price_input(product.regular_price)
             )
             self.website_edit.setText(
-                format_money_input(product.website_price)
+                _price_input(product.website_price)
             )
             self.gift_edit.setText(product.default_gift_name or "")
             self.notes_edit.setPlainText(product.notes or "")
@@ -234,7 +253,7 @@ class ProductDialog(QDialog):
             ("regular_price", self.regular_edit),
             ("website_price", self.website_edit),
         ):
-            self.blocks[key].set_hint(read_money(edit.text()).hint)
+            self.blocks[key].set_hint(_read_optional_price(edit.text()).hint)
 
     def _clear_errors(self) -> None:
         for block in self.blocks.values():
@@ -246,8 +265,8 @@ class ProductDialog(QDialog):
 
     def accept(self) -> None:
         self._clear_errors()
-        regular = read_money(self.regular_edit.text())
-        website = read_money(self.website_edit.text())
+        regular = _read_optional_price(self.regular_edit.text())
+        website = _read_optional_price(self.website_edit.text())
         problems = False
         for key, read in (
             ("regular_price", regular),
@@ -328,18 +347,23 @@ class ProductsTab(QWidget):
     import_finished = (
         Signal()
     )  # the import dialog closed (a backup may have run)
+    update_finished = (
+        Signal()
+    )  # the update dialog closed (a backup may have run)
 
     def __init__(
         self,
         repo: ProductRepository,
         conn: sqlite3.Connection | None = None,
         backups: BackupManager | None = None,
+        scraping_enabled: bool = False,
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
         self._repo = repo
         self._conn = conn
         self._backups = backups
+        self._scraping_enabled = scraping_enabled
 
         self.search_edit = QLineEdit()
         self.search_edit.setPlaceholderText(T.PH_SEARCH)
@@ -379,6 +403,14 @@ class ProductsTab(QWidget):
         self.bulk_archive_button = QPushButton(T.BTN_ARCHIVE_SELECTED)
         self.export_button = QPushButton(T.BTN_EXPORT_CSV)
         self.delete_button = QPushButton(T.BTN_DELETE_PRODUCT)
+        self._update_running = False
+        self.update_button = QPushButton(T.BTN_UPDATE_FROM_SITE)
+        self.update_button.setToolTip(T.TIP_UPDATE_FROM_SITE)
+        self.update_button.setEnabled(
+            conn is not None
+            and backups is not None
+            and self._scraping_enabled
+        )
 
         top = QHBoxLayout()
         top.addWidget(self.search_edit, 1)
@@ -392,6 +424,7 @@ class ProductsTab(QWidget):
         bottom.addWidget(self.delete_button)
         bottom.addStretch(1)
         bottom.addWidget(self.import_button)
+        bottom.addWidget(self.update_button)  # next to the CSV button
         layout = QVBoxLayout(self)
         layout.addLayout(top)
         layout.addWidget(self.table, 1)
@@ -414,7 +447,18 @@ class ProductsTab(QWidget):
         self.table.selectionModel().selectionChanged.connect(
             lambda _s, _d: self._update_buttons()
         )
+        self.update_button.clicked.connect(
+            lambda _c=False: self._update_from_site()
+        )
         self.reload()
+
+    def set_scraping_enabled(self, enabled: bool) -> None:
+        self._scraping_enabled = enabled
+        self.update_button.setEnabled(
+            self._conn is not None
+            and self._backups is not None
+            and enabled
+        )
 
     def reload(self) -> None:
         selected = self.selected_product()
@@ -574,3 +618,19 @@ class ProductsTab(QWidget):
             case Ok(_):
                 self.reload()
                 self.products_changed.emit()
+
+    def _update_from_site(self) -> None:
+        if self._conn is None or self._backups is None or self._update_running:
+            return
+        self._update_running = True
+        try:
+            dialog = UpdateDialog(
+                self._repo, self._conn, self._backups, parent=self
+            )
+            dialog.exec()
+        finally:
+            self._update_running = False
+        self.reload()
+        if dialog.applied_summary is not None:
+            self.products_changed.emit()
+        self.update_finished.emit()
