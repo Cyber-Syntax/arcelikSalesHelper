@@ -234,10 +234,10 @@ class ProductDialog(QDialog):
         if product is not None:
             self.name_edit.setText(product.name)
             self.regular_edit.setText(
-                format_money_input(product.regular_price)
+                _price_input(product.regular_price)
             )
             self.website_edit.setText(
-                format_money_input(product.website_price)
+                _price_input(product.website_price)
             )
             self.gift_edit.setText(product.default_gift_name or "")
             self.notes_edit.setPlainText(product.notes or "")

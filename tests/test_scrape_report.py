@@ -1,11 +1,10 @@
 from decimal import Decimal
 
+from arcelikSalesHelper import strings as T
 from arcelikSalesHelper.infrastructure.scrape_report import (
     ReportRow,
     write_report_csv,
 )
-
-from arcelikSalesHelper import strings as T
 
 
 def test_report_csv_bom_columns_and_escaping(tmp_path):

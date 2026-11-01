@@ -48,6 +48,20 @@ def test_gate_reports_longer_restriction_and_retry_time():
     assert fresh.reason is GateReason.COOLDOWN
     assert fresh.remaining == timedelta(hours=23)
 
+    longer_cooldown = is_scrape_allowed(
+        NOW - timedelta(hours=1),
+        [
+            NOW - timedelta(days=29, hours=2),
+            NOW - timedelta(days=20),
+            NOW - timedelta(days=9),
+            NOW - timedelta(days=5),
+            NOW - timedelta(days=2),
+        ],
+        NOW,
+    )
+    assert longer_cooldown.reason is GateReason.COOLDOWN
+    assert longer_cooldown.remaining == timedelta(hours=23)
+
 
 def test_gate_open():
     gate = is_scrape_allowed(None, [], NOW)

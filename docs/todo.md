@@ -29,7 +29,7 @@
 - [ ] refactor popup for csv import, make it responsive: database seçenekleri sağda kalıyor, tam gözükmüyor.
 - [ ] history csv import/export
 - [ ] checkout PR errors found by cubic.ai
-- [-] add a price for all of the products, not per line!!!
+- [ ] add a price for all of the products, not per line!!!
   - [ ] workoaround used now, first line can be useable for fast calculations
 - [x] Verify all the calculation text which some seems unnecessary.
 - [x] add turkish language support

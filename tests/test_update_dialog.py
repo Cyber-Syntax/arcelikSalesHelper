@@ -3,16 +3,6 @@ from decimal import Decimal
 from pathlib import Path
 
 import pytest
-from arcelikSalesHelper.infrastructure.scrape_state import (
-    record_crawl_success,
-    try_begin_attempt,
-)
-from arcelikSalesHelper.infrastructure.scraper.models import (
-    ScrapedProduct,
-    ScrapeError,
-    ScrapeErrorCode,
-    ScrapeOutcome,
-)
 from PySide6.QtCore import QObject, Signal
 
 from arcelikSalesHelper import strings as T
@@ -25,6 +15,17 @@ from arcelikSalesHelper.infrastructure.backups import (
 )
 from arcelikSalesHelper.infrastructure.database import open_database
 from arcelikSalesHelper.infrastructure.repositories import ProductRepository
+from arcelikSalesHelper.infrastructure.scrape_state import (
+    load_state,
+    record_crawl_success,
+    try_begin_attempt,
+)
+from arcelikSalesHelper.infrastructure.scraper.models import (
+    ScrapedProduct,
+    ScrapeError,
+    ScrapeErrorCode,
+    ScrapeOutcome,
+)
 from arcelikSalesHelper.ui import update_dialog as ud
 from arcelikSalesHelper.ui.update_dialog import (
     PAGE_INTRO,
@@ -217,7 +218,12 @@ def test_partial_crawl_needs_checkbox(qapp, conn):
 def test_cancel_discards_everything(qapp, conn):
     repo, _ = seed(conn)
     dialog = make(conn, FakeBackups())
-    run_scan(dialog, [ScrapedProduct("NEW 1", D(1), D(1))], cancelled=True)
+    dialog.start_button.click()
+    dialog.cancel_button.click()
+    assert FakeWorker.last.cancelled
+    FakeWorker.last.finished_outcome.emit(
+        outcome([ScrapedProduct("NEW 1", D(1), D(1))], cancelled=True)
+    )
     assert dialog.stack.currentIndex() == PAGE_INTRO
     assert repo.search("NEW 1") == []
     assert dialog.applied_summary is None
@@ -228,6 +234,9 @@ def test_crawl_error_returns_to_intro_and_still_counts(qapp, conn):
     error = ScrapeError(ScrapeErrorCode.BLOCKED, T.UPDATE_BLOCKED)
     run_scan(dialog, [], error=error)
     assert dialog.stack.currentIndex() == PAGE_INTRO
+    state = load_state(conn)
+    assert state.last_attempt == NOW
+    assert state.attempts == (NOW,)
     assert dialog.message_label.text() == T.UPDATE_BLOCKED
     assert (
         not dialog.start_button.isEnabled()

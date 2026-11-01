@@ -168,8 +168,8 @@ No database migration is required. Cooldown/quota live in the existing
 - Deduplicate scraped products by `name_key`: the first occurrence wins; later
   duplicates are dropped and logged. Because product names contain codes, this
   should be rare.
-- Keep the scraped values alongside the effective values so the preview can
-  show both "site: boş" and "mevcut fiyat korunuyor".
+- The preview shows the effective old and new values plus row warnings explaining
+  when a missing site value preserves the existing catalog value.
 - Expose a small `ScrapePlanInfo` with counts: scraped, new, conflicts,
   unchanged, rows with no price, duplicate names.
 
@@ -205,7 +205,7 @@ All functions take an injected `now`, so tests use a fake clock.
 
 - `QThread`-based worker with a `run` method that calls `asyncio.run` on the
   crawler.
-- Signals: `progress(object)`, `finished(object)`, `failed(str)`.
+- Signals: `progress(object)`, `finished_outcome(object)`, `failed(str)`.
 - `cancel()` sets a thread-safe event; the crawler checks it.
 - Lazy-imports the scraper package and converts `ImportError` into a Turkish
   "Güncelleme bileşeni yüklenemedi" failure instead of crashing the app.
@@ -264,7 +264,7 @@ Responsibilities:
 | `strings.py`                               | Add the Turkish strings listed in section 9.                                                                                                                                                   |
 | `pyproject.toml`                           | Add `curl-cffi` and `selectolax` dependencies.                                                                                                                                                 |
 | `uv.lock`                                  | Regenerate with `uv lock`.                                                                                                                                                                     |
-| `arcelikSalesHelper.spec`                  | Collect the native libraries and data of `curl_cffi` and `selectolax`.                                                                                                                         |
+| `arcelikSalesHelper.spec` (new)            | Create a spec that collects the native libraries and data of `curl_cffi` and `selectolax`.                                                                                                    |
 | `tests/test_ui_localization.py`            | Include the new dialog in the English-label scan.                                                                                                                                              |
 
 ## 6. Scrape → catalog mapping rules
@@ -293,7 +293,7 @@ Archived matches:
 Additional row warnings:
 
 - "Sitede indirimli fiyat yok; mevcut web fiyatı korunacak." when only the
-  website price is empty for an existing product;
+  website price is empty and the existing website price is non-zero;
 - "Bu ürün arşivde; güncellemek geri yükler.";
 - "Tarama tamamlanmadı; bu sonuçlar eksik olabilir." when the crawl was
   partial.
@@ -333,7 +333,9 @@ Shows:
 - Indeterminate progress bar plus a status label with the current category,
   categories done/total and products found.
 - **Taramayı iptal et**.
-- Cancelling discards the partial result and writes no database changes.
+- Cancelling discards the partial result and writes no product changes; the
+  attempt metadata is recorded before crawling so cancelled runs consume the
+  cooldown and quota.
 - If the crawl fails with `blocked`, `no_products` or `network`, the dialog
   shows the Turkish error and returns to the intro page. The attempt still
   counts toward the cooldown/quota.
@@ -440,8 +442,8 @@ Rules:
 - The intro page shows the remaining cooldown and the quota usage.
 - There is no GUI override. Constants can be changed by a developer, but the
   shipped defaults are 24 hours and 5 runs per 30 days.
-- Every run writes a log entry with the gate decision, start/end time, category
-  count, product count, failures and cancellation state.
+- Every run logs the gate decision, start/end time, category count, product
+  count, failures and cancellation state.
 
 ## 10. Turkish UI strings
 

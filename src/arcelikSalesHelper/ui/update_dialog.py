@@ -366,12 +366,23 @@ class UpdateDialog(QDialog):
     def _on_failed(self, message: str) -> None:
         if self._worker is None:
             return
+        log.info("scrape finished: failed=%s", message)
         self._release_worker()
         self._back_to_intro(message, error=True)
 
     def _on_outcome(self, outcome: ScrapeOutcome) -> None:
         if self._worker is None:  # dialog was closed meanwhile
             return
+        log.info(
+            "scrape finished: cancelled=%s error=%s categories=%d/%d "
+            "products=%d failures=%d",
+            outcome.cancelled,
+            outcome.error.code.value if outcome.error is not None else None,
+            outcome.categories_done,
+            outcome.categories_total,
+            len(outcome.products),
+            outcome.failed_requests + outcome.read_problems,
+        )
         self._release_worker()
         if outcome.cancelled:
             self._back_to_intro(T.UPDATE_CANCELLED, error=False)

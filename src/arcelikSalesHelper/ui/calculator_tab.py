@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from decimal import Decimal
 
 from PySide6.QtCore import QSignalBlocker, Qt, QTimer, Signal
 from PySide6.QtGui import QColor, QResizeEvent
@@ -47,6 +48,10 @@ from .theme import DEFAULT_FONT_SCALE
 
 MAX_QUICK_ROWS = 50
 DEFAULT_QUICK_ROWS = 3
+
+
+def _price_input(value: Decimal) -> str:
+    return "" if value == 0 else format_money_input(value)
 
 
 class CalculatorLineWidget(QWidget):
@@ -125,12 +130,8 @@ class CalculatorLineWidget(QWidget):
         try:
             self._product = product
             self.name_edit.setText(product.name)
-            self.regular_edit.setText(
-                format_money_input(product.regular_price)
-            )
-            self.website_edit.setText(
-                format_money_input(product.website_price)
-            )
+            self.regular_edit.setText(_price_input(product.regular_price))
+            self.website_edit.setText(_price_input(product.website_price))
             self.gift_name_edit.setText(product.default_gift_name or "")
             self.name_edit.setReadOnly(True)
         finally:
