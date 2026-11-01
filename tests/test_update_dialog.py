@@ -70,7 +70,16 @@ class FakeBackups:
 
 
 def outcome(products, **kw):
-    return ScrapeOutcome(tuple(products), 1, 1, 0, 0, 0, 1.0, **kw)
+    return ScrapeOutcome(
+        tuple(products),
+        categories_total=kw.pop("categories_total", 1),
+        categories_done=kw.pop("categories_done", 1),
+        categories_failed=kw.pop("categories_failed", 0),
+        failed_requests=kw.pop("failed_requests", 0),
+        price_failures=kw.pop("price_failures", 0),
+        elapsed_seconds=kw.pop("elapsed_seconds", 1.0),
+        **kw,
+    )
 
 
 @pytest.fixture
@@ -187,7 +196,7 @@ def test_no_changes_means_no_backup(qapp, conn):
 
 
 def test_suspicious_drop_blocks_apply(qapp, conn):
-    record_crawl_success(conn, NOW - timedelta(days=2), 100, complete=True)
+    record_crawl_success(conn, 100, complete=True)
     dialog = make(conn, FakeBackups())
     run_scan(dialog, [ScrapedProduct(f"P {i}", D(1), D(1)) for i in range(10)])
     assert not dialog.apply_button.isEnabled()

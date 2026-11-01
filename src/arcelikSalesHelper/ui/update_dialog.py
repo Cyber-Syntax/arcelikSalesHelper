@@ -387,10 +387,17 @@ class UpdateDialog(QDialog):
         state = load_state(self._conn)
         count = len(outcome.products)
         self._drop = is_suspicious_drop(count, state.product_count)
-        self._partial = not outcome.complete
+        structural = (
+            outcome.categories_failed
+            or outcome.failed_requests
+            or outcome.categories_done < outcome.categories_total
+        )
+        self._partial = bool(structural)
         try:
             record_crawl_success(
-                self._conn, count, complete=outcome.complete and not self._drop
+                self._conn,
+                count,
+                complete=outcome.complete and not self._drop,
             )
         except sqlite3.Error:
             log.exception("could not record the crawl result")
@@ -416,12 +423,14 @@ class UpdateDialog(QDialog):
         banner: list[str] = []
         if self._drop:
             banner.append(T.UPDATE_SITE_CHANGED)
-        if self._partial:
+        if structural:
             banner.append(
                 T.update_partial(
                     outcome.categories_done, outcome.categories_total
                 )
             )
+        if outcome.read_problems:
+            banner.append(T.update_read_problems(outcome.read_problems))
         self.banner.setText("\n".join(banner))
         self.banner.setVisible(bool(banner))
         blocker_state = self.partial_check.blockSignals(True)

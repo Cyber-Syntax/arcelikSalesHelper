@@ -119,29 +119,28 @@ def try_begin_attempt(conn: sqlite3.Connection, now: datetime) -> ScrapeGate:
             _set(conn, _K_ATTEMPTS, json.dumps([_fmt(t) for t in kept]))
         else:
             log.info(
-                "scrape attempt started (%d/%d in window)",
-                gate.used + 1,
-                gate.limit,
+                "scrape attempt rejected: %s, retry at %s",
+                gate.reason.value,
+                gate.retry_at,
             )
     return gate
 
 
 def record_crawl_success(
     conn: sqlite3.Connection,
-    now: datetime,
     product_count: int,
     *,
     complete: bool,
 ) -> None:
     """The baseline for the drop guard only moves after a complete crawl."""
     with transaction(conn):
-        _set(conn, _K_SUCCESS, _fmt(now))
         if complete:
-            with transaction(conn):
-                _set(conn, _K_COUNT, str(product_count))
+            _set(conn, _K_COUNT, str(product_count))
 
 
-def record_applied(conn: sqlite3.Connection, change_count: int) -> None:
+def record_applied(
+    conn: sqlite3.Connection, now: datetime, change_count: int
+) -> None:
     with transaction(conn):
         _set(conn, _K_SUCCESS, _fmt(now))
         _set(conn, _K_CHANGES, str(change_count))
