@@ -32,6 +32,7 @@ class ScrapeWorker(QThread):
         self._cancel.set()
 
     def run(self) -> None:
+        log.info("scrape worker started")
         try:
             # Imported here so a missing native library cannot stop the app.
             from arcelikSalesHelper.infrastructure.scraper import crawler
@@ -46,4 +47,10 @@ class ScrapeWorker(QThread):
             log.exception("scrape crashed")
             self.failed.emit(T.update_unexpected(str(exc)))
         else:
+            log.info(
+                "scrape worker finished: cancelled=%s error=%s elapsed=%.3fs",
+                outcome.cancelled,
+                None if outcome.error is None else outcome.error.code.value,
+                outcome.elapsed_seconds,
+            )
             self.finished_outcome.emit(outcome)

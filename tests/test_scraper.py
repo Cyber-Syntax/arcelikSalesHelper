@@ -192,3 +192,31 @@ def test_failed_category_makes_outcome_incomplete():
     outcome = _run(FakeSession(pages), ScrapeConfig())
     assert not outcome.complete
     assert outcome.categories_failed == 1
+
+
+def test_progress_reports_page_and_parse_phase():
+    pages = _site(
+        {
+            f"{BASE_URL}/buzdolabi": FakeResponse(
+                200, card("/buzdolabi/a", "A", "100,00 TL")
+            ),
+            f"{BASE_URL}/buzdolabi?page=1": FakeResponse(
+                200, card("/buzdolabi/a", "A", "100,00 TL")
+            ),
+        }
+    )
+    progress = []
+    outcome = asyncio.run(
+        crawl(
+            ScrapeConfig(category_allowlist=frozenset({"buzdolabi"})),
+            progress.append,
+            session_factory=FakeFactory(FakeSession(pages)),
+            sleep=_no_sleep,
+            jitter=lambda _a, _b: 0.0,
+        )
+    )
+    assert outcome.complete
+    page_events = [event for event in progress if event.phase == "parse"]
+    assert page_events
+    assert page_events[0].category == "buzdolabi"
+    assert page_events[0].page == 0

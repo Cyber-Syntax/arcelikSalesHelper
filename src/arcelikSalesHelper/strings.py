@@ -835,11 +835,11 @@ UPDATE_CANCELLED = "Tarama iptal edildi; hiçbir değişiklik yapılmadı."
 UPDATE_PROGRESS_START = "Site haritası okunuyor…"
 
 UPDATE_PREVIEW_COLUMNS = (
-    "Ürün", "Durum", "Eski normal", "Yeni normal", "Eski web", "Yeni web",
+    "Ürün", "Durum", "Eski fiyat", "Yeni fiyat", "Eski oliz", "Yeni oliz",
     "Karar", "Notlar",
 )  # fmt: skip
 UPDATE_RESULT_COLUMNS = (
-    "Ürün", "Durum", "Eski normal", "Yeni normal", "Eski web", "Yeni web",
+    "Ürün", "Durum", "Eski fiyat", "Yeni fiyat", "Eski oliz", "Yeni oliz",
 )  # fmt: skip
 UPDATE_APPLY_ALL = "Tümünü güncelle"
 UPDATE_SKIP_ALL = "Tümünü atla"
@@ -874,6 +874,14 @@ def update_progress(category: str, done: int, total: int) -> str:
 
 def update_progress_detail(count: int) -> str:
     return f"{count} ürün bulundu"
+
+
+def update_progress_phase(phase: str, page: int | None) -> str:
+    if page is None:
+        return "Kategori tamamlanıyor…"
+    if phase == "parse":
+        return f"Sayfa {page + 1} çözümleniyor…"
+    return f"Sayfa {page + 1} okunuyor…"
 
 
 def update_unexpected(detail: str) -> str:

@@ -149,10 +149,15 @@ No database migration is required. Cooldown/quota live in the existing
     would risk an IP ban;
   - a zero-product crawl returns `no_products`;
   - parse failures are counted and reported.
-- Progress is reported per category and per page, so the UI can show
-  `Taranıyor: <kategori> (3/48 kategori)` and the number of products found.
-- Logging: start time, category counts, product count, failures, duration and
-  cancellation. Never log response bodies.
+- Progress is reported per category and per page, including the current phase
+  (`okuma` or `çözümleme`), so the UI can show
+  `Taranıyor: <kategori> (3/48 kategori)`, the current page and the number of
+  products found.
+- Logging uses a short crawl ID to correlate events. Request attempts include
+  the safe request context, status, response byte count, retry/backoff and
+  elapsed time. Sitemap discovery, category pages and parser durations are
+  logged separately; slow requests/parses are warnings. Never log response
+  bodies, cookies or sensitive headers.
 
 **`__init__.py`**
 
@@ -698,7 +703,7 @@ with a real backup.
 | A website rename creates a duplicate product           | Accepted for now because names contain codes. The preview shows the new name; the employee can skip it or rename manually.                                         |
 | Empty discount keeps a stale website price             | Explicit row warning; the employee can edit the product manually. Documented in this plan and in the dialog text.                                                  |
 | Turkish `name_key` mismatch (`I`/`ı`/`İ`)              | The catalog and the website use the same Turkish names; test with real data. Do not change `name_key` without a separate migration and uniqueness review.          |
-| Long crawl blocks the UI                               | Worker thread, progress, cancel, and a note on the intro page.                                                                                                     |
+| Long crawl blocks the UI                               | Worker thread, page/phase progress, cancel, and request/parser timing logs.                                                                                       |
 | `curl_cffi` native library missing in a packaged build | `collect_all` in the spec, lazy import, clear Turkish error, smoke test on both operating systems.                                                                 |
 | Backup fails mid-flow                                  | Hard stop before any write; the existing failure banner is refreshed.                                                                                              |
 | Partial crawl applied as if complete                   | The "Kısmi sonuçları uygula" checkbox is required, plus a row warning.                                                                                             |
@@ -710,6 +715,10 @@ with a real backup.
 - A run is blocked during the 24-hour cooldown and after 5 attempts in 30 days.
 - The intro page shows the last success, the cooldown and the quota.
 - The progress page shows category progress and can be cancelled.
+- The progress page shows the current category, page and scrape phase.
+- The rotating log contains a crawl ID, request/retry timings, sitemap
+  discovery counts, page/parser timings and final diagnostic counters without
+  response bodies.
 - The preview shows every scraped product with its name, status and old → new
   regular/website prices.
 - Conflicts require a decision; bulk actions work; new products can be skipped.
