@@ -63,7 +63,7 @@ Prioritize tests that exercise an application workflow from input to result:
   the changes, and apply them only after confirmation.
 - Verify duplicate names, missing prices, malformed cards, pagination, page
   caps, partial crawls, and suspicious drops.
-- Verify that a successful apply records the update result and that a crawl
+- Verify that every started crawl, including failed and cancelled runs, records an attempt and consumes cooldown/quota, while only an applied update records the update result.
   without an apply does not appear as a successful update.
 - Calculate a realistic multi-product transaction and verify the visible
   totals, allocation, and POS-entry values.
