@@ -20,6 +20,7 @@ from arcelikSalesHelper.ui.main_window import MainWindow
 from arcelikSalesHelper.ui.theme import (
     DEFAULT_FONT_SCALE,
     FONT_SCALE_KEY,
+    SCRAPING_ENABLED_KEY,
     load_font_scale,
 )
 
@@ -175,3 +176,25 @@ def test_invalid_saved_text_scale_uses_the_default(tmp_path: Path) -> None:
     )
     settings.setValue(FONT_SCALE_KEY, 77)
     assert load_font_scale(settings) == DEFAULT_FONT_SCALE
+
+
+def test_scraping_toggle_is_off_by_default_and_persists(
+    qtbot, db, tmp_path, clock
+) -> None:  # type: ignore[no-untyped-def]
+    window, _, paths = make_window(db, tmp_path, clock)
+    qtbot.addWidget(window)
+    toggle = window.settings_tab.scraping_check
+    assert not toggle.isChecked()
+    assert not window.products_tab.update_button.isEnabled()
+
+    toggle.click()
+    settings_value = window._settings.value(SCRAPING_ENABLED_KEY, type=bool)
+    assert settings_value is True
+    assert window.products_tab.update_button.isEnabled()
+
+    restored = QSettings(
+        str(tmp_path / "ui-settings.ini"), QSettings.Format.IniFormat
+    )
+    reopened = MainWindow(db, paths, settings=restored)
+    qtbot.addWidget(reopened)
+    assert reopened.settings_tab.scraping_check.isChecked()

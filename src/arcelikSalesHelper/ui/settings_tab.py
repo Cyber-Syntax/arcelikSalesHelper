@@ -7,6 +7,7 @@ from PySide6.QtCore import QUrl, Signal
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
     QComboBox,
+    QCheckBox,
     QFormLayout,
     QHBoxLayout,
     QLabel,
@@ -61,11 +62,14 @@ class SettingsTab(QWidget):
         *,
         font_scale: int = DEFAULT_FONT_SCALE,
         on_font_scale_changed: Callable[[int], None] | None = None,
+        scraping_enabled: bool = False,
+        on_scraping_changed: Callable[[bool], None] | None = None,
     ) -> None:
         super().__init__(parent)
         self._paths = paths
         self._manager = manager
         self._on_font_scale_changed = on_font_scale_changed
+        self._on_scraping_changed = on_scraping_changed
 
         self.font_scale_combo = QComboBox()
         for percent in FONT_SCALE_CHOICES:
@@ -75,6 +79,11 @@ class SettingsTab(QWidget):
         self.font_scale_note = QLabel(T.NOTE_UI_TEXT_SIZE)
         self.font_scale_note.setWordWrap(True)
         self.font_scale_note.setStyleSheet(HINT_STYLE)
+        self.scraping_check = QCheckBox(T.CHK_SCRAPING_ENABLED)
+        self.scraping_check.setChecked(scraping_enabled)
+        self.scraping_note = QLabel(T.NOTE_SCRAPING)
+        self.scraping_note.setWordWrap(True)
+        self.scraping_note.setStyleSheet(HINT_STYLE)
 
         self.db_edit = self._path_edit(paths.db_path)
         self.backup_dir_edit = self._path_edit(paths.backup_dir)
@@ -106,6 +115,7 @@ class SettingsTab(QWidget):
         )
         form.addRow(T.LBL_LATEST_BACKUP, self.latest_label)
         form.addRow(T.LBL_UI_TEXT_SIZE, self.font_scale_combo)
+        form.addRow(T.LBL_SCRAPING, self.scraping_check)
         buttons = QHBoxLayout()
         buttons.addWidget(self.backup_button)
         buttons.addStretch(1)
@@ -114,6 +124,7 @@ class SettingsTab(QWidget):
         layout.addLayout(form)
         layout.addWidget(self.count_label)
         layout.addWidget(self.font_scale_note)
+        layout.addWidget(self.scraping_note)
         layout.addWidget(self.failure_label)
         layout.addLayout(buttons)
         layout.addWidget(self.feedback)
@@ -131,6 +142,8 @@ class SettingsTab(QWidget):
             self.font_scale_combo.currentIndexChanged.connect(
                 self._change_font_scale
             )
+        if on_scraping_changed is not None:
+            self.scraping_check.toggled.connect(on_scraping_changed)
         self.refresh()
 
     def _change_font_scale(self, index: int) -> None:

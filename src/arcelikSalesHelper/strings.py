@@ -653,6 +653,12 @@ BTN_OPEN_FOLDER = "Klasörü aç"
 LBL_LATEST_BACKUP = "Son başarılı yedek"
 LBL_UI_TEXT_SIZE = "Metin boyutu"
 NOTE_UI_TEXT_SIZE = "Uygulamadaki metinlerin boyutunu değiştirir."
+LBL_SCRAPING = "Web sitesi fiyat taraması"
+NOTE_SCRAPING = (
+    "Yetkili kullanım için açılır. Açık olduğunda Ürünler sekmesindeki "
+    "Güncelle düğmesi kullanılabilir."
+)
+CHK_SCRAPING_ENABLED = "Taramayı etkinleştir"
 BTN_BACKUP_NOW = "Şimdi yedekle"
 BACKUPS_DISABLED = "Yedekleme etkin değil."
 NO_BACKUP_YET = "Henüz yedek yok."

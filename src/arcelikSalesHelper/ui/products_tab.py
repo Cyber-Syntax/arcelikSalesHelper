@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 import sqlite3
 from decimal import Decimal
 from pathlib import Path
@@ -34,7 +33,6 @@ from PySide6.QtWidgets import (
 
 from arcelikSalesHelper import strings as T
 from arcelikSalesHelper.application.calculator import MoneyRead, read_money
-from arcelikSalesHelper.constants import SCRAPING_ENABLED_ENV_VAR
 from arcelikSalesHelper.domain.formatting import format_money_input, format_try
 from arcelikSalesHelper.domain.products import Product, ProductDraft
 from arcelikSalesHelper.domain.result import Err, Ok
@@ -358,12 +356,14 @@ class ProductsTab(QWidget):
         repo: ProductRepository,
         conn: sqlite3.Connection | None = None,
         backups: BackupManager | None = None,
+        scraping_enabled: bool = False,
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
         self._repo = repo
         self._conn = conn
         self._backups = backups
+        self._scraping_enabled = scraping_enabled
 
         self.search_edit = QLineEdit()
         self.search_edit.setPlaceholderText(T.PH_SEARCH)
@@ -409,7 +409,7 @@ class ProductsTab(QWidget):
         self.update_button.setEnabled(
             conn is not None
             and backups is not None
-            and os.environ.get(SCRAPING_ENABLED_ENV_VAR) == "1"
+            and self._scraping_enabled
         )
 
         top = QHBoxLayout()
@@ -451,6 +451,14 @@ class ProductsTab(QWidget):
             lambda _c=False: self._update_from_site()
         )
         self.reload()
+
+    def set_scraping_enabled(self, enabled: bool) -> None:
+        self._scraping_enabled = enabled
+        self.update_button.setEnabled(
+            self._conn is not None
+            and self._backups is not None
+            and enabled
+        )
 
     def reload(self) -> None:
         selected = self.selected_product()

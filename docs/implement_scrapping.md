@@ -1,9 +1,9 @@
 # Scraping integration plan — Products tab "Güncelle"
 
-Status: implemented behind an explicit authorization opt-in. The feature is
-disabled unless `ARCELIKSALESHELPER_ENABLE_SCRAPING=1` is configured by an
-authorized deployment. This file replaces the earlier notes and reference
-script; the script itself is not part of this document any more.
+Status: implemented behind an explicit authorization opt-in in the Settings
+tab. The feature is disabled by default and can be enabled by an authorized
+employee. This file replaces the earlier notes and reference script; the
+script itself is not part of this document any more.
 
 Sources: `docs/PRD.md`, `docs/implementation_plan.md`, `docs/employee_feedback.md`,
 and the product/CSV-import/backup code currently in `src/arcelikSalesHelper`.
@@ -592,8 +592,7 @@ where they already fit.
 
 - `Güncelle` button exists with the exact Turkish text.
 - The button is disabled when the connection or backup manager is missing.
-- The button is also disabled unless the authorized deployment sets
-  `ARCELIKSALESHELPER_ENABLE_SCRAPING=1`.
+- The button is also disabled unless scraping is enabled in the Settings tab.
 - The new dialog contains no English labels.
 - Product dialog accepts blank prices and the table shows `—` / `YOK`.
 
@@ -606,10 +605,10 @@ preference is a fake session.
 ## 14. Documentation updates
 
 - `docs/implement_scrapping.md`: this plan (replaces the earlier notes and
-  script).
+  script) and documents the Settings opt-in.
 - `docs/implementation_plan.md`: keep website scraping marked partial and
-  pending authorization; the implementation is available only behind the
-  explicit deployment opt-in.
+  pending authorization; the implementation is available only after the
+  employee enables scraping in Settings.
 - `docs/PRD.md`: add a short deviation note, because the PRD says the GUI must
   not depend on scraping behavior or anti-bot workarounds. Record that scraping
   is an optional, isolated, employee-triggered integration with hard rate

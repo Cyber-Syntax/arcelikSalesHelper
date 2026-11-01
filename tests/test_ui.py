@@ -17,12 +17,12 @@ def test_update_button(qapp, db):
     assert not ProductsTab(repo, db, None).update_button.isEnabled()
 
 
-def test_update_button_requires_authorization_opt_in(qapp, db, monkeypatch):
+def test_update_button_requires_settings_opt_in(qapp, db):
     repo = ProductRepository(db)
-    monkeypatch.delenv("ARCELIKSALESHELPER_ENABLE_SCRAPING", raising=False)
     assert not ProductsTab(repo, db, object()).update_button.isEnabled()
-    monkeypatch.setenv("ARCELIKSALESHELPER_ENABLE_SCRAPING", "1")
-    assert ProductsTab(repo, db, object()).update_button.isEnabled()
+    assert ProductsTab(
+        repo, db, object(), scraping_enabled=True
+    ).update_button.isEnabled()
 
 
 def add_product(
