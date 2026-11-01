@@ -1,6 +1,6 @@
 # Behavior Test Implementation Plan
 
-**Status:** Active alpha testing plan  
+**Status:** Active alpha testing plan<br>
 **Scope:** Employee-visible behavior and stable business rules
 
 ## 1. Purpose
