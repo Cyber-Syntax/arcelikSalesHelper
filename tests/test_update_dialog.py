@@ -241,3 +241,23 @@ def test_crawl_error_returns_to_intro_and_still_counts(qapp, conn):
     assert (
         not dialog.start_button.isEnabled()
     )  # the attempt started the cooldown
+
+
+def test_blocked_crawl_is_safe_and_cannot_be_retried_immediately(qapp, conn):
+    repo, pid = seed(conn)
+    dialog = make(conn, FakeBackups())
+    blocked = ScrapeError(ScrapeErrorCode.BLOCKED, T.UPDATE_BLOCKED)
+
+    run_scan(
+        dialog,
+        [ScrapedProduct("ADE 500", D(999), D(888))],
+        error=blocked,
+    )
+
+    assert dialog.stack.currentIndex() == PAGE_INTRO
+    assert repo.get(pid).regular_price == D(100)
+    assert repo.get(pid).website_price == D(90)
+    assert repo.search("NEW 1") == []
+    assert load_state(conn).attempts == (NOW,)
+    assert not dialog.start_button.isEnabled()
+    assert dialog.message_label.text() == T.UPDATE_BLOCKED
