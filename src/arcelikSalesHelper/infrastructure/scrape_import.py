@@ -153,14 +153,6 @@ def build_scrape_parsed(
     return ScrapeBuild(parsed, len(scraped), duplicates, without_price)
 
 
-# ---- decisions -----------------------------------------------------------
-
-
-def default_decisions(plan: ImportPlan) -> dict[int, Decision]:
-    """Conflicts default to Skip: no existing price changes unless chosen."""
-    return {item.row.row: Decision.SKIP for item in plan.conflicts}
-
-
 def without_rows(plan: ImportPlan, skipped: Collection[int]) -> ImportPlan:
     """Drop NEW rows the employee unticked (conflicts use decisions)."""
     items = tuple(

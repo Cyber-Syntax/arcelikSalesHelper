@@ -1,7 +1,9 @@
 # Scraping integration plan — Products tab "Güncelle"
 
-Status: implementation plan, not code. This file replaces the earlier notes and
-reference script; the script itself is not part of this document any more.
+Status: implemented behind an explicit authorization opt-in in the Settings
+tab. The feature is disabled by default and can be enabled by an authorized
+employee. This file replaces the earlier notes and reference script; the
+script itself is not part of this document any more.
 
 Sources: `docs/PRD.md`, `docs/implementation_plan.md`, `docs/employee_feedback.md`,
 and the product/CSV-import/backup code currently in `src/arcelikSalesHelper`.
@@ -168,8 +170,8 @@ No database migration is required. Cooldown/quota live in the existing
 - Deduplicate scraped products by `name_key`: the first occurrence wins; later
   duplicates are dropped and logged. Because product names contain codes, this
   should be rare.
-- Keep the scraped values alongside the effective values so the preview can
-  show both "site: boş" and "mevcut fiyat korunuyor".
+- The preview shows the effective old and new values plus row warnings explaining
+  when a missing site value preserves the existing catalog value.
 - Expose a small `ScrapePlanInfo` with counts: scraped, new, conflicts,
   unchanged, rows with no price, duplicate names.
 
@@ -205,7 +207,7 @@ All functions take an injected `now`, so tests use a fake clock.
 
 - `QThread`-based worker with a `run` method that calls `asyncio.run` on the
   crawler.
-- Signals: `progress(object)`, `finished(object)`, `failed(str)`.
+- Signals: `progress(object)`, `finished_outcome(object)`, `failed(str)`.
 - `cancel()` sets a thread-safe event; the crawler checks it.
 - Lazy-imports the scraper package and converts `ImportError` into a Turkish
   "Güncelleme bileşeni yüklenemedi" failure instead of crashing the app.
@@ -264,7 +266,7 @@ Responsibilities:
 | `strings.py`                               | Add the Turkish strings listed in section 9.                                                                                                                                                   |
 | `pyproject.toml`                           | Add `curl-cffi` and `selectolax` dependencies.                                                                                                                                                 |
 | `uv.lock`                                  | Regenerate with `uv lock`.                                                                                                                                                                     |
-| `arcelikSalesHelper.spec`                  | Collect the native libraries and data of `curl_cffi` and `selectolax`.                                                                                                                         |
+| `arcelikSalesHelper.spec` (new)            | Create a spec that collects the native libraries and data of `curl_cffi` and `selectolax`.                                                                                                    |
 | `tests/test_ui_localization.py`            | Include the new dialog in the English-label scan.                                                                                                                                              |
 
 ## 6. Scrape → catalog mapping rules
@@ -293,7 +295,7 @@ Archived matches:
 Additional row warnings:
 
 - "Sitede indirimli fiyat yok; mevcut web fiyatı korunacak." when only the
-  website price is empty for an existing product;
+  website price is empty and the existing website price is non-zero;
 - "Bu ürün arşivde; güncellemek geri yükler.";
 - "Tarama tamamlanmadı; bu sonuçlar eksik olabilir." when the crawl was
   partial.
@@ -333,7 +335,9 @@ Shows:
 - Indeterminate progress bar plus a status label with the current category,
   categories done/total and products found.
 - **Taramayı iptal et**.
-- Cancelling discards the partial result and writes no database changes.
+- Cancelling discards the partial result and writes no product changes; the
+  attempt metadata is recorded before crawling so cancelled runs consume the
+  cooldown and quota.
 - If the crawl fails with `blocked`, `no_products` or `network`, the dialog
   shows the Turkish error and returns to the intro page. The attempt still
   counts toward the cooldown/quota.
@@ -440,8 +444,8 @@ Rules:
 - The intro page shows the remaining cooldown and the quota usage.
 - There is no GUI override. Constants can be changed by a developer, but the
   shipped defaults are 24 hours and 5 runs per 30 days.
-- Every run writes a log entry with the gate decision, start/end time, category
-  count, product count, failures and cancellation state.
+- Every run logs the gate decision, start/end time, category count, product
+  count, failures and cancellation state.
 
 ## 10. Turkish UI strings
 
@@ -588,6 +592,7 @@ where they already fit.
 
 - `Güncelle` button exists with the exact Turkish text.
 - The button is disabled when the connection or backup manager is missing.
+- The button is also disabled unless scraping is enabled in the Settings tab.
 - The new dialog contains no English labels.
 - Product dialog accepts blank prices and the table shows `—` / `YOK`.
 
@@ -600,12 +605,10 @@ preference is a fake session.
 ## 14. Documentation updates
 
 - `docs/implement_scrapping.md`: this plan (replaces the earlier notes and
-  script).
-- `docs/implementation_plan.md`:
-  - change the "Website scraping" row from Deferred to Implemented
-    (employee-triggered, rate-limited);
-  - add a milestone section with the scope and exit checks from this plan;
-  - update the "Later milestones" bullet that currently defers scraping.
+  script) and documents the Settings opt-in.
+- `docs/implementation_plan.md`: keep website scraping marked partial and
+  pending authorization; the implementation is available only after the
+  employee enables scraping in Settings.
 - `docs/PRD.md`: add a short deviation note, because the PRD says the GUI must
   not depend on scraping behavior or anti-bot workarounds. Record that scraping
   is an optional, isolated, employee-triggered integration with hard rate

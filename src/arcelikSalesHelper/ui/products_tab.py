@@ -234,10 +234,10 @@ class ProductDialog(QDialog):
         if product is not None:
             self.name_edit.setText(product.name)
             self.regular_edit.setText(
-                format_money_input(product.regular_price)
+                _price_input(product.regular_price)
             )
             self.website_edit.setText(
-                format_money_input(product.website_price)
+                _price_input(product.website_price)
             )
             self.gift_edit.setText(product.default_gift_name or "")
             self.notes_edit.setPlainText(product.notes or "")
@@ -356,12 +356,14 @@ class ProductsTab(QWidget):
         repo: ProductRepository,
         conn: sqlite3.Connection | None = None,
         backups: BackupManager | None = None,
+        scraping_enabled: bool = False,
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
         self._repo = repo
         self._conn = conn
         self._backups = backups
+        self._scraping_enabled = scraping_enabled
 
         self.search_edit = QLineEdit()
         self.search_edit.setPlaceholderText(T.PH_SEARCH)
@@ -404,7 +406,11 @@ class ProductsTab(QWidget):
         self._update_running = False
         self.update_button = QPushButton(T.BTN_UPDATE_FROM_SITE)
         self.update_button.setToolTip(T.TIP_UPDATE_FROM_SITE)
-        self.update_button.setEnabled(conn is not None and backups is not None)
+        self.update_button.setEnabled(
+            conn is not None
+            and backups is not None
+            and self._scraping_enabled
+        )
 
         top = QHBoxLayout()
         top.addWidget(self.search_edit, 1)
@@ -445,6 +451,14 @@ class ProductsTab(QWidget):
             lambda _c=False: self._update_from_site()
         )
         self.reload()
+
+    def set_scraping_enabled(self, enabled: bool) -> None:
+        self._scraping_enabled = enabled
+        self.update_button.setEnabled(
+            self._conn is not None
+            and self._backups is not None
+            and enabled
+        )
 
     def reload(self) -> None:
         selected = self.selected_product()

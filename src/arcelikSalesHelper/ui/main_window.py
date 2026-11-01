@@ -37,7 +37,12 @@ from .common import show_warning
 from .history_tab import HistoryTab
 from .products_tab import ProductsTab
 from .settings_tab import SettingsTab, describe_failure
-from .theme import FONT_SCALE_KEY, install_material_theme, load_font_scale
+from .theme import (
+    FONT_SCALE_KEY,
+    SCRAPING_ENABLED_KEY,
+    install_material_theme,
+    load_font_scale,
+)
 
 BANNER_STYLE = "background-color: #d32f2f; color: white; padding: 6px;"
 
@@ -70,7 +75,12 @@ class MainWindow(QMainWindow):
         self._backups = backups
         repo = ProductRepository(conn)
         self._history_repo = HistoryRepository(conn)
-        self.products_tab = ProductsTab(repo, conn, backups)
+        scraping_enabled = self._settings.value(
+            SCRAPING_ENABLED_KEY, False, type=bool
+        )
+        self.products_tab = ProductsTab(
+            repo, conn, backups, scraping_enabled=scraping_enabled
+        )
         self.calculator_tab = CalculatorTab(repo)
         self.calculator_tab.set_font_scale(self._font_scale)
         self.history_tab = HistoryTab(self._history_repo)
@@ -79,6 +89,8 @@ class MainWindow(QMainWindow):
             backups,
             font_scale=self._font_scale,
             on_font_scale_changed=self._set_font_scale,
+            scraping_enabled=scraping_enabled,
+            on_scraping_changed=self._set_scraping_enabled,
         )
 
         self.tabs = QTabWidget()
@@ -125,6 +137,11 @@ class MainWindow(QMainWindow):
         if app is not None:
             install_material_theme(app, percent)
         self.calculator_tab.set_font_scale(percent)
+
+    def _set_scraping_enabled(self, enabled: bool) -> None:
+        self._settings.setValue(SCRAPING_ENABLED_KEY, enabled)
+        self._settings.sync()
+        self.products_tab.set_scraping_enabled(enabled)
 
     # ---- backups ---------------------------------------------------------
 

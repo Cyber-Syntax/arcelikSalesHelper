@@ -166,6 +166,7 @@ def test_pagination_stops_on_repeated_page():
     outcome = _run(session)
     assert [p.name for p in outcome.products] == ["A", "B"]
     assert outcome.complete
+    assert f"{BASE_URL}/buzdolabi?page=2" in session.calls
     assert f"{BASE_URL}/buzdolabi?page=3" not in session.calls
 
 

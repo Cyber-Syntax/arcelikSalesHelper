@@ -653,6 +653,12 @@ BTN_OPEN_FOLDER = "Klasörü aç"
 LBL_LATEST_BACKUP = "Son başarılı yedek"
 LBL_UI_TEXT_SIZE = "Metin boyutu"
 NOTE_UI_TEXT_SIZE = "Uygulamadaki metinlerin boyutunu değiştirir."
+LBL_SCRAPING = "Web sitesi fiyat taraması"
+NOTE_SCRAPING = (
+    "Yetkili kullanım için açılır. Açık olduğunda Ürünler sekmesindeki "
+    "Güncelle düğmesi kullanılabilir."
+)
+CHK_SCRAPING_ENABLED = "Taramayı etkinleştir"
 BTN_BACKUP_NOW = "Şimdi yedekle"
 BACKUPS_DISABLED = "Yedekleme etkin değil."
 NO_BACKUP_YET = "Henüz yedek yok."
@@ -663,6 +669,7 @@ BACKUP_REASON_LABELS = {
     "close": "kapanış",
     "pre_migration": "yükseltme öncesi",
     "pre_import": "içe aktarma öncesi",
+    "pre_scrape": "tarama öncesi",
     "manual": "elle",
 }
 BACKUP_REASON_UNKNOWN = "bilinmiyor"
@@ -874,8 +881,14 @@ def update_unexpected(detail: str) -> str:
 
 
 def update_counts(
-    scraped, new, conflicts, unchanged, without_price, duplicates, errors
-):
+    scraped: int,
+    new: int,
+    conflicts: int,
+    unchanged: int,
+    without_price: int,
+    duplicates: int,
+    errors: int,
+) -> str:
     text = (
         f"{scraped} ürün tarandı · {new} yeni · {conflicts} fiyat farkı "
         f"(varsayılan: atla) · {unchanged} değişmedi · {without_price} ürünün "
@@ -888,8 +901,8 @@ def update_counts(
 
 def update_read_problems(count: int) -> str:
     return (
-        f"{count} ürün kartı veya sayfa okunamadı ya da sayfa sınırına takıldı. "
-        "Sonuçlar eksik olabilir."
+        f"{count} fiyat alanı, ürün kartı veya sayfa okunamadı ya da sayfa "
+        "sınırına takıldı. Sonuçlar eksik olabilir."
     )
 
 

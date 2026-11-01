@@ -6,6 +6,7 @@ from qt_material import apply_stylesheet
 
 MATERIAL_THEME = "light_blue.xml"
 FONT_SCALE_KEY = "ui/font_scale_percent"
+SCRAPING_ENABLED_KEY = "scraping/enabled"
 FONT_SCALE_CHOICES = (100, 110, 120, 130, 140, 150)
 DEFAULT_FONT_SCALE = 100
 
