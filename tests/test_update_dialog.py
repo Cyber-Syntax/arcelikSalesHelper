@@ -250,7 +250,10 @@ def test_blocked_crawl_is_safe_and_cannot_be_retried_immediately(qapp, conn):
 
     run_scan(
         dialog,
-        [ScrapedProduct("ADE 500", D(999), D(888))],
+        [
+            ScrapedProduct("ADE 500", D(999), D(888)),
+            ScrapedProduct("NEW 1", D(1), D(1)),
+        ],
         error=blocked,
     )
 
