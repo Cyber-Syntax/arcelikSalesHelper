@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import sqlite3
 from decimal import Decimal
 from pathlib import Path
@@ -33,6 +34,7 @@ from PySide6.QtWidgets import (
 
 from arcelikSalesHelper import strings as T
 from arcelikSalesHelper.application.calculator import MoneyRead, read_money
+from arcelikSalesHelper.constants import SCRAPING_ENABLED_ENV_VAR
 from arcelikSalesHelper.domain.formatting import format_money_input, format_try
 from arcelikSalesHelper.domain.products import Product, ProductDraft
 from arcelikSalesHelper.domain.result import Err, Ok
@@ -404,7 +406,11 @@ class ProductsTab(QWidget):
         self._update_running = False
         self.update_button = QPushButton(T.BTN_UPDATE_FROM_SITE)
         self.update_button.setToolTip(T.TIP_UPDATE_FROM_SITE)
-        self.update_button.setEnabled(conn is not None and backups is not None)
+        self.update_button.setEnabled(
+            conn is not None
+            and backups is not None
+            and os.environ.get(SCRAPING_ENABLED_ENV_VAR) == "1"
+        )
 
         top = QHBoxLayout()
         top.addWidget(self.search_edit, 1)

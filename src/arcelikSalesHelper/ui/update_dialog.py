@@ -381,7 +381,9 @@ class UpdateDialog(QDialog):
             outcome.categories_done,
             outcome.categories_total,
             len(outcome.products),
-            outcome.failed_requests + outcome.read_problems,
+            outcome.categories_failed
+            + outcome.failed_requests
+            + outcome.read_problems,
         )
         self._release_worker()
         if outcome.cancelled:

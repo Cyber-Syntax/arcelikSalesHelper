@@ -131,7 +131,9 @@ class CalculatorLineWidget(QWidget):
             self._product = product
             self.name_edit.setText(product.name)
             self.regular_edit.setText(_price_input(product.regular_price))
-            self.website_edit.setText(_price_input(product.website_price))
+            self.website_edit.setText(
+                format_money_input(product.website_price)
+            )
             self.gift_name_edit.setText(product.default_gift_name or "")
             self.name_edit.setReadOnly(True)
         finally:
