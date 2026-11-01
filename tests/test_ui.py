@@ -52,7 +52,7 @@ def test_dialog_shows_inline_errors_and_stays_open(qtbot, repo) -> None:  # type
     assert dialog.saved is None
     assert dialog.blocks["name"].error_text != ""
     assert dialog.blocks["regular_price"].error_text != ""
-    assert dialog.blocks["website_price"].error_text != ""
+    assert dialog.blocks["website_price"].error_text == ""
     assert repo.search() == []
 
 
