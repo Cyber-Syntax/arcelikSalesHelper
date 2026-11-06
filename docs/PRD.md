@@ -87,6 +87,7 @@ The GUI must not depend on scraping behavior, website markup, or anti-bot workar
 - **Shared manager total:** One transaction-wide manager sale total, split proportionally to each product line's regular price multiplied by quantity. Fractional residue is assigned deterministically so allocated line totals add exactly to the entered total.
 - **POS calculation mode:** Per-line choice between fixed-amount and percentage-based website/no-gift POS calculation. Defaults to fixed amount.
 - **POS-entry amount:** The value calculated for entry into Dynamics AX/POS. It is separate from the customer-facing website or manager option and remains labeled as requiring operational verification.
+- **Campaign profile:** The measured linear discount behavior of a transaction line, represented by an effective rate (`r`), fixed amount (`c`), and whether the line may be adjusted. The UI does not infer this profile from a product name.
 
 ### Product fields
 
