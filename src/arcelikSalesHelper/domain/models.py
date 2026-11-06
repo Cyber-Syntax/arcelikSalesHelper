@@ -24,6 +24,15 @@ class PosCalculationMode(Enum):
 
 
 @dataclass(frozen=True)
+class CampaignProfile:
+    """The measured discount behavior of one POS line."""
+
+    rate: Decimal = Decimal(0)
+    fixed_amount: Decimal = Decimal(0)
+    editable: bool = True
+
+
+@dataclass(frozen=True)
 class LineInput:
     product_name: str
     quantity: int
@@ -35,6 +44,7 @@ class LineInput:
     manager_mode: ManagerMode | None = None
     pos_calculation_mode: PosCalculationMode = PosCalculationMode.FIXED_AMOUNT
     product_id: int | None = None
+    campaign_profile: CampaignProfile | None = None
 
 
 @dataclass(frozen=True)

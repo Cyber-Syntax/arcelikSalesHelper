@@ -81,7 +81,7 @@ def test_snapshot_columns_hold_normalized_values_and_entered_text() -> None:
     )
     assert D(second.manager_line_total or "") == D(13500)
     assert D(second.manager_unit or "") == D(4500)
-    assert json.loads(second.entered_json) == {}
+    assert json.loads(second.entered_json) == {"campaign_profile": None}
     assert first.pos_calculation_mode == PosCalculationMode.FIXED_AMOUNT.value
 
 

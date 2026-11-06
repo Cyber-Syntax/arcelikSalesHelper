@@ -172,7 +172,7 @@ def _line_record(
             else format_decimal_exact(result.manager_unit)
         ),
         result_json=_dumps(body),
-        entered_json="{}",
+        entered_json=_dumps({"campaign_profile": line.campaign_profile}),
     )
 
 

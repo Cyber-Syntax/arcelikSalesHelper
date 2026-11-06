@@ -157,6 +157,32 @@ def test_blank_shared_manager_total_applies_no_manager_values(
     assert tab.evaluation.forms[0].manager_value == ""
 
 
+def test_shared_manager_total_without_pos_shown_calculates(
+    qtbot, repo
+) -> None:  # type: ignore[no-untyped-def]
+    tab = CalculatorTab(repo)
+    qtbot.addWidget(tab)
+    fill(tab.rows[0], "Fridge", "5.000,00", "4.000,00")
+    tab.shared_manager_edit.setText("3.000,00")
+
+    assert tab.evaluation.valid
+    assert tab.evaluation.result is not None
+    assert tab.evaluation.result.totals.pos.value == D("4000.00")
+
+
+def test_reduction_fields_do_not_require_unavailable_calibration(
+    qtbot, repo
+) -> None:  # type: ignore[no-untyped-def]
+    tab = CalculatorTab(repo)
+    qtbot.addWidget(tab)
+    fill(tab.rows[0], "Fridge", "5.000,00", "4.000,00")
+    tab.pos_shown_edit.setText("4.000,00")
+    tab.shared_manager_edit.setText("3.000,00")
+
+    assert tab.evaluation.valid
+    assert tab.evaluation.pending_reason is None
+
+
 def test_removing_a_line_recomputes_totals(qtbot, repo) -> None:  # type: ignore[no-untyped-def]
     tab = CalculatorTab(repo)
     qtbot.addWidget(tab)

@@ -147,10 +147,10 @@ PH_MANAGER_TOTAL = "Örneğin 68.131,00"
 GROUP_SPLIT = "Toplam dağıtımı"
 LBL_POS_SHOWN_TOTAL = "POS'ta görünen indirimli toplam"
 PH_POS_SHOWN_TOTAL = "Örneğin 189.450,00"
-CHK_LOCK_LINE = "Sabit tut (düğün)"
+CHK_LOCK_LINE = "Kampanya kalibrasyonu gerekli"
 TIP_LOCK_LINE = (
-    "İşaretli ürün POS'a ilk fiyatıyla girilir. Fark yalnızca işaretsiz "
-    "(oliz) ürünlere bölünür."
+    "Bu satır için POS'un iki fiyat noktasından ölçülen etkin indirim "
+    "profili gereklidir."
 )
 LBL_QUICK_ROW_PRICE = "İlk fiyat"
 
@@ -158,7 +158,10 @@ SPLIT_NEED_BOTH = (
     "POS'ta görünen toplamı ve yönetici toplamını birlikte girin."
 )
 SPLIT_NO_FREE = (
-    "Fiyatı düşürülecek en az bir sabit olmayan (oliz) ürün bırakın."
+    "Fiyatı düzeltilecek en az bir kalibre edilmiş satır bırakın."
+)
+SPLIT_CALIBRATION_REQUIRED = (
+    "Dağıtım için her satırın etkin indirim kalibrasyonu gereklidir."
 )
 SPLIT_NOT_ENOUGH = (
     "Sabit olmayan ürünler bu farkı karşılayamıyor; fark, ürünlerin net "
@@ -167,11 +170,15 @@ SPLIT_NOT_ENOUGH = (
 SEC_SPLIT_SUMMARY = "Dağıtım özeti"
 LBL_SPLIT_POS_SHOWN = "POS'ta görünen indirimli toplam"
 LBL_SPLIT_TARGET = "Yönetici toplam fiyatı"
-LBL_SPLIT_CUT = "Sabit olmayan ürünlerden düşülen tutar"
-LBL_SPLIT_ADD = "Sabit olmayan ürünlere eklenen tutar"
+LBL_SPLIT_CUT = "Düzenlenebilir satırlardan düşülen tutar"
+LBL_SPLIT_ADD = "Düzenlenebilir satırlara eklenen tutar"
 SPLIT_NOTE = (
-    "Sabit tutulan ürünler ilk fiyatıyla girilir. Fark, sabit olmayan "
-    "ürünlere ilk fiyat oranında bölündü. Sonucu POS'ta bir kez doğrulayın."
+    "Fark yalnızca kalibre edilmiş düzenlenebilir satırlara net tutarları "
+    "oranında dağıtıldı. Sonucu POS'ta bir kez doğrulayın."
+)
+SPLIT_NOTE_FALLBACK = (
+    "Etkin indirim kalibrasyonu bulunamadı. Fark mevcut fiyat ağırlığıyla "
+    "dağıtıldı; POS'ta sonucu mutlaka doğrulayın."
 )
 
 
