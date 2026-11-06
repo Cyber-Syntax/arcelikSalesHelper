@@ -88,6 +88,7 @@ The GUI must not depend on scraping behavior, website markup, or anti-bot workar
 - **POS calculation mode:** Per-line choice between fixed-amount and percentage-based website/no-gift POS calculation. Defaults to fixed amount.
 - **POS-entry amount:** The value calculated for entry into Dynamics AX/POS. It is separate from the customer-facing website or manager option and remains labeled as requiring operational verification.
 - **Campaign profile:** The measured linear discount behavior of a transaction line, represented by an effective rate (`r`), fixed amount (`c`), and whether the line may be adjusted. The UI does not infer this profile from a product name.
+- When no campaign profile is available, the calculator uses a clearly labeled price-weighted fallback for the shared-total workflow and requires POS verification; it does not pretend that automatic calibration occurred.
 
 ### Product fields
 

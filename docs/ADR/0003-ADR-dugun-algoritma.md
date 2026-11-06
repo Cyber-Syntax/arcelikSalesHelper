@@ -190,6 +190,11 @@ def solve(items, target):
 
 ## 7. Uygulama Adımları
 
+Yerel POS/web kalibrasyon bağlayıcısı henüz bulunmadığı için uygulama,
+profil olmayan satırlarda dağıtımı engellemez. Bu durumda mevcut fiyat
+ağırlıklı dağıtım kullanılır ve kullanıcıya POS doğrulaması gerektiği açıkça
+bildirilir. Kalibrasyon profili sağlandığında aşağıdaki ADR çözümü kullanılır.
+
 1. Satır modeline ölçülmüş kampanya profili (`r`, `c`, `editable`) ekle.
 2. Kalibrasyon fonksiyonunu yaz ve ürün başına önbellekle (kampanya değişirse geçersiz kıl).
 3. Dağıtımı "tüm ürünlere eşit" yerine "seçili ürünlere net üzerinden orantılı" yap.
