@@ -1,4 +1,5 @@
 from decimal import Decimal as D
+from decimal import localcontext
 
 import pytest
 
@@ -39,20 +40,54 @@ def test_verify_corrects_last_editable_line_and_reports_convergence() -> None:
     lines = (
         CampaignLine("editable", D(100), CampaignProfile(D("0.10"))),
     )
-    initial = solve_campaign_prices(lines, D(120))
+    initial = solve_campaign_prices(lines, D("119.997"))
 
     result = verify_campaign_prices(
         initial,
         lines,
-        D(120),
+        D("119.997"),
         lambda prices: prices[0].price * D("0.90"),
     )
 
     assert result.converged
     assert result.difference == D(0)
-    assert result.rounds == 1
+    assert result.rounds == 0
 
 
 def test_calibrate_rejects_equal_points() -> None:
     with pytest.raises(ValueError, match="farklı"):
         calibrate(lambda price: price, D(10), D(10))
+
+
+def test_solve_rounds_large_money_values_without_context_failure() -> None:
+    with localcontext() as context:
+        context.prec = 28
+        prices = solve_campaign_prices(
+            (
+                CampaignLine(
+                    "large",
+                    D("1e40"),
+                    CampaignProfile(D("0.10")),
+                ),
+            ),
+            D("1e40"),
+        )
+
+    assert prices[0].price.as_tuple().exponent == -2
+
+
+def test_verification_does_not_claim_convergence_for_unrepresentable_cents() -> None:
+    lines = (
+        CampaignLine("editable", D(100), CampaignProfile(D("0.10"))),
+    )
+    initial = solve_campaign_prices(lines, D(100))
+
+    result = verify_campaign_prices(
+        initial,
+        lines,
+        D("100.005"),
+        lambda prices: prices[0].price * D("0.90"),
+    )
+
+    assert not result.converged
+    assert result.difference != D(0)

@@ -163,6 +163,9 @@ SPLIT_NO_FREE = (
 SPLIT_CALIBRATION_REQUIRED = (
     "Dağıtım için her satırın etkin indirim kalibrasyonu gereklidir."
 )
+SPLIT_MIXED_CALIBRATION = (
+    "Karışık kalibrasyonlu ve kalibrasyonsuz satırlar birlikte dağıtılamaz."
+)
 SPLIT_NOT_ENOUGH = (
     "Sabit olmayan ürünler bu farkı karşılayamıyor; fark, ürünlerin net "
     "tutarını aşıyor."

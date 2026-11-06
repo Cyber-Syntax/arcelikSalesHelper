@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
-from decimal import ROUND_HALF_UP, Decimal
+from decimal import ROUND_HALF_UP, Decimal, localcontext
 
 from .arith import ZERO
 from .models import CampaignProfile
@@ -33,7 +33,9 @@ class VerificationResult:
 
 
 def _round_price(value: Decimal) -> Decimal:
-    return value.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    with localcontext() as context:
+        context.prec = max(60, len(value.as_tuple().digits) + max(value.adjusted(), 0) + 3)
+        return value.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
 
 def calibrate(
@@ -131,8 +133,14 @@ def verify_campaign_prices(
                     difference if price.line_id == last.line_id else ZERO
                 ),
                 price=(
-                    price.price
-                    + (correction if price.line_id == last.line_id else ZERO)
+                    _round_price(
+                        price.price
+                        + (
+                            correction
+                            if price.line_id == last.line_id
+                            else ZERO
+                        )
+                    )
                 ),
             )
             for price in current

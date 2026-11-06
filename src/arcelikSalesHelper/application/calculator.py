@@ -551,6 +551,9 @@ def evaluate_with_reduction(
         line_results.append(result)
 
     has_profiles = all(f.campaign_profile is not None for f in kept)
+    has_any_profiles = any(f.campaign_profile is not None for f in kept)
+    if has_any_profiles and not has_profiles:
+        return _pending(kept, T.SPLIT_MIXED_CALIBRATION)
     if not has_profiles:
         shares = distribute_cents(
             reduction,
@@ -600,8 +603,11 @@ def evaluate_with_reduction(
         )
         manager = (
             desired_pos
-            if form.gift_selected
-            else sub(desired_pos, sub(res.regular_total, res.website_discounted_total))
+            if form.gift_selected or not has_profiles
+            else sub(
+                desired_pos,
+                sub(res.regular_total, res.website_discounted_total),
+            )
         )
         if manager < ZERO:
             return _pending(kept, T.SPLIT_NOT_ENOUGH)
