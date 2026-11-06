@@ -342,7 +342,8 @@ class UpdateDialog(QDialog):
             )
         )
         self.progress_detail.setText(
-            T.update_progress_detail(progress.products_found)
+            f"{T.update_progress_detail(progress.products_found)} "
+            f"{T.update_progress_phase(progress.phase, progress.page)}"
         )
 
     def _release_worker(self) -> None:

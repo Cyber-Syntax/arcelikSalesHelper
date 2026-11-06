@@ -16,6 +16,7 @@ from arcelikSalesHelper.domain.formatting import (
     format_try,
 )
 from arcelikSalesHelper.domain.models import (
+    CampaignProfile,
     POS_LABEL,
     GiftOption,
     LineInput,
@@ -28,13 +29,15 @@ from arcelikSalesHelper.domain.models import (
 )
 from arcelikSalesHelper.domain.money import parse_money_ex
 from arcelikSalesHelper.domain.pricing import (
+    allocate_total_by_weight,
     build_options,
     calculate_line,
     calculate_transaction,
-    distribute_cents,
     effective_website_price,
+    distribute_cents,
     round_pos_amount,
 )
+from arcelikSalesHelper.domain.campaign import CampaignLine, solve_campaign_prices
 from arcelikSalesHelper.domain.result import Err, Ok
 
 # ---- input ----------------------------------------------------------------
@@ -55,7 +58,9 @@ class LineForm:
     manager_mode: ManagerMode = ManagerMode.UNIT
     pos_calculation_mode: PosCalculationMode = PosCalculationMode.FIXED_AMOUNT
     product_id: int | None = None
-    locked: bool = False  # düğün: POS'a ilk fiyatıyla girilir, dokunulmaz
+    campaign_profile: CampaignProfile | None = None
+    # Kept only so old history snapshots remain readable.
+    locked: bool = False
 
 
 @dataclass(frozen=True)
@@ -215,6 +220,7 @@ def evaluate_line(form: LineForm, line_index: int = 0) -> Evaluation:
         manager_mode=form.manager_mode if manager_value is not None else None,
         pos_calculation_mode=form.pos_calculation_mode,
         product_id=form.product_id,
+        campaign_profile=form.campaign_profile,
     )
     match calculate_line(line, line_index):
         case Ok(result):
@@ -485,19 +491,45 @@ def evaluate_with_reduction(
     target_text: str,
     quick: bool = False,
 ) -> TransactionEvaluation:
-    """Sabit olmayan (oliz) satırlara POS farkını bölerek POS giriş tutarlarını bulur.
+    """Kalibre edilmiş kampanya profilleriyle hedef POS fiyatlarını bulur.
 
-    fark = POS'ta görünen indirimli toplam - yönetici toplamı
-    Kilitli satırlar ilk fiyatıyla girilir. Sabit olmayan satırlarda indirim
-    sabit olduğundan brüt 1 TL düşünce net de 1 TL düşer; bu yüzden fark
-    doğrudan, ilk fiyat oranında bölünür.
-    İki tutar da boşsa dağıtım yapılmaz.
+    Kampanya profili olmayan satırlar için dağıtım yapılmaz; ürün adına göre
+    düğün veya başka bir kampanya varsayımı yapılması güvenli değildir.
     """
     kept = tuple(forms)
     shown_text = pos_shown_text.strip()
     target_text = target_text.strip()
     if not shown_text and not target_text:
         return evaluate_transaction(kept)
+    if not shown_text and target_text:
+        target = read_money(target_text)
+        if target.value is None:
+            return _pending(kept, target.error or T.MONEY_FORMAT)
+        if not kept:
+            return evaluate_transaction(kept)
+        shared_line_results: list[LineResult] = []
+        for index, form in enumerate(kept):
+            result = evaluate_line(form, index).result
+            if result is None:
+                return evaluate_transaction(kept)
+            shared_line_results.append(result)
+        allocations = allocate_total_by_weight(
+            round_pos_amount(target.value),
+            [result.regular_total for result in shared_line_results],
+        )
+        shared_adjusted = [
+            replace(
+                form,
+                manager_value="",
+                manager_value_decimal=allocation,
+                manager_mode=ManagerMode.LINE,
+                pos_calculation_mode=PosCalculationMode.FIXED_AMOUNT,
+            )
+            for form, allocation in zip(
+                kept, allocations, strict=True
+            )
+        ]
+        return evaluate_transaction(shared_adjusted)
     if not shown_text or not target_text:
         return _pending(kept, T.SPLIT_NEED_BOTH)
     shown = read_money(shown_text)
@@ -507,6 +539,7 @@ def evaluate_with_reduction(
 
     shown_value = round_pos_amount(shown.value)
     target_value = round_pos_amount(target.value)
+    reduction = sub(shown_value, target_value)
 
     if not kept:
         return evaluate_transaction(kept)
@@ -517,14 +550,45 @@ def evaluate_with_reduction(
             return evaluate_transaction(kept)
         line_results.append(result)
 
-    reduction = sub(shown_value, target_value)
-    free = [i for i, f in enumerate(kept) if not f.locked]
-    if reduction != ZERO and not free:
-        return _pending(kept, T.SPLIT_NO_FREE)
-    shares = distribute_cents(
-        reduction, [line_results[i].regular_total for i in free]
-    )
-    cuts = dict(zip(free, shares, strict=True))
+    has_profiles = all(f.campaign_profile is not None for f in kept)
+    has_any_profiles = any(f.campaign_profile is not None for f in kept)
+    if has_any_profiles and not has_profiles:
+        return _pending(kept, T.SPLIT_MIXED_CALIBRATION)
+    if not has_profiles:
+        shares = distribute_cents(
+            reduction,
+            [result.regular_total for result in line_results],
+        )
+        desired = {}
+        fallback_cuts = dict(enumerate(shares))
+    else:
+        fallback_cuts = {}
+        campaign_lines_list: list[CampaignLine] = []
+        for index, (form, result) in enumerate(
+            zip(kept, line_results, strict=True)
+        ):
+            profile = form.campaign_profile
+            if profile is None:
+                return _pending(kept, T.SPLIT_CALIBRATION_REQUIRED)
+            campaign_lines_list.append(
+                CampaignLine(
+                    str(index),
+                    (
+                        result.regular_total
+                        if form.gift_selected
+                        else result.website_discounted_total
+                    ),
+                    profile,
+                )
+            )
+        campaign_lines = tuple(campaign_lines_list)
+        try:
+            campaign_prices = solve_campaign_prices(
+                campaign_lines, target_value
+            )
+        except ValueError as error:
+            return _pending(kept, str(error))
+        desired = {price.line_id: price.price for price in campaign_prices}
 
     adjusted: list[LineForm] = []
     for index, (form, res) in enumerate(zip(kept, line_results, strict=True)):
@@ -533,7 +597,18 @@ def evaluate_with_reduction(
             if form.gift_selected
             else res.website_discounted_total
         )
-        manager = sub(base_total, cuts.get(index, ZERO))
+        desired_pos = desired.get(
+            str(index),
+            sub(base_total, fallback_cuts.get(index, ZERO)),
+        )
+        manager = (
+            desired_pos
+            if form.gift_selected or not has_profiles
+            else sub(
+                desired_pos,
+                sub(res.regular_total, res.website_discounted_total),
+            )
+        )
         if manager < ZERO:
             return _pending(kept, T.SPLIT_NOT_ENOUGH)
         adjusted.append(
@@ -559,7 +634,7 @@ def evaluate_with_reduction(
                 abs(reduction),
             ),
         ),
-        T.SPLIT_NOTE,
+        T.SPLIT_NOTE if has_profiles else T.SPLIT_NOTE_FALLBACK,
     )
     evaluation = replace(
         evaluation, totals_sections=evaluation.totals_sections + (summary,)

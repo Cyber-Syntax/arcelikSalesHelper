@@ -72,8 +72,6 @@ class CalculatorLineWidget(QWidget):
         self.website_edit.setPlaceholderText(T.PH_WEBSITE)
         self.gift_check = QCheckBox(T.CHK_GIFT)
         self.gift_name_edit = QLineEdit()
-        self.lock_check = QCheckBox(T.CHK_LOCK_LINE)
-        self.lock_check.setToolTip(T.TIP_LOCK_LINE)
 
         self.blocks = {
             "product_name": FieldBlock(self.name_edit),
@@ -89,7 +87,6 @@ class CalculatorLineWidget(QWidget):
         form.addRow(T.FORM_WEBSITE, self.blocks["website_discounted_price"])
         form.addRow("", self.gift_check)
         form.addRow(T.FORM_GIFT_NAME, self.gift_name_edit)
-        form.addRow("", self.lock_check)
 
         for edit in (
             self.name_edit,
@@ -100,7 +97,6 @@ class CalculatorLineWidget(QWidget):
             edit.textChanged.connect(self._emit)
         self.quantity_spin.valueChanged.connect(self._emit)
         self.gift_check.toggled.connect(self._emit)
-        self.lock_check.toggled.connect(self._emit)
 
     # ---- state -----------------------------------------------------------
 
@@ -121,7 +117,6 @@ class CalculatorLineWidget(QWidget):
             gift_selected=self.gift_check.isChecked(),
             gift_name=self.gift_name_edit.text(),
             product_id=None if product is None else product.id,
-            locked=self.lock_check.isChecked(),
         )
 
     def set_product(self, product: Product) -> None:
@@ -157,7 +152,7 @@ class CalculatorLineWidget(QWidget):
 
 
 class QuickRowWidget(QWidget):
-    """Hızlı toplam modunda bir ürün: ilk fiyat + sabit tut kutusu."""
+    """Hızlı toplam modunda bir ürün: yalnızca ilk fiyat."""
 
     changed = Signal()
 
@@ -168,15 +163,11 @@ class QuickRowWidget(QWidget):
         self.price_edit = QLineEdit()
         self.price_edit.setPlaceholderText(T.PH_REGULAR)
         self.block = FieldBlock(self.price_edit)
-        self.lock_check = QCheckBox(T.CHK_LOCK_LINE)
-        self.lock_check.setToolTip(T.TIP_LOCK_LINE)
         layout = QHBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.addWidget(self.label)
         layout.addWidget(self.block, 1)
-        layout.addWidget(self.lock_check)
         self.price_edit.textChanged.connect(lambda _t: self.changed.emit())
-        self.lock_check.toggled.connect(lambda _c: self.changed.emit())
 
     def form(self) -> LineForm:
         # Web fiyatı 0 = indirim yok: net toplam doğrudan ilk fiyattan başlar.
@@ -184,7 +175,6 @@ class QuickRowWidget(QWidget):
             product_name=T.quick_row_title(self.number),
             regular_price=self.price_edit.text(),
             website_discounted_price="0",
-            locked=self.lock_check.isChecked(),
         )
 
     def set_feedback(self, errors: Sequence[FieldError]) -> None:
@@ -655,7 +645,6 @@ class CalculatorTab(QWidget):
             and not line.gift_name_edit.text()
             and line.quantity_spin.value() == 1
             and not line.gift_check.isChecked()
-            and not line.lock_check.isChecked()
         )
 
     def add_one_off_line(self) -> LineRow:

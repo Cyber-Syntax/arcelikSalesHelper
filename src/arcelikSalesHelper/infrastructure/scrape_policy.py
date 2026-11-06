@@ -2,12 +2,17 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+import os
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from enum import Enum
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 SCRAPE_MIN_INTERVAL = timedelta(hours=24)
+SCRAPE_MIN_INTERVAL_ENV_VAR = "ARCELIK_SCRAPE_MIN_INTERVAL_SECONDS"
 SCRAPE_QUOTA_LIMIT = 5
 SCRAPE_QUOTA_WINDOW = timedelta(days=30)
 SCRAPE_SUSPICIOUS_DROP_RATIO = 0.5
@@ -32,16 +37,36 @@ class ScrapeGate:
         return self.reason is GateReason.OK
 
 
+def configured_min_interval() -> timedelta:
+    """Return the cooldown, optionally overridden for development runs."""
+    raw = os.environ.get(SCRAPE_MIN_INTERVAL_ENV_VAR)
+    if raw is None:
+        return SCRAPE_MIN_INTERVAL
+    try:
+        seconds = int(raw)
+    except ValueError as exc:
+        raise ValueError(
+            f"{SCRAPE_MIN_INTERVAL_ENV_VAR} must be a non-negative integer"
+        ) from exc
+    if seconds < 0:
+        raise ValueError(
+            f"{SCRAPE_MIN_INTERVAL_ENV_VAR} must be a non-negative integer"
+        )
+    return timedelta(seconds=seconds)
+
+
 def cooldown_remaining(
     last_attempt: datetime | None,
     now: datetime,
-    minimum: timedelta = SCRAPE_MIN_INTERVAL,
+    minimum: timedelta | None = None,
 ) -> timedelta | None:
     """Time left to wait, or None when a run is allowed.
 
     Exactly ``minimum`` elapsed is allowed. A last attempt in the future (the
     clock moved back) counts as zero elapsed time: the full wait applies.
     """
+    if minimum is None:
+        minimum = configured_min_interval()
     if last_attempt is None:
         return None
     elapsed = max(now - last_attempt, timedelta(0))
@@ -87,10 +112,12 @@ def is_scrape_allowed(
     attempts: Sequence[datetime],
     now: datetime,
     *,
-    minimum: timedelta = SCRAPE_MIN_INTERVAL,
+    minimum: timedelta | None = None,
     limit: int = SCRAPE_QUOTA_LIMIT,
     window: timedelta = SCRAPE_QUOTA_WINDOW,
 ) -> ScrapeGate:
+    if minimum is None:
+        minimum = configured_min_interval()
     used = len(attempts_in_window(attempts, now, window))
     cooldown = cooldown_remaining(last_attempt, now, minimum)
     quota = quota_remaining(attempts, now, limit, window)

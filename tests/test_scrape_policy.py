@@ -3,6 +3,7 @@ from datetime import UTC, datetime, timedelta
 from arcelikSalesHelper.infrastructure.scrape_policy import (
     GateReason,
     attempts_in_window,
+    configured_min_interval,
     cooldown_remaining,
     is_scrape_allowed,
     is_suspicious_drop,
@@ -24,6 +25,25 @@ def test_cooldown_boundaries():
 
 def test_future_last_attempt_blocks_for_full_interval():
     assert cooldown_remaining(NOW + DAY, NOW) == DAY
+
+
+def test_cooldown_can_be_overridden_by_environment(monkeypatch):
+    monkeypatch.setenv("ARCELIK_SCRAPE_MIN_INTERVAL_SECONDS", "0")
+
+    assert configured_min_interval() == timedelta(0)
+    assert cooldown_remaining(NOW, NOW) is None
+    assert is_scrape_allowed(NOW, [NOW], NOW).allowed
+
+
+def test_invalid_cooldown_environment_value_is_rejected(monkeypatch):
+    monkeypatch.setenv("ARCELIK_SCRAPE_MIN_INTERVAL_SECONDS", "-1")
+
+    try:
+        configured_min_interval()
+    except ValueError as exc:
+        assert "ARCELIK_SCRAPE_MIN_INTERVAL_SECONDS" in str(exc)
+    else:
+        raise AssertionError("invalid cooldown override should fail")
 
 
 def test_quota_rolling_window():

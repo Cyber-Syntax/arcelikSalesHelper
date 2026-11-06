@@ -35,6 +35,9 @@ def configure_logging(log_path: Path) -> None:
     root = logging.getLogger()
     root.setLevel(logging.INFO)
     root.addHandler(handler)
+    logging.getLogger("arcelikSalesHelper.infrastructure.scraper").setLevel(
+        logging.DEBUG
+    )
 
 
 def install_excepthook(log_path: Path) -> None:

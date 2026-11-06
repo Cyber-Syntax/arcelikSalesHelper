@@ -10,9 +10,14 @@ from PySide6.QtWidgets import (
     QListWidgetItem,
 )
 
-from arcelikSalesHelper.application.calculator import TransactionEvaluation
+from arcelikSalesHelper.application.calculator import (
+    LineForm,
+    TransactionEvaluation,
+    evaluate_with_reduction,
+)
 from arcelikSalesHelper.domain.products import ProductDraft
 from arcelikSalesHelper.domain.result import Ok
+from arcelikSalesHelper.domain.models import CampaignProfile
 from arcelikSalesHelper.ui.calculator_tab import CalculatorTab
 from arcelikSalesHelper.ui.theme import (
     DEFAULT_FONT_SCALE,
@@ -155,6 +160,69 @@ def test_blank_shared_manager_total_applies_no_manager_values(
     assert tab.evaluation.lines[0].result is not None
     assert tab.evaluation.lines[0].result.manager_line_total is None
     assert tab.evaluation.forms[0].manager_value == ""
+
+
+def test_shared_manager_total_without_pos_shown_calculates(
+    qtbot, repo
+) -> None:  # type: ignore[no-untyped-def]
+    tab = CalculatorTab(repo)
+    qtbot.addWidget(tab)
+    fill(tab.rows[0], "Fridge", "5.000,00", "4.000,00")
+    tab.shared_manager_edit.setText("3.000,00")
+
+    assert tab.evaluation.valid
+    assert tab.evaluation.result is not None
+    assert tab.evaluation.result.totals.pos.value == D("4000.00")
+
+
+def test_reduction_fields_do_not_require_unavailable_calibration(
+    qtbot, repo
+) -> None:  # type: ignore[no-untyped-def]
+    tab = CalculatorTab(repo)
+    qtbot.addWidget(tab)
+    fill(tab.rows[0], "Fridge", "5.000,00", "4.000,00")
+    tab.pos_shown_edit.setText("4.000,00")
+    tab.shared_manager_edit.setText("3.000,00")
+
+    assert tab.evaluation.valid
+    assert tab.evaluation.pending_reason is None
+
+
+def test_unprofiled_reduction_does_not_subtract_website_discount_twice(
+    qtbot, repo
+) -> None:  # type: ignore[no-untyped-def]
+    tab = CalculatorTab(repo)
+    qtbot.addWidget(tab)
+    fill_two(tab)
+    tab.pos_shown_edit.setText("23.000,00")
+    tab.shared_manager_edit.setText("16.500,00")
+
+    assert tab.evaluation.valid
+    assert tab.evaluation.result is not None
+    assert tab.evaluation.result.totals.pos.value == D("16500.00")
+
+
+def test_mixed_campaign_profiles_are_rejected_for_reduction() -> None:
+    forms = (
+        LineForm(
+            "Profiled",
+            regular_price="100",
+            website_discounted_price="90",
+            campaign_profile=CampaignProfile(D("0.10")),
+        ),
+        LineForm(
+            "Unprofiled",
+            regular_price="100",
+            website_discounted_price="90",
+        ),
+    )
+
+    evaluation = evaluate_with_reduction(forms, "180", "160")
+
+    assert not evaluation.valid
+    assert evaluation.pending_reason == (
+        "Karışık kalibrasyonlu ve kalibrasyonsuz satırlar birlikte dağıtılamaz."
+    )
 
 
 def test_removing_a_line_recomputes_totals(qtbot, repo) -> None:  # type: ignore[no-untyped-def]

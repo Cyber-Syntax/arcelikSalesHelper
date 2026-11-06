@@ -37,3 +37,17 @@ the behavior scenarios and replace the storage-specific test setup.
 
 See [docs/implement_behavior_tests_plan.md](docs/implement_behavior_tests_plan.md)
 for the testing approach and priority scenarios.
+
+## Agent skills
+
+### Issue tracker
+
+Small tasks are tracked in `docs/todo.md`; complex issues and bugs with detailed error context are tracked in GitHub Issues. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Use the canonical labels `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, and `wontfix`. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+This is a single-context repository; domain terms and decisions live at the root and in `docs/ADR/`. See `docs/agents/domain.md`.

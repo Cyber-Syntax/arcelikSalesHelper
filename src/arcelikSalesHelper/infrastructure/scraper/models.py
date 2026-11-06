@@ -37,6 +37,9 @@ class ScrapeProgress:
     categories_done: int
     categories_total: int
     products_found: int
+    phase: str = "category"
+    page: int | None = None
+    page_products: int = 0
 
 
 @dataclass(frozen=True)
