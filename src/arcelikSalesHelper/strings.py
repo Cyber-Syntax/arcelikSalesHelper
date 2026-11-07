@@ -183,6 +183,10 @@ SPLIT_NOTE_FALLBACK = (
     "Etkin indirim kalibrasyonu bulunamadı. Fark mevcut fiyat ağırlığıyla "
     "dağıtıldı; POS'ta sonucu mutlaka doğrulayın."
 )
+SPLIT_NOTE_SHOWN_RATE = (
+    "Satır fiyatları POS'ta görünen toplamla uyuşmadığı için kampanya oranı "
+    "POS'ta görünen indirimli toplamdan hesaplandı; POS'ta doğrulayın."
+)
 
 
 def quick_row_title(number: int) -> str:

@@ -5,19 +5,25 @@ returned ``ResultView``.  All numbers shown come from ``LineResult``; nothing is
 recomputed here (only formatted).
 """
 
+from __future__ import annotations
+
 from collections.abc import Sequence
 from dataclasses import dataclass, replace
 from decimal import Decimal
 
 from arcelikSalesHelper import strings as T
-from arcelikSalesHelper.domain.arith import ZERO, sub
+from arcelikSalesHelper.domain.arith import ZERO, div, mul, sub
+from arcelikSalesHelper.domain.campaign import (
+    CampaignLine,
+    solve_campaign_prices,
+)
 from arcelikSalesHelper.domain.formatting import (
     format_decimal_exact,
     format_try,
 )
 from arcelikSalesHelper.domain.models import (
-    CampaignProfile,
     POS_LABEL,
+    CampaignProfile,
     GiftOption,
     LineInput,
     LineResult,
@@ -29,16 +35,94 @@ from arcelikSalesHelper.domain.models import (
 )
 from arcelikSalesHelper.domain.money import parse_money_ex
 from arcelikSalesHelper.domain.pricing import (
+    NoEditableLines,
+    PosSolveError,
+    PosSpec,
     allocate_total_by_weight,
     build_options,
     calculate_line,
     calculate_transaction,
-    effective_website_price,
     distribute_cents,
+    effective_website_price,
     round_pos_amount,
+    solve_pos_targets,
 )
-from arcelikSalesHelper.domain.campaign import CampaignLine, solve_campaign_prices
 from arcelikSalesHelper.domain.result import Err, Ok
+
+
+def _adjust_by_discount_model(
+    forms: Sequence[LineForm],
+    results: Sequence[LineResult],
+    target: Decimal,
+) -> list[LineForm] | None:
+    """None = model does not apply (gift lines / no discounted lines)."""
+    if any(f.gift_selected for f in forms):
+        return None
+    specs = [
+        PosSpec(
+            r.regular_total,
+            r.website_discounted_total,
+            f.pos_calculation_mode is PosCalculationMode.PERCENTAGE,
+        )
+        for f, r in zip(forms, results, strict=True)
+    ]
+    try:
+        plan = solve_pos_targets(specs, target)
+    except NoEditableLines:
+        return None
+    return [
+        replace(
+            f,
+            manager_value="",
+            manager_value_decimal=t.net,
+            manager_mode=ManagerMode.LINE,
+            pos_calculation_mode=(
+                PosCalculationMode.PERCENTAGE
+                if t.percent
+                else PosCalculationMode.FIXED_AMOUNT
+            ),
+        )
+        for f, t in zip(forms, plan, strict=True)
+    ]
+
+
+def _adjust_by_shown_rate(
+    forms: Sequence[LineForm],
+    results: Sequence[LineResult],
+    shown: Decimal,
+    target: Decimal,
+) -> list[LineForm] | None:
+    """Trust the POS net over line website prices when they disagree.
+
+    The catalog's website price is the normal online price; the POS campaign
+    (for example the 10% wedding discount) can be different.  The "discounted
+    total shown in POS" is the observed net basket, so it reveals the real
+    uniform campaign rate even when the per-line website prices do not.
+    """
+    if any(f.gift_selected for f in forms):
+        return None
+    regular_total = sum((r.regular_total for r in results), ZERO)
+    if regular_total <= ZERO or shown <= ZERO or shown >= regular_total:
+        return None
+    factor = div(shown, regular_total)
+    gross_target = div(target, factor)
+    if gross_target <= ZERO:
+        return None
+    shares = distribute_cents(
+        gross_target, [r.regular_total for r in results]
+    )
+    return [
+        replace(
+            f,
+            manager_value="",
+            manager_value_decimal=mul(share, factor),
+            manager_mode=ManagerMode.LINE,
+            pos_calculation_mode=PosCalculationMode.PERCENTAGE,
+            campaign_profile=CampaignProfile(rate=sub(Decimal(1), factor)),
+        )
+        for f, share in zip(forms, shares, strict=True)
+    ]
+
 
 # ---- input ----------------------------------------------------------------
 
@@ -485,6 +569,39 @@ def _with_pos_shown_totals(
     return replace(evaluation, totals_sections=sections)
 
 
+def _finish_reduction(
+    adjusted: Sequence[LineForm],
+    shown_value: Decimal,
+    target_value: Decimal,
+    reduction: Decimal,
+    *,
+    calibrated: bool,
+    quick: bool,
+    note: str | None = None,
+) -> TransactionEvaluation:
+    evaluation = evaluate_transaction(adjusted)
+    if not evaluation.valid:
+        return evaluation
+    summary = Section(
+        T.SEC_SPLIT_SUMMARY,
+        (
+            _money_row(T.LBL_SPLIT_POS_SHOWN, shown_value),
+            _money_row(T.LBL_SPLIT_TARGET, target_value),
+            _money_row(
+                T.LBL_SPLIT_CUT if reduction >= ZERO else T.LBL_SPLIT_ADD,
+                abs(reduction),
+            ),
+        ),
+        note or (T.SPLIT_NOTE if calibrated else T.SPLIT_NOTE_FALLBACK),
+    )
+    evaluation = replace(
+        evaluation, totals_sections=evaluation.totals_sections + (summary,)
+    )
+    return (
+        _with_pos_shown_totals(evaluation, shown_value) if quick else evaluation
+    )
+
+
 def evaluate_with_reduction(
     forms: Sequence[LineForm],
     pos_shown_text: str,
@@ -513,6 +630,15 @@ def evaluate_with_reduction(
             if result is None:
                 return evaluate_transaction(kept)
             shared_line_results.append(result)
+        rounded = round_pos_amount(target.value)
+        try:
+            adjusted_forms = _adjust_by_discount_model(
+                kept, shared_line_results, rounded
+            )
+        except PosSolveError as error:
+            return _pending(kept, str(error))
+        if adjusted_forms is not None:
+            return evaluate_transaction(adjusted_forms)
         allocations = allocate_total_by_weight(
             round_pos_amount(target.value),
             [result.regular_total for result in shared_line_results],
@@ -525,9 +651,7 @@ def evaluate_with_reduction(
                 manager_mode=ManagerMode.LINE,
                 pos_calculation_mode=PosCalculationMode.FIXED_AMOUNT,
             )
-            for form, allocation in zip(
-                kept, allocations, strict=True
-            )
+            for form, allocation in zip(kept, allocations, strict=True)
         ]
         return evaluate_transaction(shared_adjusted)
     if not shown_text or not target_text:
@@ -554,6 +678,39 @@ def evaluate_with_reduction(
     has_any_profiles = any(f.campaign_profile is not None for f in kept)
     if has_any_profiles and not has_profiles:
         return _pending(kept, T.SPLIT_MIXED_CALIBRATION)
+    if not has_any_profiles:
+        line_website_total = sum(
+            (r.website_discounted_total for r in line_results), ZERO
+        )
+        if abs(sub(line_website_total, shown_value)) > Decimal("0.01"):
+            shown_forms = _adjust_by_shown_rate(
+                kept, line_results, shown_value, target_value
+            )
+            if shown_forms is not None:
+                return _finish_reduction(
+                    shown_forms,
+                    shown_value,
+                    target_value,
+                    reduction,
+                    calibrated=False,
+                    quick=quick,
+                    note=T.SPLIT_NOTE_SHOWN_RATE,
+                )
+        try:
+            model_forms = _adjust_by_discount_model(
+                kept, line_results, target_value
+            )
+        except PosSolveError as error:
+            return _pending(kept, str(error))
+        if model_forms is not None:
+            return _finish_reduction(
+                model_forms,
+                shown_value,
+                target_value,
+                reduction,
+                calibrated=False,
+                quick=quick,
+            )
     if not has_profiles:
         shares = distribute_cents(
             reduction,
@@ -621,26 +778,11 @@ def evaluate_with_reduction(
             )
         )
 
-    evaluation = evaluate_transaction(adjusted)
-    if not evaluation.valid:
-        return evaluation
-    summary = Section(
-        T.SEC_SPLIT_SUMMARY,
-        (
-            _money_row(T.LBL_SPLIT_POS_SHOWN, shown_value),
-            _money_row(T.LBL_SPLIT_TARGET, target_value),
-            _money_row(
-                T.LBL_SPLIT_CUT if reduction >= ZERO else T.LBL_SPLIT_ADD,
-                abs(reduction),
-            ),
-        ),
-        T.SPLIT_NOTE if has_profiles else T.SPLIT_NOTE_FALLBACK,
-    )
-    evaluation = replace(
-        evaluation, totals_sections=evaluation.totals_sections + (summary,)
-    )
-    return (
-        _with_pos_shown_totals(evaluation, shown_value)
-        if quick
-        else evaluation
+    return _finish_reduction(
+        adjusted,
+        shown_value,
+        target_value,
+        reduction,
+        calibrated=has_profiles,
+        quick=quick,
     )

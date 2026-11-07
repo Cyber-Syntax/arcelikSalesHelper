@@ -43,7 +43,7 @@ def test_percentage_mode_explains_derived_rate_and_gross_up():
     )
     assert ev.view is not None and ev.result is not None
     rows = {row.label: row.value for row in ev.view.card.pos.rows}
-    assert rows[T.LBL_POS_AMOUNT].startswith("33.333,333333333333")
+    assert rows[T.LBL_POS_AMOUNT] == "33.333,33 TL"
     assert rows[T.LBL_POS_DISCOUNT_RATE] == "10%"
 
 
