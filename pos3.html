@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>POS Fiyat Dağıtım</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; }
+    .num-cell { font-variant-numeric: tabular-nums; }
+    input:focus, select:focus { outline: none; }
+    .modal-enter { animation: modalIn .2s ease-out; }
+    @keyframes modalIn { from { opacity: 0; transform: scale(.96);} to {opacity:1; transform:scale(1);} }
+  </style>
+</head>
+<body class="bg-slate-100 text-slate-800 min-h-screen">
+  <div class="max-w-7xl mx-auto p-4 md:p-6">
+
+    <!-- Header -->
+    <header class="mb-6 flex flex-wrap items-center justify-between gap-3">
+      <div>
+        <h1 class="text-2xl font-bold text-slate-900">POS Fiyat Dağıtım</h1>
+        <p class="text-sm text-slate-500">Yüzde + sabit indirimli ürünleri net-uzayında oransal dağıt</p>
+      </div>
+      <button id="distributeBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-lg font-medium shadow-sm transition">
+        Hesapla &amp; Dağıt →
+      </button>
+    </header>
+
+    <!-- Hedef + hızlı eylemler -->
+    <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 mb-4 flex flex-wrap items-end gap-3">
+      <div class="flex-1 min-w-[200px]">
+        <label class="block text-xs font-semibold text-slate-600 mb-1">HEDEF NET SEPET (TL)</label>
+        <input id="targetInput" type="text" inputmode="decimal"
+          class="w-full text-lg font-semibold border border-slate-300 rounded-lg px-3 py-2 num-cell focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200" />
+      </div>
+      <button id="lockAllBtn" class="px-4 py-2 text-sm border border-slate-300 rounded-lg hover:bg-slate-50 transition">Tümünü Kilitle</button>
+      <button id="unlockAllBtn" class="px-4 py-2 text-sm border border-slate-300 rounded-lg hover:bg-slate-50 transition">Tümünü Aç</button>
+      <button id="clearBtn" class="px-4 py-2 text-sm border border-rose-200 text-rose-600 rounded-lg hover:bg-rose-50 transition">Temizle</button>
+    </div>
+
+    <!-- Ürün tablosu -->
+    <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm min-w-[820px]">
+          <thead class="bg-slate-50 border-b border-slate-200 text-xs uppercase tracking-wide text-slate-500">
+            <tr>
+              <th class="text-left px-3 py-3 font-semibold">Ürün</th>
+              <th class="text-right px-3 py-3 font-semibold">Liste Fiyatı</th>
+              <th class="text-center px-3 py-3 font-semibold">Tip</th>
+              <th class="text-right px-3 py-3 font-semibold">Değer</th>
+              <th class="text-right px-3 py-3 font-semibold">İndirim</th>
+              <th class="text-right px-3 py-3 font-semibold">Net</th>
+              <th class="text-center px-3 py-3 font-semibold" title="Kilitli ürünlerin fiyatı değiştirilmez">Kilit</th>
+              <th class="px-3 py-3"></th>
+            </tr>
+          </thead>
+          <tbody id="productRows" class="divide-y divide-slate-100"></tbody>
+        </table>
+      </div>
+      <div class="p-3 border-t border-slate-200">
+        <button id="addBtn" class="text-indigo-600 hover:text-indigo-800 font-medium text-sm">+ Ürün ekle</button>
+      </div>
+    </div>
+
+    <!-- Özet kartları -->
+    <div class="mt-4 grid grid-cols-2 md:grid-cols-5 gap-3">
+      <div class="bg-white rounded-lg border border-slate-200 p-3">
+        <div class="text-xs text-slate-500 mb-1">Toplam Liste</div>
+        <div id="sumList" class="text-lg font-semibold num-cell">0,00</div>
+      </div>
+      <div class="bg-white rounded-lg border border-slate-200 p-3">
+        <div class="text-xs text-slate-500 mb-1">Yüzde İndirim</div>
+        <div id="sumPct" class="text-lg font-semibold text-amber-600 num-cell">0,00</div>
+      </div>
+      <div class="bg-white rounded-lg border border-slate-200 p-3">
+        <div class="text-xs text-slate-500 mb-1">Sabit İndirim</div>
+        <div id="sumFixed" class="text-lg font-semibold text-sky-600 num-cell">0,00</div>
+      </div>
+      <div class="bg-white rounded-lg border border-slate-200 p-3">
+        <div class="text-xs text-slate-500 mb-1">Toplam İndirim</div>
+        <div id="sumDiscount" class="text-lg font-semibold text-rose-600 num-cell">0,00</div>
+      </div>
+      <div class="bg-indigo-50 rounded-lg border border-indigo-200 p-3">
+        <div class="text-xs text-indigo-600 mb-1">Net Sepet</div>
+        <div id="sumNet" class="text-lg font-semibold text-indigo-700 num-cell">0,00</div>
+      </div>
+    </div>
+
+    <p class="mt-3 text-xs text-slate-500">
+      💡 <strong>Kilit</strong> işaretli ürünlerin fiyatı değişmez. Sadece sabit indirimlileri ölçeklemek için yüzde ürünlerini kilitleyin.
+    </p>
+  </div>
+
+  <!-- Modal -->
+  <div id="modal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden modal-enter flex flex-col">
+      <div class="flex items-center justify-between px-5 py-4 border-b border-slate-200">
+        <h2 class="text-lg font-bold">Dağıtım Sonucu</h2>
+        <button id="closeModal" class="text-slate-400 hover:text-slate-700 text-2xl leading-none w-8 h-8 flex items-center justify-center rounded hover:bg-slate-100">×</button>
+      </div>
+      <div id="modalBody" class="p-5 overflow-y-auto"></div>
+      <div class="px-5 py-4 border-t border-slate-200 flex justify-end gap-2 bg-slate-50">
+        <button id="cancelApply" class="px-4 py-2 text-sm border border-slate-300 rounded-lg hover:bg-white transition">Vazgeç</button>
+        <button id="applyBtn" class="px-4 py-2 text-sm bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium transition">Fiyatları Uygula</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+  // ---------- yardımcılar ----------
+  const fmt = n => (Number.isFinite(n) ? n : 0).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const r2  = n => Math.round(n * 100) / 100;
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  }
+
+  // "33.999" -> 33999, "1.234,56" -> 1234.56, "1234,56" -> 1234.56, "1234.56" -> 1234.56
+  function parseNum(s) {
+    if (typeof s === 'number') return s;
+    if (s === null || s === undefined) return 0;
+    s = String(s).trim().replace(/\s/g, '');
+    if (!s) return 0;
+    const hasComma = s.includes(',');
+    const hasDot = s.includes('.');
+    if (hasComma && hasDot) {
+      if (s.lastIndexOf(',') > s.lastIndexOf('.')) {
+        s = s.replace(/\./g, '').replace(/,/g, '.');
+      } else {
+        s = s.replace(/,/g, '');
+      }
+    } else if (hasComma) {
+      const parts = s.split(',');
+      if (parts.length > 2) s = s.replace(/,/g, '');
+      else if (parts[1].length === 3 && parts[0] !== '0' && parts[0] !== '') s = parts[0] + parts[1];
+      else s = parts[0] + '.' + parts[1];
+    } else if (hasDot) {
+      const parts = s.split('.');
+      if (parts.length > 2) s = s.replace(/\./g, '');
+      else if (parts[1] && parts[1].length === 3 && parts[0] !== '0' && parts[0] !== '') s = parts[0] + parts[1];
+    }
+    const n = parseFloat(s);
+    return isNaN(n) ? 0 : n;
+  }
+
+  // ---------- durum ----------
+  let products = [];
+  let nextId = 1;
+  let targetRaw = '81000';
+  let pendingResult = null;
+
+  const price = p => parseNum(p.priceRaw);
+  const val   = p => parseNum(p.valueRaw);
+  const getR  = p => (p.type === 'percent' ? val(p) / 100 : 0);
+  const getC  = p => (p.type === 'fixed'   ? val(p)       : 0);
+  const netAt = (p, pv) => pv * (1 - getR(p)) - getC(p);
+  const currentNet = p => netAt(p, price(p));
+  const discountOf = p => price(p) - currentNet(p);
+
+  function addProduct(init) {
+    const p = { id: nextId++, name: '', priceRaw: '0', type: 'percent', valueRaw: '10', locked: false, ...init };
+    products.push(p);
+    return p;
+  }
+
+  function initDefaults() {
+    addProduct({ name: 'OCD K 752 EWS', priceRaw: '33999', type: 'percent', valueRaw: '10' });
+    addProduct({ name: 'ADE 9062 S1',   priceRaw: '32499', type: 'percent', valueRaw: '10' });
+    addProduct({ name: 'AFC 341 S',     priceRaw: '34499', type: 'percent', valueRaw: '10' });
+  }
+
+  // ---------- render ----------
+  function render() {
+    const active = document.activeElement;
+    const activeId    = active && active.dataset ? active.dataset.pid   : null;
+    const activeField = active && active.dataset ? active.dataset.field : null;
+    let selStart = null, selEnd = null;
+    if (active && typeof active.selectionStart === 'number') {
+      try { selStart = active.selectionStart; selEnd = active.selectionEnd; } catch (e) {}
+    }
+
+    const tbody = document.getElementById('productRows');
+    tbody.innerHTML = products.map(p => {
+      const disc = discountOf(p);
+      const net  = currentNet(p);
+      const typeOptions =
+        `<option value="percent" ${p.type === 'percent' ? 'selected' : ''}>Yüzde %</option>` +
+        `<option value="fixed"   ${p.type === 'fixed'   ? 'selected' : ''}>Sabit TL</option>` +
+        `<option value="none"    ${p.type === 'none'    ? 'selected' : ''}>Yok</option>`;
+      const valDisabled = p.type === 'none' ? 'disabled' : '';
+      const valSuffix   = p.type === 'percent' ? '%' : (p.type === 'fixed' ? 'TL' : '');
+      return `
+        <tr class="hover:bg-slate-50/50 transition ${p.locked ? 'bg-slate-50' : ''}" data-row="${p.id}">
+          <td class="px-3 py-2">
+            <input data-pid="${p.id}" data-field="name" type="text" value="${escapeHtml(p.name)}" placeholder="Ürün adı"
+              class="w-full bg-transparent border border-transparent hover:border-slate-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 rounded px-2 py-1 text-sm" />
+          </td>
+          <td class="px-3 py-2 text-right">
+            <input data-pid="${p.id}" data-field="priceRaw" type="text" inputmode="decimal" value="${escapeHtml(p.priceRaw)}"
+              class="w-28 text-right bg-transparent border border-transparent hover:border-slate-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 rounded px-2 py-1 text-sm num-cell" />
+          </td>
+          <td class="px-3 py-2 text-center">
+            <select data-pid="${p.id}" data-field="type" class="bg-transparent border border-slate-200 rounded px-2 py-1 text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200">
+              ${typeOptions}
+            </select>
+          </td>
+          <td class="px-3 py-2 text-right">
+            <div class="flex items-center justify-end gap-1">
+              <input data-pid="${p.id}" data-field="valueRaw" type="text" inputmode="decimal" value="${escapeHtml(p.valueRaw)}" ${valDisabled}
+                class="w-20 text-right bg-transparent border border-transparent hover:border-slate-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 rounded px-2 py-1 text-sm num-cell ${p.type === 'none' ? 'opacity-40' : ''}" />
+              <span class="text-xs text-slate-500 w-6 text-left">${valSuffix}</span>
+            </div>
+          </td>
+          <td class="px-3 py-2 text-right text-rose-600 font-medium num-cell" data-discount="${p.id}">${fmt(disc)}</td>
+          <td class="px-3 py-2 text-right font-semibold num-cell" data-net="${p.id}">${fmt(net)}</td>
+          <td class="px-3 py-2 text-center">
+            <input data-pid="${p.id}" data-field="locked" type="checkbox" ${p.locked ? 'checked' : ''}
+              class="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer" />
+          </td>
+          <td class="px-3 py-2 text-right">
+            <button data-del="${p.id}" class="text-slate-400 hover:text-rose-600 text-lg leading-none px-1 transition" title="Sil">×</button>
+          </td>
+        </tr>`;
+    }).join('');
+
+    renderSummaryOnly();
+
+    if (activeId && activeField) {
+      const el = tbody.querySelector(`[data-pid="${activeId}"][data-field="${activeField}"]`);
+      if (el) {
+        el.focus();
+        if (selStart !== null && el.setSelectionRange) {
+          try { el.setSelectionRange(selStart, selEnd); } catch (e) {}
+        }
+      }
+    }
+  }
+
+  function computeTotals() {
+    let list = 0, net = 0, pctDiscount = 0, fixedDiscount = 0;
+    for (const p of products) {
+      list += price(p);
+      net  += currentNet(p);
+      if (p.type === 'percent')      pctDiscount += price(p) * getR(p);
+      else if (p.type === 'fixed')   fixedDiscount += getC(p);
+    }
+    return { list, net, pctDiscount, fixedDiscount, discount: pctDiscount + fixedDiscount };
+  }
+
+  function renderSummaryOnly() {
+    const t = computeTotals();
+    document.getElementById('sumList').textContent     = fmt(t.list);
+    document.getElementById('sumPct').textContent      = fmt(t.pctDiscount);
+    document.getElementById('sumFixed').textContent    = fmt(t.fixedDiscount);
+    document.getElementById('sumDiscount').textContent = fmt(t.discount);
+    document.getElementById('sumNet').textContent      = fmt(t.net);
+    for (const p of products) {
+      const dc = document.querySelector(`[data-discount="${p.id}"]`);
+      const nt = document.querySelector(`[data-net="${p.id}"]`);
+      if (dc) dc.textContent = fmt(discountOf(p));
+      if (nt) nt.textContent = fmt(currentNet(p));
+    }
+  }
+
+  // ---------- dağıtım ----------
+  function distribute() {
+    const target   = parseNum(targetRaw);
+    const editable = products.filter(p => !p.locked);
+    const N_A = editable.reduce((s, p) => s + currentNet(p), 0);
+    const F   = products.reduce((s, p) => s + currentNet(p), 0);
+    const delta = target - F;
+
+    if (editable.length === 0) return { error: 'Dağıtım için en az bir ürünün kilidi açık olmalı.' };
+    if (N_A <= 0)              return { error: 'Düzenlenebilir ürünlerin net toplamı 0. Dağıtım yapılamaz.' };
+    if (N_A + delta <= 0)      return { error: `Düzenlenebilir kalemler hedefe yetmiyor. (N_A = ${fmt(N_A)}, ΔF = ${fmt(delta)})` };
+
+    const k = (N_A + delta) / N_A;
+    const newPrices = {};
+    for (const p of editable) {
+      const newNet = currentNet(p) * k;
+      newPrices[p.id] = (newNet + getC(p)) / (1 - getR(p));
+    }
+
+    // yuvarlama artığını son düzenlenebilir kalemde düzelt
+    const computeNet = (map) => {
+      let total = 0;
+      for (const p of products) {
+        const pv = map[p.id] !== undefined ? map[p.id] : price(p);
+        total += netAt(p, pv);
+      }
+      return total;
+    };
+    let resid = target - computeNet(newPrices);
+    if (Math.abs(resid) >= 0.005 && editable.length > 0) {
+      const last = editable[editable.length - 1];
+      newPrices[last.id] = r2(newPrices[last.id] + resid / (1 - getR(last)));
+    }
+
+    const rows = products.map(p => {
+      const oldPrice = price(p);
+      const newPrice = newPrices[p.id] !== undefined ? r2(newPrices[p.id]) : oldPrice;
+      return {
+        id: p.id, name: p.name, type: p.type,
+        r: getR(p), c: getC(p),
+        oldPrice, newPrice,
+        oldNet: netAt(p, oldPrice),
+        newNet: netAt(p, newPrice),
+        isEditable: newPrices[p.id] !== undefined,
+      };
+    });
+
+    let newList = 0, newNet = 0, newPctDisc = 0, newFixedDisc = 0;
+    for (const row of rows) {
+      newList += row.newPrice;
+      newNet  += row.newNet;
+      if (row.type === 'percent')      newPctDisc   += row.newPrice * row.r;
+      else if (row.type === 'fixed')   newFixedDisc += row.c;
+    }
+    const newTotalDisc = newPctDisc + newFixedDisc;
+
+    return { k, N_A, F, delta, target, rows, newList, newNet, newPctDisc, newFixedDisc, newTotalDisc };
+  }
+
+  // ---------- modal ----------
+  function openModal(html) {
+    document.getElementById('modalBody').innerHTML = html;
+    const m = document.getElementById('modal');
+    m.classList.remove('hidden');
+    m.classList.add('flex');
+  }
+  function closeModal() {
+    const m = document.getElementById('modal');
+    m.classList.add('hidden');
+    m.classList.remove('flex');
+  }
+
+  function showResult() {
+    const res = distribute();
+    const applyBtn = document.getElementById('applyBtn');
+
+    if (res.error) {
+      openModal(`<div class="bg-rose-50 border border-rose-200 text-rose-700 px-4 py-3 rounded-lg text-sm">${escapeHtml(res.error)}</div>`);
+      applyBtn.style.display = 'none';
+      pendingResult = null;
+      return;
+    }
+
+    const { k, N_A, F, delta, rows, target, newList, newNet, newPctDisc, newFixedDisc, newTotalDisc } = res;
+
+    const rowsHtml = rows.map(r => {
+      const changed = Math.abs(r.newPrice - r.oldPrice) > 0.005;
+      const badge = r.isEditable
+        ? (changed ? '<span class="text-[10px] px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-700 font-medium ml-1">DEĞİŞTİ</span>' : '')
+        : '<span class="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 font-medium ml-1">KİLİTLİ</span>';
+      return `
+        <tr class="${r.isEditable ? '' : 'text-slate-400'}">
+          <td class="px-3 py-2 text-sm">${escapeHtml(r.name || '—')}${badge}</td>
+          <td class="px-3 py-2 text-right num-cell text-sm text-slate-500">${fmt(r.oldPrice)}</td>
+          <td class="px-3 py-2 text-right num-cell text-sm font-semibold ${changed ? 'text-indigo-700' : ''}">${fmt(r.newPrice)}</td>
+          <td class="px-3 py-2 text-right num-cell text-sm">${fmt(r.newNet)}</td>
+        </tr>`;
+    }).join('');
+
+    const html = `
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+        <div class="bg-slate-50 rounded-lg p-3">
+          <div class="text-[11px] text-slate-500 mb-1 uppercase tracking-wide">Katsayı k</div>
+          <div class="text-lg font-bold text-slate-900 num-cell">${k.toFixed(6)}</div>
+        </div>
+        <div class="bg-amber-50 rounded-lg p-3">
+          <div class="text-[11px] text-amber-700 mb-1 uppercase tracking-wide">Yüzde İndirim</div>
+          <div class="text-lg font-bold text-amber-700 num-cell">${fmt(newPctDisc)}</div>
+        </div>
+        <div class="bg-sky-50 rounded-lg p-3">
+          <div class="text-[11px] text-sky-700 mb-1 uppercase tracking-wide">Sabit İndirim</div>
+          <div class="text-lg font-bold text-sky-700 num-cell">${fmt(newFixedDisc)}</div>
+        </div>
+        <div class="bg-rose-50 rounded-lg p-3">
+          <div class="text-[11px] text-rose-700 mb-1 uppercase tracking-wide">Toplam İndirim</div>
+          <div class="text-lg font-bold text-rose-700 num-cell">${fmt(newTotalDisc)}</div>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+        <div class="bg-white border border-slate-200 rounded-lg p-3">
+          <div class="text-[11px] text-slate-500 mb-1 uppercase tracking-wide">N_A (esnek net)</div>
+          <div class="text-sm font-semibold num-cell">${fmt(N_A)}</div>
+        </div>
+        <div class="bg-white border border-slate-200 rounded-lg p-3">
+          <div class="text-[11px] text-slate-500 mb-1 uppercase tracking-wide">F (tüm net)</div>
+          <div class="text-sm font-semibold num-cell">${fmt(F)}</div>
+        </div>
+        <div class="bg-white border border-slate-200 rounded-lg p-3">
+          <div class="text-[11px] text-slate-500 mb-1 uppercase tracking-wide">ΔF (fark)</div>
+          <div class="text-sm font-semibold num-cell">${fmt(delta)}</div>
+        </div>
+        <div class="bg-indigo-50 border border-indigo-200 rounded-lg p-3">
+          <div class="text-[11px] text-indigo-700 mb-1 uppercase tracking-wide">Yeni Net Toplam</div>
+          <div class="text-sm font-bold text-indigo-700 num-cell">${fmt(newNet)}</div>
+        </div>
+      </div>
+
+      <div class="border border-slate-200 rounded-lg overflow-hidden">
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm min-w-[500px]">
+            <thead class="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+              <tr>
+                <th class="text-left px-3 py-2 font-semibold">Ürün</th>
+                <th class="text-right px-3 py-2 font-semibold">Eski POS</th>
+                <th class="text-right px-3 py-2 font-semibold">Yeni POS</th>
+                <th class="text-right px-3 py-2 font-semibold">Yeni Net</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">${rowsHtml}</tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="mt-4 p-4 bg-emerald-50 border border-emerald-200 rounded-lg flex items-center justify-between gap-3 flex-wrap">
+        <div>
+          <div class="text-xs text-emerald-700 uppercase tracking-wide font-semibold">POS'A GİRİLECEK TOPLAM (Liste)</div>
+          <div class="text-xs text-emerald-600 mt-0.5">
+            Hedef net: ${fmt(target)} · Doğrulama: ${Math.abs(newNet - target) < 0.05 ? '✓' : '⚠'}
+          </div>
+        </div>
+        <div class="text-2xl font-bold text-emerald-800 num-cell">${fmt(newList)}</div>
+      </div>
+    `;
+
+    openModal(html);
+    applyBtn.style.display = '';
+    pendingResult = res;
+  }
+
+  // ---------- olaylar ----------
+  document.addEventListener('input', (e) => {
+    const t = e.target;
+    const pid   = t.dataset && t.dataset.pid;
+    const field = t.dataset && t.dataset.field;
+    if (!pid || !field) return;
+    const p = products.find(x => x.id === Number(pid));
+    if (!p) return;
+    if      (field === 'name')     p.name = t.value;
+    else if (field === 'priceRaw') p.priceRaw = t.value;
+    else if (field === 'valueRaw') p.valueRaw = t.value;
+    renderSummaryOnly();
+  });
+
+  document.addEventListener('change', (e) => {
+    const t = e.target;
+    const pid   = t.dataset && t.dataset.pid;
+    const field = t.dataset && t.dataset.field;
+    if (!pid) return;
+    const p = products.find(x => x.id === Number(pid));
+    if (!p) return;
+    if (field === 'type')        { p.type = t.value;   render(); }
+    else if (field === 'locked') { p.locked = t.checked; render(); }
+  });
+
+  document.addEventListener('click', (e) => {
+    const delId = e.target.dataset && e.target.dataset.del;
+    if (delId) {
+      products = products.filter(p => p.id !== Number(delId));
+      render();
+    }
+  });
+
+  document.getElementById('addBtn').addEventListener('click', () => {
+    addProduct({ name: '', priceRaw: '0', type: 'percent', valueRaw: '10' });
+    render();
+  });
+
+  document.getElementById('targetInput').addEventListener('input', (e) => { targetRaw = e.target.value; });
+  document.getElementById('targetInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') showResult(); });
+
+  document.getElementById('distributeBtn').addEventListener('click', showResult);
+  document.getElementById('closeModal').addEventListener('click', closeModal);
+  document.getElementById('cancelApply').addEventListener('click', closeModal);
+  document.getElementById('modal').addEventListener('click', (e) => { if (e.target.id === 'modal') closeModal(); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeModal(); });
+
+  document.getElementById('applyBtn').addEventListener('click', () => {
+    if (!pendingResult) return;
+    for (const row of pendingResult.rows) {
+      if (!row.isEditable) continue;
+      const p = products.find(x => x.id === row.id);
+      if (!p) continue;
+      p.priceRaw = Number.isInteger(row.newPrice)
+        ? String(row.newPrice)
+        : row.newPrice.toFixed(2).replace('.', ',');
+    }
+    pendingResult = null;
+    closeModal();
+    render();
+  });
+
+  document.getElementById('lockAllBtn').addEventListener('click', () => {
+    products.forEach(p => p.locked = true);
+    render();
+  });
+  document.getElementById('unlockAllBtn').addEventListener('click', () => {
+    products.forEach(p => p.locked = false);
+    render();
+  });
+  document.getElementById('clearBtn').addEventListener('click', () => {
+    if (!confirm('Tüm ürünler silinsin mi?')) return;
+    products = [];
+    render();
+  });
+
+  // ---------- başlangıç ----------
+  initDefaults();
+  document.getElementById('targetInput').value = targetRaw;
+  render();
+</script>
+</body>
+</html>
