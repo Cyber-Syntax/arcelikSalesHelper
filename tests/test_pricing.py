@@ -325,3 +325,88 @@ def test_mixed_percentage_and_fixed_lines_keep_per_line_model():
         Decimal("34499"),
         Decimal("42102.70"),
     ]
+
+
+def test_catalog_prices_mixed_basket_uses_shown_total_campaign_group():
+    """Catalog discounts differ from the POS campaign; only the fixed line moves."""
+    forms = [
+        LineForm(
+            "OCD K 752 EWS",
+            regular_price="33999",
+            website_discounted_price="31499",
+        ),
+        LineForm(
+            "ADE 9062 S1",
+            regular_price="32499",
+            website_discounted_price="30499",
+        ),
+        LineForm(
+            "AFC 341 S",
+            regular_price="34499",
+            website_discounted_price="31499",
+        ),
+        LineForm(
+            "901 KMP I",
+            regular_price="56299",
+            website_discounted_price="46299",
+        ),
+    ]
+    ev = evaluate_with_reduction(forms, "137196,3", "123000")
+
+    assert ev.valid
+    assert ev.result.totals.pos.value == Decimal("143099.70")
+    assert ev.result.totals.manager.value == Decimal("123000")
+    assert [line.pos_amount for line in ev.result.lines] == [
+        Decimal("33999"),
+        Decimal("32499"),
+        Decimal("34499"),
+        Decimal("42102.70"),
+    ]
+    assert [line.manager_line_total for line in ev.result.lines] == [
+        Decimal("30599.10"),
+        Decimal("29249.10"),
+        Decimal("31049.10"),
+        Decimal("32102.70"),
+    ]
+
+
+def test_catalog_prices_two_fixed_lines_split_the_remaining_pos_total():
+    forms = [
+        LineForm(
+            "OCD K 752 EWS",
+            regular_price="33999",
+            website_discounted_price="31499",
+        ),
+        LineForm(
+            "ADE 9062 S1",
+            regular_price="32499",
+            website_discounted_price="30499",
+        ),
+        LineForm(
+            "AFC 341 S",
+            regular_price="34499",
+            website_discounted_price="31499",
+        ),
+        LineForm(
+            "901 KMP IG",
+            regular_price="57599",
+            website_discounted_price="47599",
+        ),
+        LineForm(
+            "A 965 C AI",
+            regular_price="71399",
+            website_discounted_price="63399",
+        ),
+    ]
+    ev = evaluate_with_reduction(forms, "201895,3", "175000")
+
+    assert ev.valid
+    assert ev.result.totals.pos.value == Decimal("203099.70")
+    assert ev.result.totals.manager.value == Decimal("175000")
+    assert [line.pos_amount for line in ev.result.lines] == [
+        Decimal("33999"),
+        Decimal("32499"),
+        Decimal("34499"),
+        Decimal("45589.96"),
+        Decimal("56512.74"),
+    ]

@@ -1,9 +1,9 @@
 # ADR-001: Satış Fiyatı Düzeltmede Etkin İndirim Modeli (r, c)
 
-| | |
-| --- | --- |
-| **Durum** | Kabul edildi (Accepted) |
-| **Tarih** | 06.11.2026 |
+|            |                                                      |
+| ---------- | ---------------------------------------------------- |
+| **Durum**  | Kabul edildi (Accepted)                              |
+| **Tarih**  | 06.11.2026                                           |
 | **Bağlam** | Dynamics POS fiyat düzeltme aracı (Excel / uygulama) |
 
 ---
@@ -31,11 +31,11 @@ Ek olarak:
 
 ### 2.1 Tek ürün, yalnızca düğün %10 (ürün 10121)
 
-| Adım | Değer |
-| --- | --- |
+| Adım           | Değer     |
+| -------------- | --------- |
 | İndirim öncesi | 38.299,00 |
-| İndirim (%10) | 3.829,90 |
-| Hedef net | 30.000,00 |
+| İndirim (%10)  | 3.829,90  |
+| Hedef net      | 30.000,00 |
 
 **Mevcut formül:**
 
@@ -82,13 +82,13 @@ Buradan hedef net `N` için girilecek fiyat:
 p = (N + c) / (1 − r)
 ```
 
-| Kalem tipi | r | c |
-| --- | --- | --- |
-| Düğün (%10) | 0,10 | 0 |
-| Düğün + yüzdelik ekstra | etkin oran | 0 |
-| Oliz / sabit indirim | 0 | sabit tutar |
-| Karışık | dolu | dolu |
-| İndirimsiz | 0 | 0 |
+| Kalem tipi              | r          | c           |
+| ----------------------- | ---------- | ----------- |
+| Düğün (%10)             | 0,10       | 0           |
+| Düğün + yüzdelik ekstra | etkin oran | 0           |
+| Oliz / sabit indirim    | 0          | sabit tutar |
+| Karışık                 | dolu       | dolu        |
+| İndirimsiz              | 0          | 0           |
 
 Ayrı bir "ekstra indirim" alanı eklenmez. Sistemin satıra uyguladığı **toplam etkin indirim** ölçülür.
 
@@ -165,13 +165,13 @@ def solve(items, target):
 
 ## 5. Değerlendirilen Alternatifler
 
-| Alternatif | Neden reddedildi |
-| --- | --- |
-| Mevcut `F + İndirim` formülü | Yüzdelik indirimde yanlış sonuç verir (örnek 2.1). |
-| Düğün oranını %10 sabit kodlamak | AFC gibi ekstra kampanyalarda bozulur. |
-| Ayrı "ekstra indirim" alanı eklemek | Kullanıcıya yük bindirir, kampanya her değiştiğinde güncelleme gerekir. |
-| İteratif deneme-yanılma (Excel döngüsü) | Yakınsar ama yavaş ve kontrolsüzdür. Kapalı form çözüm mevcut. |
-| Farkı tüm kalemlere eşit bölmek | Düğün dışı ürünlerin fiyatını (55 bin → 85 bin) bozar. |
+| Alternatif                              | Neden reddedildi                                                        |
+| --------------------------------------- | ----------------------------------------------------------------------- |
+| Mevcut `F + İndirim` formülü            | Yüzdelik indirimde yanlış sonuç verir (örnek 2.1).                      |
+| Düğün oranını %10 sabit kodlamak        | AFC gibi ekstra kampanyalarda bozulur.                                  |
+| Ayrı "ekstra indirim" alanı eklemek     | Kullanıcıya yük bindirir, kampanya her değiştiğinde güncelleme gerekir. |
+| İteratif deneme-yanılma (Excel döngüsü) | Yakınsar ama yavaş ve kontrolsüzdür. Kapalı form çözüm mevcut.          |
+| Farkı tüm kalemlere eşit bölmek         | Düğün dışı ürünlerin fiyatını (55 bin → 85 bin) bozar.                  |
 
 ## 6. Sonuçlar
 
@@ -207,11 +207,20 @@ paylaşıyorsa bu satırlar yüzde kampanyası olarak tanınır:
 
 "POS'ta görünen indirimli toplam" alanı doldurulduğunda ve satırların web
 fiyatları bu toplamla uyuşmadığında, katalogdaki web fiyatı yerine POS'un
-gösterdiği net sepet esas alınır. Kampanya oranı
-`1 − (POS'ta görünen toplam / ilk fiyat toplamı)` olarak hesaplanır ve hedef
-net tutar bu oranla brüt POS tutarına çevrilip ilk fiyatlar oranında
-dağıtılır. Bu kural, katalogdaki normal online indirimin POS kampanya
-oranından farklı olduğu durumları kapsar; sonuç yine POS'ta doğrulanmalıdır.
+gösterdiği net sepet esas alınır. Kampanya oranı, katalog indirim oranı bu
+oranın altında kalan satırların ortak yüzde grubu olduğu varsayımıyla
+
+```
+POS'ta görünen toplam
+  = Σ yüzde grubu net + Σ sabit satır web fiyatı
+  = Σ yüzde grubu ilk fiyat × (1 − oran) + Σ sabit satır web fiyatı
+```
+
+denkleminden tek olarak çözülür. Yüzde grubundaki satırların POS fiyatları
+liste fiyatında korunur; sabit satırların POS fiyatları, hedef net ile toplam
+indirim korunacak şekilde liste fiyatları oranında dağıtılır. Bu kural,
+katalogdaki normal online indirimin POS kampanya oranından farklı olduğu
+durumları kapsar; sonuç yine POS'ta doğrulanmalıdır.
 
 Kalibrasyon profili sağlandığında aşağıdaki ADR çözümü kullanılır.
 
@@ -221,9 +230,8 @@ Kalibrasyon profili sağlandığında aşağıdaki ADR çözümü kullanılır.
 4. Doğrulama/düzeltme turunu ekle (maks. 3 tur, sonuçta fark ≠ 0 ise uyarı ver).
 5. Gerçek vakalarla regresyon testi yaz: ürün 10121, AFC sepeti (155.000 hedefi), karışık sepet.
 
-
-
 ## Yukarıdaki çözüm doğru değil, aşağıda genel bir çözüm bulundu:
+
 yüzdeli ürün indirimi çözüm
 
 OCD K 752 EWS: 33.999 → indirimli fiyat: 30.599,1
@@ -240,7 +248,7 @@ Toplam Indirim: 10099.7
 
 son pos fiyatı: 81.000 tl
 
-indirimli sepet %10 üzerinden bulunmuş 100997   ×   0,9 = 90897,3
+indirimli sepet %10 üzerinden bulunmuş 100997 × 0,9 = 90897,3
 
 ben indirimli sepeti 81.000 yapmam lazım
 
@@ -292,13 +300,13 @@ Excel tablonuzu şu sütun yapısına göre kurabilirsiniz:
 
 ### Tablo Yapısı
 
-| Hücre | Başlık | Açıklama / Gireceğiniz Değer |
-| --- | --- | --- |
-| **A2** | **Orijinal Yüzdeli Ürünler Toplamı** | Yüzde 10 indirim alan 3 ürünün orijinal liste fiyatı toplamı *(Örn: `100997`)* |
-| **B2** | **Sabit İndirim Tutarı** | Sabit indirimli üründen düşen indirim tutarı *(Örn: `10000`)* |
-| **C2** | **Sabit Ürünün Orijinal Fiyatı** | Sabit indirim uygulanan ürünün orijinal liste fiyatı *(Örn: `56299`)* |
-| **D2** | **Hedef Son Fiyat (Sepet Tutarı)** | Kasada ulaşmak istediğiniz indirimli tutar *(Örn: `123000`)* |
-| **E2** | **POS'a Girilecek Sabit Ürün Fiyatı** | **FORMÜLLÜ HÜCRE (Sonuç)** |
+| Hücre  | Başlık                                | Açıklama / Gireceğiniz Değer                                                   |
+| ------ | ------------------------------------- | ------------------------------------------------------------------------------ |
+| **A2** | **Orijinal Yüzdeli Ürünler Toplamı**  | Yüzde 10 indirim alan 3 ürünün orijinal liste fiyatı toplamı _(Örn: `100997`)_ |
+| **B2** | **Sabit İndirim Tutarı**              | Sabit indirimli üründen düşen indirim tutarı _(Örn: `10000`)_                  |
+| **C2** | **Sabit Ürünün Orijinal Fiyatı**      | Sabit indirim uygulanan ürünün orijinal liste fiyatı _(Örn: `56299`)_          |
+| **D2** | **Hedef Son Fiyat (Sepet Tutarı)**    | Kasada ulaşmak istediğiniz indirimli tutar _(Örn: `123000`)_                   |
+| **E2** | **POS'a Girilecek Sabit Ürün Fiyatı** | **FORMÜLLÜ HÜCRE (Sonuç)**                                                     |
 
 ---
 
@@ -315,10 +323,10 @@ Excel tablonuzu şu sütun yapısına göre kurabilirsiniz:
 
 Formüldeki değerleri ikinci senaryonuz üzerinden kontrol edelim:
 
-* **A2:** `100997` *(33.999 + 32.499 + 34.499)*
-* **B2:** `10000`
-* **C2:** `56299` *(Formülde kullanılmasına gerek kalmıyor, doğrudan farkı hesaplıyor)*
-* **D2:** `123000` *(Hedeflenen Son Fiyat)*
+- **A2:** `100997` _(33.999 + 32.499 + 34.499)_
+- **B2:** `10000`
+- **C2:** `56299` _(Formülde kullanılmasına gerek kalmıyor, doğrudan farkı hesaplıyor)_
+- **D2:** `123000` _(Hedeflenen Son Fiyat)_
 
 Formülün hesabı:
 `123000 - (100997 * 0.9) + 10000`
@@ -330,13 +338,13 @@ Yüzdeli ürünleri orijinal fiyatıyla girip, sabit ürünü E2'de çıkan sonu
 
 doğrulanmayan birden fazla için formül (pos'ta dene)
 
-901 KMP IG(SECİLİ KURUTMA VE ANKASTREDE 17.850 TL): 
+901 KMP IG(SECİLİ KURUTMA VE ANKASTREDE 17.850 TL):
 
 ürün indirimsiz fiyatı: 57.599,00 TL
 
 normal indirimli fiyatı: 47.599 TL (iki kampanya birbirini karşılamaz, o yüzden diğer yüksek fiyatlı 17.850 tl pos'a giriyor)
 
-bu ürünün kendi indirimi değil ama toplama indirim eklenmiş oluyor. 
+bu ürünün kendi indirimi değil ama toplama indirim eklenmiş oluyor.
 
 Indirim Öncesi Tutar: 214895
 Indirimli Sepet Tutarı: 187045
@@ -366,7 +374,7 @@ farklı ürün eklendi, fiyat oranlı oldu(tv 8.000 tl + kurutma 10.000 tl) = 18
 
 901 KMP IG + A 965 C AI
 
-A 965 C AI: 
+A 965 C AI:
 
 normal fiyatı: 71.399,00
 
@@ -384,51 +392,25 @@ Indirim Öncesi Tutar: 203099.7
 Indirimli Sepet Tutarı: 175000
 Toplam Indirim: 28099.7
 
-
-
 Bu senaryoda sistem karma (hibrit) indirim mantığıyla çalışıyor: Yüzdeli ürünlerin indirimi ($10.099,70\text{ TL}$) sepetteki fiyatlarına bağlı olarak değişirken, sabit ürünlerin indirimleri ($18.000\text{ TL}$) fiyat ne olursa olsun sabit kalıyor.
-
-
- 
 
 Mevcut Durum Analizi
 
 Yüzdeli Ürünler Orijinal Fiyat Toplamı ($A$): $100.997,00\text{ TL}$ (Sağladığı %10 İndirim: $10.099,70\text{ TL}$)
 
-
- 
-
 Sabit İndirimli Ürünlerin Toplam İndirimi ($B$): $18.000,00\text{ TL}$ ($8.000 + 10.000$)
-
-
- 
 
 Mevcut Toplam İndirim Tutarı: $10.099,70 + 18.000,00 = \mathbf{28.099,70\text{ TL}}$
 
-
- 
-
 Mevcut İndirim Öncesi Tutar: $229.995,00\text{ TL}$
 
-
- 
-
 Mevcut İndirimli Sepet Tutarı: $201.895,30\text{ TL}$
-
-
- 
 
 Genel Matematiksel Formül
 
 Hedeflediğiniz herhangi bir İndirimli Sepet Tutarı ($S$) için POS'a girilmesi gereken Yeni Toplam Liste Fiyatı ($X$):
 
-
- 
-
 Yüzdeli ürünlerin fiyatları sabit tutulduğunda (%10 indirimleri $10.099,70\text{ TL}$ olarak kalacağı için):
-
-
- 
 
 $$X = S + \text{Sabit İndirimler} + \text{Yüzdeli Ürünlerin Sağladığı İndirim}$$
 
@@ -437,9 +419,6 @@ $$X = S + 18.000 + 10.099,70 = \mathbf{S + 28.099,70\text{ TL}}$$
 Fiyat Değişikliği Uygulaması
 
 Sabit indirimli ürünlerin (901 KMP IG ve A 965 C AI) toplam liste fiyatını ayarlamak için yapmanız gerekenler:
-
-
- 
 
 1. Sabit Ürünlerin POS Fiyatları Toplamını Bulma
 
@@ -451,9 +430,6 @@ $$\text{Sabit Ürünler POS Toplamı} = (S + 28.099,70) - 100.997 = \mathbf{S - 
 
 Sabit indirimli iki ürünün orijinal liste fiyatları toplamı:
 
-
- 
-
 $$57.599 + 71.399 = \mathbf{128.998,00\text{ TL}}$$
 
 $$\text{Katsayı} = \frac{\text{Yeni Sabit Ürünler POS Toplamı}}{128.998}$$
@@ -462,46 +438,25 @@ $$\text{Katsayı} = \frac{\text{Yeni Sabit Ürünler POS Toplamı}}{128.998}$$
 
 Gerekli Toplam Liste Fiyatı ($X$):
 
-
- 
-
 $$175.000 + 28.099,70 = \mathbf{203.099,70\text{ TL}}$$
 
 Sabit Ürünler POS Toplamı:
-
-
- 
 
 $$203.099,70 - 100.997,00 = \mathbf{102.102,70\text{ TL}}$$
 
 Orantılı Dağıtım Katsayısı:
 
-
- 
-
 $$\text{Katsayı} = \frac{102.102,70}{128.998} \approx \mathbf{0,791506}$$
 
 Sabit Ürünlerin POS'a Girilecek Fiyatları:
 
-
- 
-
 901 KMP IG: $57.599 \times 0,791506 = \mathbf{45.590,04\text{ TL}}$
 
-
- 
-
 A 965 C AI: $71.399 \times 0,791506 = \mathbf{56.512,66\text{ TL}}$
-
-
- 
 
 Excel Formülü
 
 Excel'de hedef sepet tutarını yazdığınızda sabit ürünlere girilecek POS fiyatlarını otomatik çıkarmak için:
-
-
- 
 
 Hücre
 
@@ -546,3 +501,7 @@ Sabit Ürünler İçin Dağıtım Katsayısı
 =(E2 - A2) / C2
 
 Sonuç: Her sabit ürünün orijinal liste fiyatını F2 hücresi ile çarptığınızda, POS'a girilecek yeni fiyatları elde edersiniz ve sepet tam olarak hedeflediğiniz D2 tutarına ulaşır.
+
+### son değişiklikten sonra basit bir sorun kaldı:
+
+şimdi şu an sorun bir nevi çözüldü; örneğin 81 bin örneğinde artık 90.000 doğru görünüyor ama ikinci olizli ürün örneğimiz 901 kmpı ekleyince değer olarak 141.019,90 tl bulunuyor, eğer herhangi bir üründe hediye dahil checkbox seçersem pos giriş tutarı 143.099,70 tl oluyor....
