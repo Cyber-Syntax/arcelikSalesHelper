@@ -1,7 +1,11 @@
-from decimal import Decimal as D
+from decimal import Decimal, Decimal as D
 
 import pytest
 
+from arcelikSalesHelper.application.calculator import (
+    LineForm,
+    evaluate_with_reduction,
+)
 from arcelikSalesHelper.domain.models import (
     LineInput,
     ManagerMode,
@@ -114,7 +118,7 @@ def test_pos_uses_normal_website_discounted_total():
     assert pos_amount(D(145298), D(132798), D(112000)) == D(124500)
 
 
-def test_percentage_pos_mode_grosses_up_manager_price_without_rounding():
+def test_percentage_pos_mode_grosses_up_manager_price_and_rounds_pos():
     line = calc(
         make(
             regular_price=D(38299),
@@ -126,8 +130,8 @@ def test_percentage_pos_mode_grosses_up_manager_price_without_rounding():
     )
     assert line.pos_calculation_mode is PosCalculationMode.PERCENTAGE
     assert line.pos_discount_percentage == D("10.0")
-    assert str(line.pos_amount).startswith("33333.333333333333")
-    assert line.pos_amount != D("33333.33")
+    assert line.pos_amount == D("33333.33")
+    assert line.manager_line_total == D(30000)
 
 
 def test_percentage_pos_mode_respects_line_total_quantity_and_gift_pos():
@@ -141,7 +145,7 @@ def test_percentage_pos_mode_respects_line_total_quantity_and_gift_pos():
             pos_calculation_mode=PosCalculationMode.PERCENTAGE,
         )
     )
-    assert str(line.pos_amount).startswith("333.333333333333")
+    assert line.pos_amount == D("333.33")
     gift = calc(
         make(
             regular_price=D(100),
@@ -223,3 +227,101 @@ def test_transaction_totals_mark_missing_manager_lines_without_partial_sum():
     assert result.value.totals.manager.value is None
     assert result.value.totals.manager.missing_lines == (1,)
     assert result.value.totals.regular.value == D(10000)
+
+
+def test_three_percent_lines_target_81000():
+    forms = [
+        LineForm(
+            "OCD", regular_price="33999", website_discounted_price="30599,1"
+        ),
+        LineForm(
+            "ADE", regular_price="32499", website_discounted_price="29249,1"
+        ),
+        LineForm(
+            "AFC", regular_price="34499", website_discounted_price="31049,1"
+        ),
+    ]
+    ev = evaluate_with_reduction(forms, "", "81000")
+    assert ev.result.totals.pos.value == Decimal("90000.00")
+
+
+def test_three_percent_lines_shown_and_target():
+    forms = [
+        LineForm(
+            "OCD", regular_price="33999", website_discounted_price="30599,1"
+        ),
+        LineForm(
+            "ADE", regular_price="32499", website_discounted_price="29249,1"
+        ),
+        LineForm(
+            "AFC", regular_price="34499", website_discounted_price="31049,1"
+        ),
+    ]
+    ev = evaluate_with_reduction(forms, "90897,3", "81000")
+    assert ev.result.totals.pos.value == Decimal("90000.00")
+
+
+def test_catalog_website_prices_use_pos_shown_total_rate():
+    """The online price can differ from the POS campaign; trust the shown net."""
+    forms = [
+        LineForm(
+            "OCD K 752 EWS",
+            regular_price="33999",
+            website_discounted_price="31499",
+        ),
+        LineForm(
+            "ADE 9062 S1",
+            regular_price="32499",
+            website_discounted_price="30499",
+        ),
+        LineForm(
+            "AFC 341 S",
+            regular_price="34499",
+            website_discounted_price="31499",
+        ),
+    ]
+    ev = evaluate_with_reduction(forms, "90897,3", "81000")
+
+    assert ev.valid
+    assert ev.result.totals.pos.value == Decimal("90000.00")
+    assert ev.result.totals.manager.value == Decimal("81000")
+    assert [line.pos_amount for line in ev.result.lines] == [
+        Decimal("30297.04"),
+        Decimal("28960.36"),
+        Decimal("30742.60"),
+    ]
+
+
+def test_mixed_percentage_and_fixed_lines_keep_per_line_model():
+    forms = [
+        LineForm(
+            "OCD K 752 EWS",
+            regular_price="33999",
+            website_discounted_price="30599,1",
+        ),
+        LineForm(
+            "ADE 9062 S1",
+            regular_price="32499",
+            website_discounted_price="29249,1",
+        ),
+        LineForm(
+            "AFC 341 S",
+            regular_price="34499",
+            website_discounted_price="31049,1",
+        ),
+        LineForm(
+            "901 KMP I",
+            regular_price="56299",
+            website_discounted_price="46299",
+        ),
+    ]
+    ev = evaluate_with_reduction(forms, "137196,3", "123000")
+
+    assert ev.valid
+    assert ev.result.totals.pos.value == Decimal("143099.70")
+    assert [line.pos_amount for line in ev.result.lines] == [
+        Decimal("33999"),
+        Decimal("32499"),
+        Decimal("34499"),
+        Decimal("42102.70"),
+    ]

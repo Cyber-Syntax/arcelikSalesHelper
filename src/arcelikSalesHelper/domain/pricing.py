@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
+from dataclasses import dataclass
 from decimal import ROUND_DOWN, ROUND_HALF_UP, Decimal, localcontext
 from functools import reduce
 
@@ -127,8 +128,18 @@ def pos_amount(
     website_discounted_total: Decimal,
     manager_line_total: Decimal,
     mode: PosCalculationMode = PosCalculationMode.FIXED_AMOUNT,
+    rate: Decimal | None = None,
 ) -> Decimal:
     if mode is PosCalculationMode.PERCENTAGE:
+        # An explicit campaign rate wins over the price-derived website rate;
+        # the POS campaign and the online discount can differ.
+        if rate is not None:
+            denominator = sub(Decimal(1), rate)
+            return (
+                manager_line_total
+                if denominator == ZERO
+                else div(manager_line_total, denominator)
+            )
         # The discount rate is (regular - website) / regular, so gross-up by
         # dividing by its complement (website / regular). At a zero regular
         # price there is no meaningful rate; preserve the manager amount.
@@ -153,6 +164,11 @@ def _compute_line(line: LineInput, line_index: int) -> LineResult:
     total: Decimal | None = None
     pos: Decimal | None = None
     pos_percentage: Decimal | None = None
+    profile_rate = (
+        line.campaign_profile.rate
+        if line.campaign_profile is not None
+        else None
+    )
     if line.manager_value is not None and line.manager_mode is not None:
         unit, total = manager_totals(
             line.manager_value, line.manager_mode, qty
@@ -162,12 +178,16 @@ def _compute_line(line: LineInput, line_index: int) -> LineResult:
             and not line.gift_selected
         ):
             pos_percentage = (
-                mul(
-                    div(sub(regular_total, website_total), regular_total),
-                    HUNDRED,
+                mul(profile_rate, HUNDRED)
+                if profile_rate is not None
+                else (
+                    mul(
+                        div(sub(regular_total, website_total), regular_total),
+                        HUNDRED,
+                    )
+                    if regular_total != ZERO
+                    else None
                 )
-                if regular_total != ZERO
-                else None
             )
         pos = (
             total
@@ -177,6 +197,7 @@ def _compute_line(line: LineInput, line_index: int) -> LineResult:
                 website_total,
                 total,
                 line.pos_calculation_mode,
+                rate=profile_rate,
             )
         )
         pos = round_pos_amount(pos)
@@ -285,3 +306,115 @@ def build_options(
         manager_line_total=gift_manager[2],
     )
     return website, gift
+
+
+RATE_TOLERANCE = Decimal("0.00001")
+
+
+class PosSolveError(ValueError):
+    pass
+
+
+class NoEditableLines(PosSolveError):
+    """No discounted line to adjust; the caller keeps its old fallback."""
+
+
+@dataclass(frozen=True)
+class PosSpec:
+    regular_total: Decimal
+    website_total: Decimal
+    force_percent: bool = False
+
+
+@dataclass(frozen=True)
+class PosTarget:
+    net: Decimal  # becomes the line's manager total
+    percent: bool  # True -> PosCalculationMode.PERCENTAGE
+
+
+def _discount_rate(spec: PosSpec) -> Decimal | None:
+    discount = sub(spec.regular_total, spec.website_total)
+    if discount <= ZERO or spec.regular_total <= ZERO:
+        return None
+    return div(discount, spec.regular_total)
+
+
+def _percent_flags(specs: Sequence[PosSpec]) -> list[bool]:
+    rates = [_discount_rate(s) for s in specs]
+    flags: list[bool] = []
+    for i, (spec, rate) in enumerate(zip(specs, rates, strict=True)):
+        if rate is None:
+            flags.append(False)
+            continue
+        shared = any(
+            j != i
+            and other is not None
+            and abs(other - rate) <= RATE_TOLERANCE
+            for j, other in enumerate(rates)
+        )
+        flags.append(spec.force_percent or shared)
+    return flags
+
+
+def solve_pos_targets(
+    specs: Sequence[PosSpec], target: Decimal
+) -> tuple[PosTarget, ...]:
+    """Per-line manager net (+ mode) so the basket's net equals ``target``."""
+    flags = _percent_flags(specs)
+    pct: list[int] = []
+    fix: list[int] = []
+    plain: list[int] = []
+    for i, (spec, is_pct) in enumerate(zip(specs, flags, strict=True)):
+        if is_pct:
+            pct.append(i)
+        elif spec.regular_total > spec.website_total:
+            fix.append(i)
+        else:
+            plain.append(i)
+    if not pct and not fix:
+        raise NoEditableLines(T.SPLIT_NO_FREE)
+
+    def total(
+        indices: Sequence[int], pick: Callable[[PosSpec], Decimal]
+    ) -> Decimal:
+        return reduce(add, (pick(specs[i]) for i in indices), ZERO)
+
+    out: list[PosTarget | None] = [None] * len(specs)
+    for i in plain:
+        out[i] = PosTarget(specs[i].regular_total, False)  # POS == list price
+    plain_net = total(plain, lambda s: s.regular_total)
+    pct_web = total(pct, lambda s: s.website_total)
+
+    if fix:
+        fixed_discount = total(
+            fix, lambda s: sub(s.regular_total, s.website_total)
+        )
+        pos_total = sub(sub(sub(target, plain_net), pct_web), -fixed_discount)
+        if pos_total <= ZERO:
+            raise PosSolveError(T.SPLIT_NOT_ENOUGH)
+        shares = distribute_cents(
+            pos_total, [specs[i].regular_total for i in fix]
+        )
+        for i, pos in zip(fix, shares, strict=True):
+            net = sub(pos, sub(specs[i].regular_total, specs[i].website_total))
+            if net < ZERO:
+                raise PosSolveError(T.SPLIT_NOT_ENOUGH)
+            out[i] = PosTarget(net, False)
+        for i in pct:  # percent lines keep their list price as POS price
+            out[i] = PosTarget(specs[i].website_total, True)
+    else:
+        net_total = sub(target, plain_net)
+        if net_total <= ZERO:
+            raise PosSolveError(T.SPLIT_NOT_ENOUGH)
+        pct_regular = total(pct, lambda s: s.regular_total)
+        pos_total = round_pos_amount(div(mul(net_total, pct_regular), pct_web))
+        shares = distribute_cents(
+            pos_total, [specs[i].regular_total for i in pct]
+        )
+        for i, pos in zip(pct, shares, strict=True):
+            s = specs[i]
+            out[i] = PosTarget(
+                div(mul(pos, s.website_total), s.regular_total), True
+            )
+
+    return tuple(t for t in out if t is not None)
