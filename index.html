@@ -11,130 +11,153 @@
         th, td { overflow: hidden; word-break: break-word; }
     </style>
 </head>
-<body class="bg-gray-50 text-gray-800 min-h-screen p-6">
+<body class="bg-gray-100 text-gray-800 min-h-screen p-4 md:p-6">
 
-    <div class="max-w-6xl mx-auto bg-white rounded-xl shadow-md overflow-hidden p-8">
-        <h1 class="text-2xl font-bold text-indigo-600 mb-2">POS Fiyat Düzeltme Aracı (r, c Modeli)</h1>
-        <p class="text-sm text-gray-500 mb-6">ADR-001 Kapalı Formül ve Net Uzayında Orantılı Dağıtım Motoru</p>
+    <div class="max-w-5xl mx-auto bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden p-5 md:p-6">
+        <!-- Başlık Bölümü -->
+        <div class="mb-5 border-b pb-4">
+            <h1 class="text-xl font-bold text-indigo-700">POS Fiyat Düzeltme Aracı (r, c Modeli)</h1>
+            <p class="text-xs text-gray-500 mt-0.5">ADR-001 Kapalı Formül ve Net Uzayında Orantılı Dağıtım Motoru</p>
+        </div>
 
-        <!-- Üst Parametreler -->
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 bg-indigo-50 p-4 rounded-lg border border-indigo-100">
-            <div>
-                <label class="block text-sm font-semibold text-gray-700 mb-1">Hedef Net Sepet Tutarı (TL)</label>
-                <input type="text" id="targetNet" value="175.000,00" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none font-bold text-indigo-700 bg-white">
+        <!-- Üst Parametreler (Kompakt Hale Getirildi) -->
+        <div class="flex flex-col sm:flex-row items-end gap-3 mb-5 bg-indigo-50/70 p-3.5 rounded-lg border border-indigo-100">
+            <div class="w-full sm:w-64">
+                <label class="block text-xs font-semibold text-gray-700 mb-1">Hedef Net Sepet Tutarı (TL)</label>
+                <input type="text" id="targetNet" value="175.000,00" class="w-full px-3 py-1.5 border border-indigo-200 rounded-md focus:ring-2 focus:ring-indigo-500 outline-none font-bold text-indigo-900 bg-white text-sm">
             </div>
-            <div class="flex items-end">
-                <button onclick="calculate()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-lg transition duration-200 shadow">
+            <div class="w-full sm:w-auto flex-1 flex justify-end">
+                <button onclick="calculate()" class="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-1.5 px-5 rounded-md transition duration-150 text-sm shadow-sm flex items-center justify-center gap-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>
                     Hesapla ve POS Fiyatlarını Çıkar
                 </button>
             </div>
         </div>
 
-        <!-- Ürünler Tablosu -->
-        <div class="mb-4 flex justify-between items-center">
-            <h2 class="text-lg font-semibold text-gray-700">Sepet Kalemleri</h2>
-            <button onclick="addItem()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium py-1.5 px-3 rounded-lg transition">
-                + Yeni Ürün Ekle
+        <!-- Ürünler Tablosu Başlığı -->
+        <div class="mb-3 flex justify-between items-center">
+            <h2 class="text-sm font-semibold text-gray-700 uppercase tracking-wide">Sepet Kalemleri</h2>
+            <button onclick="addItem()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium py-1.5 px-3 rounded-md transition flex items-center gap-1 shadow-sm">
+                <span>+</span> Yeni Ürün Ekle
             </button>
         </div>
 
-        <div class="border rounded-lg mb-6 overflow-x-auto">
+        <!-- Ürünler Tablosu -->
+        <div class="border rounded-lg overflow-x-auto bg-white">
             <table id="itemsTable" class="text-left border-collapse">
                 <thead>
-                    <tr class="bg-gray-100 text-xs font-semibold text-gray-600 uppercase tracking-wider border-b">
-                        <th style="width: 28%;" class="p-3">Ürün Adı</th>
-                        <th style="width: 18%;" class="p-3">Orijinal Fiyat ($p$)</th>
-                        <th style="width: 15%;" class="p-3">Yüzde Oranı ($r$)</th>
-                        <th style="width: 18%;" class="p-3">Sabit İndirim ($c$)</th>
-                        <th style="width: 13%;" class="p-3 text-center">Düzenlenebilir?</th>
-                        <th style="width: 8%;" class="p-3 text-center">İşlem</th>
+                    <tr class="bg-gray-50 text-[11px] font-semibold text-gray-600 uppercase tracking-wider border-b">
+                        <th style="width: 30%;" class="p-2.5">Ürün Adı</th>
+                        <th style="width: 18%;" class="p-2.5">Orijinal Fiyat ($p$)</th>
+                        <th style="width: 15%;" class="p-2.5">Yüzde Oranı ($r$)</th>
+                        <th style="width: 18%;" class="p-2.5">Sabit İndirim ($c$)</th>
+                        <th style="width: 11%;" class="p-2.5 text-center">Düzenlenebilir?</th>
+                        <th style="width: 8%;" class="p-2.5 text-center">İşlem</th>
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-gray-200 text-sm">
+                <tbody class="divide-y divide-gray-100 text-sm">
                     <tr data-item>
-                        <td class="p-2"><input type="text" value="OCD K 752 EWS" class="w-full px-2 py-1 border rounded text-sm"></td>
-                        <td class="p-2"><input type="text" value="33.999,00" class="w-full px-2 py-1 border rounded price text-sm"></td>
-                        <td class="p-2"><input type="text" value="0,10" class="w-full px-2 py-1 border rounded rate text-sm"></td>
-                        <td class="p-2"><input type="text" value="0,00" class="w-full px-2 py-1 border rounded c-input text-sm"></td>
-                        <td class="p-2 text-center"><input type="checkbox" checked class="w-4 h-4 text-indigo-600 editable"></td>
-                        <td class="p-2 text-center"><button onclick="removeItem(this)" class="text-red-500 hover:text-red-700 font-bold text-xs">Sil</button></td>
+                        <td class="p-1.5"><input type="text" value="OCD K 752 EWS" class="w-full px-2 py-1 border rounded text-xs focus:ring-1 focus:ring-indigo-500 outline-none"></td>
+                        <td class="p-1.5"><input type="text" value="33.999,00" class="w-full px-2 py-1 border rounded price text-xs focus:ring-1 focus:ring-indigo-500 outline-none"></td>
+                        <td class="p-1.5"><input type="text" value="0,10" class="w-full px-2 py-1 border rounded rate text-xs focus:ring-1 focus:ring-indigo-500 outline-none"></td>
+                        <td class="p-1.5"><input type="text" value="0,00" class="w-full px-2 py-1 border rounded c-input text-xs focus:ring-1 focus:ring-indigo-500 outline-none"></td>
+                        <td class="p-1.5 text-center"><input type="checkbox" checked class="w-4 h-4 text-indigo-600 rounded border-gray-300 editable accent-indigo-600"></td>
+                        <td class="p-1.5 text-center"><button onclick="removeItem(this)" class="text-red-500 hover:text-red-700 font-medium text-xs">Sil</button></td>
                     </tr>
                     <tr data-item>
-                        <td class="p-2"><input type="text" value="ADE 9062 S1" class="w-full px-2 py-1 border rounded text-sm"></td>
-                        <td class="p-2"><input type="text" value="32.499,00" class="w-full px-2 py-1 border rounded price text-sm"></td>
-                        <td class="p-2"><input type="text" value="0,10" class="w-full px-2 py-1 border rounded rate text-sm"></td>
-                        <td class="p-2"><input type="text" value="0,00" class="w-full px-2 py-1 border rounded c-input text-sm"></td>
-                        <td class="p-2 text-center"><input type="checkbox" checked class="w-4 h-4 text-indigo-600 editable"></td>
-                        <td class="p-2 text-center"><button onclick="removeItem(this)" class="text-red-500 hover:text-red-700 font-bold text-xs">Sil</button></td>
+                        <td class="p-1.5"><input type="text" value="ADE 9062 S1" class="w-full px-2 py-1 border rounded text-xs focus:ring-1 focus:ring-indigo-500 outline-none"></td>
+                        <td class="p-1.5"><input type="text" value="32.499,00" class="w-full px-2 py-1 border rounded price text-xs focus:ring-1 focus:ring-indigo-500 outline-none"></td>
+                        <td class="p-1.5"><input type="text" value="0,10" class="w-full px-2 py-1 border rounded rate text-xs focus:ring-1 focus:ring-indigo-500 outline-none"></td>
+                        <td class="p-1.5"><input type="text" value="0,00" class="w-full px-2 py-1 border rounded c-input text-xs focus:ring-1 focus:ring-indigo-500 outline-none"></td>
+                        <td class="p-1.5 text-center"><input type="checkbox" checked class="w-4 h-4 text-indigo-600 rounded border-gray-300 editable accent-indigo-600"></td>
+                        <td class="p-1.5 text-center"><button onclick="removeItem(this)" class="text-red-500 hover:text-red-700 font-medium text-xs">Sil</button></td>
                     </tr>
                     <tr data-item>
-                        <td class="p-2"><input type="text" value="AFC 341 S" class="w-full px-2 py-1 border rounded text-sm"></td>
-                        <td class="p-2"><input type="text" value="34.499,00" class="w-full px-2 py-1 border rounded price text-sm"></td>
-                        <td class="p-2"><input type="text" value="0,10" class="w-full px-2 py-1 border rounded rate text-sm"></td>
-                        <td class="p-2"><input type="text" value="0,00" class="w-full px-2 py-1 border rounded c-input text-sm"></td>
-                        <td class="p-2 text-center"><input type="checkbox" checked class="w-4 h-4 text-indigo-600 editable"></td>
-                        <td class="p-2 text-center"><button onclick="removeItem(this)" class="text-red-500 hover:text-red-700 font-bold text-xs">Sil</button></td>
+                        <td class="p-1.5"><input type="text" value="AFC 341 S" class="w-full px-2 py-1 border rounded text-xs focus:ring-1 focus:ring-indigo-500 outline-none"></td>
+                        <td class="p-1.5"><input type="text" value="34.499,00" class="w-full px-2 py-1 border rounded price text-xs focus:ring-1 focus:ring-indigo-500 outline-none"></td>
+                        <td class="p-1.5"><input type="text" value="0,10" class="w-full px-2 py-1 border rounded rate text-xs focus:ring-1 focus:ring-indigo-500 outline-none"></td>
+                        <td class="p-1.5"><input type="text" value="0,00" class="w-full px-2 py-1 border rounded c-input text-xs focus:ring-1 focus:ring-indigo-500 outline-none"></td>
+                        <td class="p-1.5 text-center"><input type="checkbox" checked class="w-4 h-4 text-indigo-600 rounded border-gray-300 editable accent-indigo-600"></td>
+                        <td class="p-1.5 text-center"><button onclick="removeItem(this)" class="text-red-500 hover:text-red-700 font-medium text-xs">Sil</button></td>
                     </tr>
                     <tr data-item>
-                        <td class="p-2"><input type="text" value="901 KMP IG" class="w-full px-2 py-1 border rounded text-sm"></td>
-                        <td class="p-2"><input type="text" value="57.599,00" class="w-full px-2 py-1 border rounded price text-sm"></td>
-                        <td class="p-2"><input type="text" value="0,00" class="w-full px-2 py-1 border rounded rate text-sm"></td>
-                        <td class="p-2"><input type="text" value="10.000,00" class="w-full px-2 py-1 border rounded c-input text-sm"></td>
-                        <td class="p-2 text-center"><input type="checkbox" checked class="w-4 h-4 text-indigo-600 editable"></td>
-                        <td class="p-2 text-center"><button onclick="removeItem(this)" class="text-red-500 hover:text-red-700 font-bold text-xs">Sil</button></td>
+                        <td class="p-1.5"><input type="text" value="901 KMP IG" class="w-full px-2 py-1 border rounded text-xs focus:ring-1 focus:ring-indigo-500 outline-none"></td>
+                        <td class="p-1.5"><input type="text" value="57.599,00" class="w-full px-2 py-1 border rounded price text-xs focus:ring-1 focus:ring-indigo-500 outline-none"></td>
+                        <td class="p-1.5"><input type="text" value="0,00" class="w-full px-2 py-1 border rounded rate text-xs focus:ring-1 focus:ring-indigo-500 outline-none"></td>
+                        <td class="p-1.5"><input type="text" value="10.000,00" class="w-full px-2 py-1 border rounded c-input text-xs focus:ring-1 focus:ring-indigo-500 outline-none"></td>
+                        <td class="p-1.5 text-center"><input type="checkbox" checked class="w-4 h-4 text-indigo-600 rounded border-gray-300 editable accent-indigo-600"></td>
+                        <td class="p-1.5 text-center"><button onclick="removeItem(this)" class="text-red-500 hover:text-red-700 font-medium text-xs">Sil</button></td>
                     </tr>
                     <tr data-item>
-                        <td class="p-2"><input type="text" value="A 965 C AI" class="w-full px-2 py-1 border rounded text-sm"></td>
-                        <td class="p-2"><input type="text" value="71.399,00" class="w-full px-2 py-1 border rounded price text-sm"></td>
-                        <td class="p-2"><input type="text" value="0,00" class="w-full px-2 py-1 border rounded rate text-sm"></td>
-                        <td class="p-2"><input type="text" value="8.000,00" class="w-full px-2 py-1 border rounded c-input text-sm"></td>
-                        <td class="p-2 text-center"><input type="checkbox" checked class="w-4 h-4 text-indigo-600 editable"></td>
-                        <td class="p-2 text-center"><button onclick="removeItem(this)" class="text-red-500 hover:text-red-700 font-bold text-xs">Sil</button></td>
+                        <td class="p-1.5"><input type="text" value="A 965 C AI" class="w-full px-2 py-1 border rounded text-xs focus:ring-1 focus:ring-indigo-500 outline-none"></td>
+                        <td class="p-1.5"><input type="text" value="71.399,00" class="w-full px-2 py-1 border rounded price text-xs focus:ring-1 focus:ring-indigo-500 outline-none"></td>
+                        <td class="p-1.5"><input type="text" value="0,00" class="w-full px-2 py-1 border rounded rate text-xs focus:ring-1 focus:ring-indigo-500 outline-none"></td>
+                        <td class="p-1.5"><input type="text" value="8.000,00" class="w-full px-2 py-1 border rounded c-input text-xs focus:ring-1 focus:ring-indigo-500 outline-none"></td>
+                        <td class="p-1.5 text-center"><input type="checkbox" checked class="w-4 h-4 text-indigo-600 rounded border-gray-300 editable accent-indigo-600"></td>
+                        <td class="p-1.5 text-center"><button onclick="removeItem(this)" class="text-red-500 hover:text-red-700 font-medium text-xs">Sil</button></td>
                     </tr>
                 </tbody>
             </table>
         </div>
+    </div>
 
-        <!-- Sonuç Bölümü -->
-        <div id="resultContainer" class="hidden bg-gray-50 border border-gray-200 rounded-lg p-6">
-            <h2 class="text-lg font-bold text-gray-800 mb-4">Hesaplama Sonuçları</h2>
+    <!-- Sonuçlar için Popup (Modal) Container -->
+    <div id="resultModal" class="fixed inset-0 bg-gray-900/60 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
+        <div class="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col overflow-hidden border border-gray-100">
+            <!-- Modal Header -->
+            <div class="flex items-center justify-between px-6 py-4 border-b bg-gray-50">
+                <h3 class="text-lg font-bold text-gray-800">Hesaplama Sonuçları</h3>
+                <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600 transition p-1 rounded-lg hover:bg-gray-200">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
 
-            <!-- Özet Kartları -->
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                <div class="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-                    <span class="text-xs font-semibold text-gray-500 uppercase">Toplam Orijinal POS Fiyatı</span>
-                    <div id="totalOriginalPos" class="text-xl font-bold text-gray-700 mt-1">0,00 TL</div>
+            <!-- Modal Content (Scrollable) -->
+            <div class="p-6 overflow-y-auto space-y-5">
+                <!-- Özet Kartları -->
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div class="bg-gray-50 p-3.5 rounded-lg border border-gray-200">
+                        <span class="text-[11px] font-semibold text-gray-500 uppercase tracking-wider block">Toplam Orijinal POS</span>
+                        <div id="totalOriginalPos" class="text-lg font-bold text-gray-800 mt-0.5">0,00 TL</div>
+                    </div>
+                    <div class="bg-indigo-50 p-3.5 rounded-lg border border-indigo-100">
+                        <span class="text-[11px] font-semibold text-indigo-600 uppercase tracking-wider block">POS'a Girilecek Yeni Toplam</span>
+                        <div id="totalNewPos" class="text-lg font-bold text-indigo-700 mt-0.5">0,00 TL</div>
+                    </div>
+                    <div class="bg-emerald-50 p-3.5 rounded-lg border border-emerald-100">
+                        <span class="text-[11px] font-semibold text-emerald-600 uppercase tracking-wider block">Ulaşılan Net Tutar</span>
+                        <div id="totalNetSummary" class="text-lg font-bold text-emerald-700 mt-0.5">0,00 TL</div>
+                    </div>
                 </div>
-                <div class="bg-indigo-50 p-4 rounded-lg shadow-sm border border-indigo-100">
-                    <span class="text-xs font-semibold text-indigo-600 uppercase">POS'a Girilecek Yeni Toplam Fiyat</span>
-                    <div id="totalNewPos" class="text-xl font-bold text-indigo-700 mt-1">0,00 TL</div>
-                </div>
-                <div class="bg-emerald-50 p-4 rounded-lg shadow-sm border border-emerald-100">
-                    <span class="text-xs font-semibold text-emerald-600 uppercase">Ulaşılan Net Sepet Tutarı</span>
-                    <div id="totalNetSummary" class="text-xl font-bold text-emerald-700 mt-1">0,00 TL</div>
+
+                <div id="summaryText" class="text-xs text-gray-600 font-mono bg-gray-100 p-2.5 rounded-md border border-gray-200"></div>
+
+                <!-- Sonuç Tablosu -->
+                <div class="border rounded-lg overflow-hidden">
+                    <table class="bg-white border-collapse" style="table-layout: auto;">
+                        <thead>
+                            <tr class="bg-indigo-50/70 text-[11px] font-semibold text-indigo-800 uppercase tracking-wider border-b">
+                                <th class="p-2.5 text-left">Ürün Adı</th>
+                                <th class="p-2.5 text-right">Eski Fiyat</th>
+                                <th class="p-2.5 text-right">POS'a Girilecek Yeni Fiyat</th>
+                                <th class="p-2.5 text-right">Beklenen Net Karşılığı</th>
+                            </tr>
+                        </thead>
+                        <tbody id="resultTableBody" class="divide-y divide-gray-100 text-xs"></tbody>
+                    </table>
                 </div>
             </div>
 
-            <div id="summaryText" class="text-xs text-gray-600 mb-4 font-mono"></div>
-
-            <div class="overflow-x-auto">
-                <table class="bg-white rounded-lg shadow-sm border-collapse" style="table-layout: auto;">
-                    <thead>
-                        <tr class="bg-indigo-50 text-xs font-semibold text-indigo-700 uppercase tracking-wider border-b">
-                            <th class="p-3">Ürün Adı</th>
-                            <th class="p-3">Eski Fiyat</th>
-                            <th class="p-3">POS'a Girilecek Yeni Fiyat</th>
-                            <th class="p-3">Beklenen Net Karşılığı</th>
-                        </tr>
-                    </thead>
-                    <tbody id="resultTableBody" class="divide-y divide-gray-200 text-sm"></tbody>
-                </table>
+            <!-- Modal Footer -->
+            <div class="px-6 py-3 bg-gray-50 border-t flex justify-end">
+                <button onclick="closeModal()" class="bg-gray-800 hover:bg-gray-900 text-white font-medium py-1.5 px-5 rounded-md text-sm transition">
+                    Kapat
+                </button>
             </div>
         </div>
     </div>
 
     <script>
-        // Türkçe Para Formatını Parse Etme (Örn: "48.853,00" -> 48853.00)
         function parseTR(val) {
             if (typeof val === 'number') return val;
             if (!val) return 0;
@@ -142,7 +165,6 @@
             return parseFloat(cleaned) || 0;
         }
 
-        // Sayıyı Türkçe Para Formatına Dönüştürme (Örn: 48853.00 -> "48.853,00")
         function formatTR(val) {
             return Number(val).toLocaleString('tr-TR', {
                 minimumFractionDigits: 2,
@@ -155,12 +177,12 @@
             const tr = document.createElement("tr");
             tr.setAttribute("data-item", "");
             tr.innerHTML = `
-                <td class="p-2"><input type="text" value="Yeni Ürün" class="w-full px-2 py-1 border rounded text-sm"></td>
-                <td class="p-2"><input type="text" value="10.000,00" class="w-full px-2 py-1 border rounded price text-sm"></td>
-                <td class="p-2"><input type="text" value="0,00" class="w-full px-2 py-1 border rounded rate text-sm"></td>
-                <td class="p-2"><input type="text" value="0,00" class="w-full px-2 py-1 border rounded c-input text-sm"></td>
-                <td class="p-2 text-center"><input type="checkbox" checked class="w-4 h-4 text-indigo-600 editable"></td>
-                <td class="p-2 text-center"><button onclick="removeItem(this)" class="text-red-500 hover:text-red-700 font-bold text-xs">Sil</button></td>
+                <td class="p-1.5"><input type="text" value="Yeni Ürün" class="w-full px-2 py-1 border rounded text-xs focus:ring-1 focus:ring-indigo-500 outline-none"></td>
+                <td class="p-1.5"><input type="text" value="10.000,00" class="w-full px-2 py-1 border rounded price text-xs focus:ring-1 focus:ring-indigo-500 outline-none"></td>
+                <td class="p-1.5"><input type="text" value="0,00" class="w-full px-2 py-1 border rounded rate text-xs focus:ring-1 focus:ring-indigo-500 outline-none"></td>
+                <td class="p-1.5"><input type="text" value="0,00" class="w-full px-2 py-1 border rounded c-input text-xs focus:ring-1 focus:ring-indigo-500 outline-none"></td>
+                <td class="p-1.5 text-center"><input type="checkbox" checked class="w-4 h-4 text-indigo-600 rounded border-gray-300 editable accent-indigo-600"></td>
+                <td class="p-1.5 text-center"><button onclick="removeItem(this)" class="text-red-500 hover:text-red-700 font-medium text-xs">Sil</button></td>
             `;
             tbody.appendChild(tr);
         }
@@ -191,7 +213,6 @@
                 });
             });
 
-            // ADR-001 Solve Logic
             items.forEach(it => {
                 it.net = it.p * (1 - it.r) - it.c;
             });
@@ -228,24 +249,38 @@
                 totalNewPosPrice += newPosPrice;
 
                 resultsHTML += `
-                    <tr class="${it.editable ? '' : 'bg-gray-50 text-gray-400'}">
-                        <td class="p-3 font-medium">${it.name} ${!it.editable ? '(Sabit/Dokunulmaz)' : ''}</td>
-                        <td class="p-3">${formatTR(it.p)} TL</td>
-                        <td class="p-3 font-bold text-indigo-600">${formatTR(newPosPrice)} TL</td>
-                        <td class="p-3">${formatTR(expectedNet)} TL</td>
+                    <tr class="${it.editable ? 'hover:bg-gray-50' : 'bg-gray-50/70 text-gray-400'}">
+                        <td class="p-2.5 font-medium">${it.name} ${!it.editable ? '<span class="text-[10px] bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded ml-1">Sabit</span>' : ''}</td>
+                        <td class="p-2.5 text-right font-mono">${formatTR(it.p)} TL</td>
+                        <td class="p-2.5 text-right font-bold font-mono text-indigo-600">${formatTR(newPosPrice)} TL</td>
+                        <td class="p-2.5 text-right font-mono">${formatTR(expectedNet)} TL</td>
                     </tr>
                 `;
             });
 
-            // Özet Bilgilerini Güncelleme
             document.getElementById("totalOriginalPos").innerText = `${formatTR(totalOriginalPosPrice)} TL`;
             document.getElementById("totalNewPos").innerText = `${formatTR(totalNewPosPrice)} TL`;
             document.getElementById("totalNetSummary").innerText = `${formatTR(newTotalNet)} TL`;
 
             document.getElementById("resultTableBody").innerHTML = resultsHTML;
             document.getElementById("summaryText").innerHTML = `Dağıtım Katsayısı (k): <b>${k.toFixed(6)}</b> | Hedef Net: <b>${formatTR(target)} TL</b>`;
-            document.getElementById("resultContainer").classList.remove("hidden");
+
+            // Modal Aç
+            document.getElementById("resultModal").classList.remove("hidden");
         }
+
+        function closeModal() {
+            document.getElementById("resultModal").classList.add("hidden");
+        }
+
+        // Modal dışına veya ESC tuşuna basıldığında kapatma
+        document.getElementById("resultModal").addEventListener("click", function(e) {
+            if (e.target === this) closeModal();
+        });
+
+        document.addEventListener("keydown", function(e) {
+            if (e.key === "Escape") closeModal();
+        });
     </script>
 </body>
 </html>
