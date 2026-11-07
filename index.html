@@ -158,23 +158,17 @@
     </div>
 
     <script>
-        // Sadece Türkçe Sayı Formatını Doğrulayan ve Parse Eden Fonksiyon
-        // Kabul edilen örnekler: 175.000,00 | 33999 | 0,10 | 10,5
-        // Reddedilenler (Hatalı/İngilizce formatlar): 0.10 | 10.5 | abc vb.
         function parseTR(val) {
             if (typeof val === 'number') return val;
             if (!val || val.toString().trim() === "") return NaN;
 
             let str = val.toString().trim();
-
-            // Türkçe sayı formatı regexi: Binlik gruplar için nokta, ondalık için virgül
             const trNumberRegex = /^(\d{1,3}(\.\d{3})*|\d+)(,\d+)?$/;
 
             if (!trNumberRegex.test(str)) {
-                return NaN; // Geçersiz format
+                return NaN;
             }
 
-            // Binlik noktalarını kaldır, virgülü noktaya çevir
             let cleaned = str.replace(/\./g, '').replace(',', '.');
             return parseFloat(cleaned);
         }
@@ -211,7 +205,7 @@
             const target = parseTR(targetRaw);
 
             if (isNaN(target)) {
-                alert("Hata: Hedef Net Sepet Tutarı geçerli bir Türkçe sayı formatında olmalıdır (Örn: 175.000,00). Nokta yerine virgül kullanınız.");
+                alert("Hata: Hedef Net Sepet Tutarı geçerli bir Türkçe sayı formatında olmalıdır (Örn: 175.000,00).");
                 return;
             }
 
@@ -234,8 +228,9 @@
                     hasError = true;
                     return;
                 }
-                if (isNaN(rVal) || rVal < 0 || rVal > 1) {
-                    alert(`Hata: "${name}" ürününün yüzde oranı (r) 0 ile 1 arasında olmalıdır (Örn: 0,10).`);
+                // DÜZELTME: r < 0 veya r >= 1 kontrolü (r = 1 durumunda payda sıfır olur / bölme hatası önlenir)
+                if (isNaN(rVal) || rVal < 0 || rVal >= 1) {
+                    alert(`Hata: "${name}" ürününün yüzde oranı (r) 0 ile 1 arasında olmalıdır (100% olamaz).`);
                     hasError = true;
                     return;
                 }
@@ -284,8 +279,13 @@
 
                 if (it.editable) {
                     let newNet = it.net * k;
-                    newPosPrice = (newNet + it.c) / (1 - it.r);
-                    expectedNet = newNet;
+                    let rawPosPrice = (newNet + it.c) / (1 - it.r);
+
+                    // DÜZELTME: Fiyatı ekranda gösterildiği gibi 2 ondalık basamağa yuvarla
+                    newPosPrice = Math.round(rawPosPrice * 100) / 100;
+
+                    // Neti yuvarlanan POS fiyatından tekrar hassas şekilde hesapla
+                    expectedNet = newPosPrice * (1 - it.r) - it.c;
                 } else {
                     newPosPrice = it.p;
                     expectedNet = it.net;
