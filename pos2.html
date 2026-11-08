@@ -214,7 +214,7 @@
     if (!s) return NaN;
     if (s.indexOf(",") >= 0 && s.indexOf(".") >= 0) s = s.replace(/\./g, "").replace(",", ".");
     else if (s.indexOf(",") >= 0) s = s.replace(",", ".");
-    else if ((s.match(/\./g) || []).length > 1) s = s.replace(/\./g, "");
+    else if ((s.match(/\./g) || []).length > 1 || (s.indexOf(".") >= 0 && s.split(".")[1].length === 3 && s.split(".")[0] !== "0")) s = s.replace(/\./g, "");
     var v = Number(s);
     return isNaN(v) ? NaN : v;
   }
