@@ -380,7 +380,7 @@
       fark = r2(hedef - toplam);
       log.push({ tur: tur, toplam: toplam, fark: fark });
       if (Math.abs(fark) < 0.005) break;
-      F.set(son.id, r2(F.get(son.id) + fark / (1 - oranOf(son))));
+    if (tur < 3) F.set(son.id, r2(F.get(son.id) + fark / (1 - oranOf(son))));
     }
     return { k: k, F: F, log: log, toplam: toplam, brut: brut, fark: fark };
   }
