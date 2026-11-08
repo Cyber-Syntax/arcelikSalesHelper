@@ -508,7 +508,7 @@
             <td><strong>${money.format(i.posPrice)}</strong></td>
             <td>${money.format(i.percentDiscount)}</td>
             <td>${money.format(i.fixedDiscount)}</td>
-            <td class="positive">${money.format(i.net)}</td>
+            <td class="${i.net < 0 ? 'negative' : 'positive'}">${money.format(i.net)}</td>
           </tr>`).join('');
         lines.forEach(line => {
           const node = $$('.product', list)[line.index];
