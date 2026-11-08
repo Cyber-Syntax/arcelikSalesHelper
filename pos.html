@@ -394,7 +394,8 @@
         const target = readNum($('#target'));
         $('#targetDisplay').textContent = moneyText(target);
         if (!items.length) {
-          lastCalculation = null;
+        $$('.p-result', list).forEach(result => { result.textContent = '—'; });
+        lastCalculation = null;
           $('#status').textContent = 'Ürün bekleniyor';
           $('#actualTotal').textContent = '—';
           $('#currentTotal').textContent = '—';
