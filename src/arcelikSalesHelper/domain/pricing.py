@@ -324,6 +324,7 @@ class PosSpec:
     regular_total: Decimal
     website_total: Decimal
     force_percent: bool = False
+    force_fixed: bool = False
 
 
 @dataclass(frozen=True)
@@ -343,7 +344,7 @@ def _percent_flags(specs: Sequence[PosSpec]) -> list[bool]:
     rates = [_discount_rate(s) for s in specs]
     flags: list[bool] = []
     for i, (spec, rate) in enumerate(zip(specs, rates, strict=True)):
-        if rate is None:
+        if rate is None or spec.force_fixed:
             flags.append(False)
             continue
         shared = any(

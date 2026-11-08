@@ -1,0 +1,560 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#101827">
+  <title>POS Sepet Fiyatı Hesaplayıcı</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f3f6fb;
+      --panel: #ffffff;
+      --ink: #182235;
+      --muted: #68758a;
+      --line: #e2e8f0;
+      --brand: #335eea;
+      --brand-dark: #2448c7;
+      --green: #087a52;
+      --green-bg: #e8f7f0;
+      --amber: #925b08;
+      --amber-bg: #fff6df;
+      --red: #b42318;
+      --red-bg: #fff0ee;
+      --shadow: 0 12px 34px rgba(26, 42, 71, .07);
+      --radius: 18px;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: radial-gradient(circle at top left, #e8efff 0, transparent 34rem), var(--bg);
+      color: var(--ink);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.45;
+    }
+    button, input, select { font: inherit; }
+    button { cursor: pointer; }
+    .app { width: min(1240px, calc(100% - 32px)); margin: 32px auto 56px; }
+    .topbar { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; margin-bottom: 22px; }
+    .eyebrow { color: var(--brand); font-size: .76rem; font-weight: 800; letter-spacing: .11em; text-transform: uppercase; }
+    h1 { margin: 5px 0 7px; font-size: clamp(1.65rem, 4vw, 2.35rem); line-height: 1.12; letter-spacing: -.04em; }
+    .sub { margin: 0; max-width: 760px; color: var(--muted); font-size: .97rem; }
+    .offline { white-space: nowrap; border: 1px solid #cfe8da; background: #effaf4; color: #087a52; padding: 8px 12px; border-radius: 999px; font-weight: 750; font-size: .78rem; }
+    .layout { display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(300px, .85fr); gap: 20px; align-items: start; }
+    .panel { min-width: 0; background: var(--panel); border: 1px solid rgba(218, 226, 239, .9); border-radius: var(--radius); box-shadow: var(--shadow); }
+    .panel-head { padding: 20px 22px 15px; display: flex; align-items: center; justify-content: space-between; gap: 12px; border-bottom: 1px solid var(--line); }
+    h2 { margin: 0; font-size: 1.07rem; letter-spacing: -.02em; }
+    .muted { color: var(--muted); }
+    .tiny { font-size: .78rem; }
+    .panel-body { padding: 18px 22px 22px; }
+    .btn { border: 1px solid var(--line); background: #fff; color: var(--ink); padding: 9px 13px; border-radius: 11px; font-weight: 750; transition: .15s ease; }
+    .btn:hover { border-color: #b8c6db; transform: translateY(-1px); }
+    .btn-primary { border-color: var(--brand); background: var(--brand); color: white; }
+    .btn-primary:hover { background: var(--brand-dark); border-color: var(--brand-dark); }
+    .btn-quiet { background: #f8faff; }
+    .btn-danger { color: var(--red); background: #fff; border-color: #f0d4d0; }
+    .btn-small { padding: 7px 10px; font-size: .82rem; }
+    .top-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+    .target-card { padding: 18px 20px; border-radius: 15px; background: linear-gradient(135deg, #f2f5ff, #f8faff); border: 1px solid #dfe7ff; margin-bottom: 18px; }
+    .target-grid { display: grid; grid-template-columns: 1fr auto; gap: 14px; align-items: end; }
+    label { display: block; color: #526078; font-size: .78rem; font-weight: 750; margin: 0 0 6px; }
+    input[type="text"], input[type="number"], select {
+      width: 100%; min-width: 0; border: 1px solid #d9e1ed; border-radius: 10px; background: white; color: var(--ink);
+      padding: 10px 11px; outline: none; transition: border .15s, box-shadow .15s;
+    }
+    input:focus, select:focus { border-color: #829af7; box-shadow: 0 0 0 3px rgba(51, 94, 234, .12); }
+    .target-input { font-size: 1.25rem !important; font-weight: 800; padding: 12px 14px !important; }
+    .currency { position: relative; }
+    .currency input { padding-right: 43px; }
+    .currency::after { content: "TL"; position: absolute; right: 13px; top: 50%; transform: translateY(-50%); color: #8994a7; font-size: .8rem; font-weight: 800; pointer-events: none; }
+    .target-help { margin: 8px 0 0; color: var(--muted); font-size: .78rem; }
+    .product-list { display: grid; gap: 11px; }
+    .product { border: 1px solid var(--line); border-radius: 14px; padding: 14px; background: #fff; }
+    .product-top { display: grid; grid-template-columns: minmax(150px, 1.5fr) minmax(125px, .8fr) minmax(130px, .9fr) 36px; gap: 10px; align-items: end; }
+    .product-fields { display: grid; grid-template-columns: minmax(140px, 1fr) minmax(130px, .9fr) minmax(120px, .8fr); gap: 10px; margin-top: 11px; }
+    .product-meta { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin-top: 12px; }
+    .checks { display: flex; gap: 15px; flex-wrap: wrap; align-items: center; }
+    .check { display: inline-flex; gap: 7px; align-items: center; color: #58657a; font-size: .79rem; font-weight: 650; }
+    .check input { accent-color: var(--brand); width: 15px; height: 15px; }
+    .remove { width: 36px; height: 38px; border-radius: 10px; border: 1px solid #f0d4d0; background: #fff8f7; color: var(--red); font-size: 1.1rem; font-weight: 800; }
+    .remove:hover { background: var(--red-bg); }
+    .result-line { margin-left: auto; color: #34425a; font-size: .78rem; text-align: right; }
+    .result-line strong { color: var(--green); font-size: .9rem; }
+    .result-line span { color: var(--muted); }
+    .empty { border: 1px dashed #cbd5e1; padding: 28px 16px; border-radius: 14px; text-align: center; color: var(--muted); }
+    .add-row { display: flex; justify-content: space-between; gap: 10px; align-items: center; margin-top: 14px; }
+    .side { position: sticky; top: 16px; }
+    .summary { padding: 20px; }
+    .summary-title { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 17px; }
+    .status { padding: 5px 9px; font-size: .72rem; font-weight: 800; border-radius: 999px; background: var(--green-bg); color: var(--green); }
+    .stat-main { background: #17243a; color: #fff; padding: 18px; border-radius: 15px; }
+    .stat-main .caption { color: #c0cbdd; font-size: .76rem; font-weight: 700; }
+    .big-number { font-size: clamp(1.8rem, 4vw, 2.35rem); font-weight: 850; letter-spacing: -.045em; margin: 5px 0 1px; font-variant-numeric: tabular-nums; }
+    .stat-main .caption2 { color: #c0cbdd; font-size: .78rem; }
+    .stats { display: grid; gap: 0; margin-top: 12px; }
+    .stat { display: flex; justify-content: space-between; align-items: baseline; gap: 14px; padding: 11px 1px; border-bottom: 1px solid var(--line); }
+    .stat:last-child { border-bottom: 0; }
+    .stat span { color: var(--muted); font-size: .82rem; }
+    .stat strong { font-size: .9rem; font-variant-numeric: tabular-nums; text-align: right; }
+    .coef { margin-top: 16px; border: 1px solid #dfe7ff; background: #f5f7ff; border-radius: 13px; padding: 13px 14px; }
+    .coef-top { color: #5d6a84; font-size: .75rem; font-weight: 750; }
+    .coef-value { color: var(--brand); font-weight: 850; font-size: 1.45rem; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
+    .coef-sub { color: #75819a; font-size: .74rem; }
+    .message { display: none; margin-top: 13px; padding: 12px 13px; border-radius: 12px; font-size: .8rem; line-height: 1.45; }
+    .message.show { display: block; }
+    .message.error { background: var(--red-bg); color: var(--red); border: 1px solid #f4d1cc; }
+    .message.warn { background: var(--amber-bg); color: var(--amber); border: 1px solid #f0dfb2; }
+    .message.ok { background: var(--green-bg); color: var(--green); border: 1px solid #cbeada; }
+    .formula { margin-top: 17px; padding-top: 15px; border-top: 1px solid var(--line); }
+    .formula summary { cursor: pointer; color: #47556d; font-size: .82rem; font-weight: 800; }
+    .formula p { color: var(--muted); font-size: .78rem; margin: 10px 0 0; }
+    .equation { display: block; padding: 9px 10px; background: #f6f8fc; color: #34425a; border-radius: 9px; margin-top: 8px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .77rem; overflow-wrap: anywhere; }
+    .table-wrap { margin-top: 20px; overflow: hidden; }
+    .table-title { padding: 15px 18px; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; gap: 12px; align-items: center; }
+    table { width: 100%; border-collapse: collapse; font-size: .82rem; }
+    th, td { padding: 11px 13px; border-bottom: 1px solid var(--line); text-align: right; white-space: nowrap; }
+    th { color: #69768c; font-size: .72rem; background: #f8faff; }
+    th:first-child, td:first-child { text-align: left; }
+    tbody tr:last-child td { border-bottom: 0; }
+    td { font-variant-numeric: tabular-nums; }
+    .positive { color: var(--green); font-weight: 800; }
+    .negative { color: var(--red); font-weight: 800; }
+    .footer-note { color: var(--muted); font-size: .76rem; margin: 16px 2px 0; }
+    .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+    @media (max-width: 940px) {
+      .layout { grid-template-columns: 1fr; }
+      .side { position: static; }
+    }
+    @media (max-width: 620px) {
+      .app { width: min(100% - 20px, 560px); margin: 18px auto 35px; }
+      .topbar { display: block; }
+      .offline { display: inline-block; margin-top: 13px; }
+      .panel-head { padding: 16px; align-items: flex-start; }
+      .panel-body { padding: 14px; }
+      .target-card { padding: 14px; }
+      .target-grid { grid-template-columns: 1fr; }
+      .product { padding: 12px; }
+      .product-top { grid-template-columns: 1fr 1fr 36px; }
+      .product-top .name-field { grid-column: 1 / -1; }
+      .product-fields { grid-template-columns: 1fr 1fr; }
+      .product-fields .type-field { grid-column: 1 / -1; }
+      .product-meta { align-items: flex-start; }
+      .result-line { width: 100%; text-align: left; margin-left: 0; }
+      .checks { gap: 12px; }
+      .add-row { align-items: stretch; flex-direction: column; }
+      .add-row .btn { width: 100%; }
+      .table-wrap { overflow-x: auto; }
+      .table-title { padding: 13px 14px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <header class="topbar">
+      <div>
+        <div class="eyebrow">Dynamics POS · fiyat planlama</div>
+        <h1>Sepet fiyatı hesaplayıcı</h1>
+        <p class="sub">Yüzdeli ve sabit indirimli ürünleri tek ortak katsayıyla ölçekleyerek hedef net sepet tutarını hesaplayın.</p>
+      </div>
+      <div class="offline">● İnternetsiz çalışır</div>
+    </header>
+
+    <div class="layout">
+      <section class="panel" aria-labelledby="productsHeading">
+        <div class="panel-head">
+          <div>
+            <h2 id="productsHeading">Sepetteki ürünler</h2>
+            <div class="tiny muted" id="productCount">5 ürün</div>
+          </div>
+          <div class="top-actions">
+            <button class="btn btn-quiet btn-small" id="loadSample" type="button">Örnek yükle</button>
+            <button class="btn btn-small" id="clearAll" type="button">Temizle</button>
+          </div>
+        </div>
+        <div class="panel-body">
+          <div class="target-card">
+            <div class="target-grid">
+              <div>
+                <label for="target">Ulaşılmak istenen indirimli sepet tutarı</label>
+                <div class="currency"><input id="target" class="target-input" type="number" min="0" step="0.01" value="175000" inputmode="decimal"></div>
+                <p class="target-help">Tüm ürünlerin indirimler uygulandıktan sonraki toplam hedefidir.</p>
+              </div>
+              <button class="btn btn-primary" id="calculate" type="button">Hesapla</button>
+            </div>
+          </div>
+
+          <div class="product-list" id="productList" aria-live="polite"></div>
+          <div class="add-row">
+            <button class="btn btn-primary" id="addProduct" type="button">＋ Ürün ekle</button>
+            <span class="tiny muted">Her ürünün indirimi ayrı tanımlanır.</span>
+          </div>
+          <p class="footer-note">“Fiyata dahil et” açık olan ürünler ortak katsayıyla değişir. Kapalı olanların fiyatı korunur. “Hediye” işareti yalnızca bilgi amaçlıdır; tek başına hesaplamayı veya düzenlenebilirliği değiştirmez.</p>
+        </div>
+      </section>
+
+      <aside class="panel side" aria-labelledby="summaryHeading">
+        <div class="summary">
+          <div class="summary-title">
+            <h2 id="summaryHeading">Hesap sonucu</h2>
+            <span class="status" id="status">Hesaplandı</span>
+          </div>
+          <div class="stat-main">
+            <div class="caption">Hesaplanan indirimli sepet</div>
+            <div class="big-number" id="actualTotal">175.000,00 TL</div>
+            <div class="caption2">Hedef: <strong id="targetDisplay">175.000,00 TL</strong></div>
+          </div>
+          <div class="stats">
+            <div class="stat"><span>Mevcut net sepet</span><strong id="currentTotal">201.895,30 TL</strong></div>
+            <div class="stat"><span>Hedef farkı</span><strong id="difference">0,00 TL</strong></div>
+            <div class="stat"><span>POS'a girilecek brüt toplam</span><strong id="grossTotal">201.864,41 TL</strong></div>
+            <div class="stat"><span>Toplam indirim</span><strong id="discountTotal">26.864,41 TL</strong></div>
+          </div>
+          <div class="coef">
+            <div class="coef-top">ORTAK KATSAYI</div>
+            <div class="coef-value" id="coefficient">0,8776904281</div>
+            <div class="coef-sub" id="coefficientSub">Fiyatların yaklaşık %87,77'si POS'a girilir.</div>
+          </div>
+          <div class="message" id="message" role="status"></div>
+          <div class="top-actions" style="margin-top:14px">
+            <button class="btn btn-primary" id="copyResults" type="button" style="flex:1">Sonuçları kopyala</button>
+          </div>
+          <details class="formula">
+            <summary>Formül ve hesaplama mantığı</summary>
+            <p>Yüzdeli indirim fiyatla birlikte ölçeklenir. Sabit TL indirimi aynı tutarda kalır. Korunan ürünlerin net tutarı hedefin içinde tutulur.</p>
+            <span class="equation">k = (Hedef − Korunan net + Ayarlanabilir sabit indirimler) / Σ[Ayarlanabilir fiyat × (1 − oran)]</span>
+            <p>Ayarlanabilir her ürünün yeni POS fiyatı = eski liste fiyatı × k. Sabit indirim tutarı katsayıyla çarpılmaz.</p>
+          </details>
+        </div>
+      </aside>
+    </div>
+
+    <section class="panel table-wrap" aria-labelledby="breakdownHeading">
+      <div class="table-title">
+        <div>
+          <h2 id="breakdownHeading">Ürün bazında POS giriş sonuçları</h2>
+          <div class="tiny muted">Hesaplanan fiyatları POS'a aktarırken bu tabloyu kullanın.</div>
+        </div>
+      </div>
+      <div style="overflow-x:auto">
+        <table>
+          <thead><tr><th>Ürün</th><th>Eski fiyat</th><th>POS fiyatı</th><th>% indirim</th><th>Sabit indirim</th><th>Net fiyat</th></tr></thead>
+          <tbody id="resultRows"><tr><td colspan="6" class="muted" style="text-align:center">Ürün ekleyin veya örnek verileri yükleyin.</td></tr></tbody>
+        </table>
+      </div>
+    </section>
+    <p class="footer-note">Bu araç matematiksel tahmin üretir; POS'un satır bazında indirim ve KDV yuvarlaması farklı olabilir. Gerçek sepette POS toplamını mutlaka doğrulayın. Son ürün satırındaki kuruş düzeltmesi yalnızca tahmini yuvarlama farkını azaltır; POS entegrasyonu değildir.</p>
+  </main>
+
+  <template id="productTemplate">
+    <article class="product">
+      <div class="product-top">
+        <div class="name-field">
+          <label>Ürün adı / kodu</label>
+          <input class="p-name" type="text" placeholder="Örn. OCD K 752 EWS">
+        </div>
+        <div>
+          <label>Liste fiyatı (TL)</label>
+          <input class="p-price" type="number" min="0" step="0.01" value="0" inputmode="decimal">
+        </div>
+        <div>
+          <label>İndirim türü</label>
+          <select class="p-type">
+            <option value="percent">Yüzdeli</option>
+            <option value="fixed">Sabit TL</option>
+            <option value="mixed">Yüzde + sabit</option>
+            <option value="none">İndirimsiz</option>
+          </select>
+        </div>
+        <button class="remove" type="button" title="Ürünü sil" aria-label="Ürünü sil">×</button>
+      </div>
+      <div class="product-fields">
+        <div class="percent-field">
+          <label>Yüzde indirim (%)</label>
+          <input class="p-rate" type="number" min="0" max="99.99" step="0.01" value="10" inputmode="decimal">
+        </div>
+        <div class="fixed-field">
+          <label>Sabit indirim (TL)</label>
+          <input class="p-fixed" type="number" min="0" step="0.01" value="0" inputmode="decimal">
+        </div>
+        <div class="type-field">
+          <label>Uygulama</label>
+          <div class="checks" style="min-height:40px">
+            <label class="check"><input class="p-editable" type="checkbox" checked> Fiyata dahil et</label>
+            <label class="check"><input class="p-gift" type="checkbox"> Hediye</label>
+          </div>
+        </div>
+      </div>
+      <div class="product-meta">
+        <div class="tiny muted p-profile">%10 indirim · katsayıya dahil</div>
+        <div class="result-line"><span>Yeni POS fiyatı:</span> <strong class="p-result">—</strong></div>
+      </div>
+    </article>
+  </template>
+
+  <script>
+    (() => {
+      'use strict';
+      const $ = (selector, root = document) => root.querySelector(selector);
+      const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
+      const money = new Intl.NumberFormat('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      const number = new Intl.NumberFormat('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 4 });
+      const moneyText = value => `${money.format(Number.isFinite(value) ? value : 0)} TL`;
+      const round2 = value => Math.round((value + Number.EPSILON) * 100) / 100;
+      const readNum = input => {
+        const value = Number(input.value);
+        return Number.isFinite(value) ? value : 0;
+      };
+
+      const sample = [
+        { name: 'OCD K 752 EWS', price: 33999, type: 'percent', rate: 10, fixed: 0, editable: true, gift: false },
+        { name: 'ADE 9062 S1', price: 32499, type: 'percent', rate: 10, fixed: 0, editable: true, gift: false },
+        { name: 'AFC 341 S', price: 34499, type: 'percent', rate: 10, fixed: 0, editable: true, gift: false },
+        { name: '901 KMP IG', price: 57599, type: 'fixed', rate: 0, fixed: 8000, editable: true, gift: false },
+        { name: 'A 965 C AI', price: 71399, type: 'fixed', rate: 0, fixed: 10000, editable: true, gift: false }
+      ];
+
+      const list = $('#productList');
+      let lastCalculation = null;
+
+      function addProduct(data = {}) {
+        const node = $('#productTemplate').content.firstElementChild.cloneNode(true);
+        $('.p-name', node).value = data.name ?? '';
+        $('.p-price', node).value = data.price ?? 0;
+        $('.p-type', node).value = data.type ?? 'none';
+        $('.p-rate', node).value = data.rate ?? 0;
+        $('.p-fixed', node).value = data.fixed ?? 0;
+        $('.p-editable', node).checked = data.editable ?? true;
+        $('.p-gift', node).checked = data.gift ?? false;
+        $('.remove', node).addEventListener('click', () => { node.remove(); calculate(); });
+        $$('.p-name, .p-price, .p-type, .p-rate, .p-fixed, .p-editable, .p-gift', node).forEach(control => {
+          control.addEventListener('input', () => { updateFields(node); calculate(); });
+          control.addEventListener('change', () => { updateFields(node); calculate(); });
+        });
+        list.appendChild(node);
+        updateFields(node);
+        updateCount();
+        calculate();
+      }
+
+      function updateFields(node) {
+        const type = $('.p-type', node).value;
+        $('.percent-field', node).style.display = (type === 'percent' || type === 'mixed') ? '' : 'none';
+        $('.fixed-field', node).style.display = (type === 'fixed' || type === 'mixed') ? '' : 'none';
+        const rate = readNum($('.p-rate', node));
+        const fixed = readNum($('.p-fixed', node));
+        const editable = $('.p-editable', node).checked;
+        const gift = $('.p-gift', node).checked;
+        let profile = type === 'percent' ? `%${number.format(rate)} indirim` :
+          type === 'fixed' ? `${moneyText(fixed)} sabit indirim` :
+          type === 'mixed' ? `%${number.format(rate)} + ${moneyText(fixed)}` : 'İndirim yok';
+        profile += editable ? ' · katsayıya dahil' : ' · fiyatı korunur';
+        if (gift) profile += ' · hediye';
+        $('.p-profile', node).textContent = profile;
+        updateCount();
+      }
+
+      function getItems() {
+        return $$('.product', list).map((node, index) => {
+          const type = $('.p-type', node).value;
+          const rate = (type === 'percent' || type === 'mixed') ? readNum($('.p-rate', node)) / 100 : 0;
+          const fixed = (type === 'fixed' || type === 'mixed') ? readNum($('.p-fixed', node)) : 0;
+          return {
+            node, index,
+            name: $('.p-name', node).value.trim() || `Ürün ${index + 1}`,
+            price: readNum($('.p-price', node)),
+            rate, fixed,
+            editable: $('.p-editable', node).checked,
+            gift: $('.p-gift', node).checked
+          };
+        });
+      }
+
+      function lineFor(item, posPrice) {
+        const gross = round2(posPrice);
+        const percentDiscount = round2(gross * item.rate);
+        const fixedDiscount = round2(item.fixed);
+        const net = round2(gross - percentDiscount - fixedDiscount);
+        return { ...item, posPrice: gross, percentDiscount, fixedDiscount, net, gross };
+      }
+
+      function showMessage(text, type = 'ok') {
+        const box = $('#message');
+        box.textContent = text;
+        box.className = `message show ${type}`;
+      }
+      function clearMessage() { $('#message').className = 'message'; $('#message').textContent = ''; }
+      function updateCount() {
+        const count = $$('.product', list).length;
+        $('#productCount').textContent = `${count} ürün`;
+      }
+
+      function calculate() {
+        clearMessage();
+        const items = getItems();
+        const target = readNum($('#target'));
+        $('#targetDisplay').textContent = moneyText(target);
+        if (!items.length) {
+        $$('.p-result', list).forEach(result => { result.textContent = '—'; });
+        lastCalculation = null;
+          $('#status').textContent = 'Ürün bekleniyor';
+          $('#actualTotal').textContent = '—';
+          $('#currentTotal').textContent = '—';
+          $('#difference').textContent = '—';
+          $('#grossTotal').textContent = '—';
+          $('#discountTotal').textContent = '—';
+          $('#coefficient').textContent = '—';
+          $('#coefficientSub').textContent = 'Hesaplama için ürün ekleyin.';
+          $('#resultRows').innerHTML = '<tr><td colspan="6" class="muted" style="text-align:center">Ürün ekleyin veya örnek verileri yükleyin.</td></tr>';
+          return;
+        }
+        if (!Number.isFinite(target) || target < 0) return showMessage('Hedef sepet tutarı sıfırdan küçük olamaz.', 'error');
+        const invalid = items.find(i => i.price < 0 || i.fixed < 0 || i.rate < 0 || i.rate >= 1 || !Number.isFinite(i.price + i.fixed + i.rate));
+        if (invalid) return showMessage(`${invalid.name}: fiyat, indirim ve oran değerlerini kontrol edin. Yüzde oranı %100'den küçük olmalı.`, 'error');
+
+        const adjustable = items.filter(i => i.editable);
+        const protectedItems = items.filter(i => !i.editable);
+        const currentLines = items.map(i => lineFor(i, i.price));
+        const currentTotal = round2(currentLines.reduce((sum, i) => sum + i.net, 0));
+        const protectedNet = round2(currentLines.filter(i => !i.editable).reduce((sum, i) => sum + i.net, 0));
+        const denominator = adjustable.reduce((sum, i) => sum + i.price * (1 - i.rate), 0);
+        const adjustableFixed = adjustable.reduce((sum, i) => sum + i.fixed, 0);
+
+        if (!adjustable.length) {
+          $('#status').textContent = 'Düzenleme yok';
+          showMessage('“Fiyata dahil et” seçili ürün yok. En az bir ürünü ortak katsayıya dahil edin.', 'error');
+          return renderNoSolution(currentTotal, target);
+        }
+        if (denominator <= 0) {
+          $('#status').textContent = 'Hesaplanamadı';
+          showMessage('Katsayı paydası sıfır veya negatif. Düzenlenebilir ürünlerin fiyatlarını ve indirim oranlarını kontrol edin.', 'error');
+          return renderNoSolution(currentTotal, target);
+        }
+
+        const numerator = target - protectedNet + adjustableFixed;
+        const k = numerator / denominator;
+        if (!(k > 0) || !Number.isFinite(k)) {
+          $('#status').textContent = 'Hedef mümkün değil';
+          showMessage('Bu ürün ve indirim yapısıyla pozitif bir POS fiyatı bulunamıyor. Korunan ürünleri veya hedef tutarı kontrol edin.', 'error');
+          return renderNoSolution(currentTotal, target, k);
+        }
+
+        let resultLines = items.map(item => lineFor(item, item.editable ? item.price * k : item.price));
+        let total = round2(resultLines.reduce((sum, i) => sum + i.net, 0));
+        let correctionApplied = false;
+        // Yüzde indirimin satır bazında kuruşa yuvarlanmasından doğan küçük farkı son düzenlenebilir satırda azalt.
+        const lastEditable = [...resultLines].reverse().find(i => i.editable);
+        if (lastEditable) {
+          const residual = round2(target - total);
+          if (Math.abs(residual) > 0.0001 && Math.abs(residual) <= 2) {
+            const basePrice = lastEditable.posPrice + residual / (1 - lastEditable.rate);
+            let best = lastEditable;
+            let bestLines = resultLines;
+            let bestTotal = total;
+            let bestDiff = Math.abs(round2(target - total));
+            for (let cents = -5; cents <= 5; cents++) {
+              const candidatePrice = round2(basePrice + cents / 100);
+              if (candidatePrice < 0 || candidatePrice * (1 - lastEditable.rate) - lastEditable.fixed < 0) continue;
+              const candidate = lineFor(lastEditable, candidatePrice);
+              const candidateLines = resultLines.map(line => line.index === candidate.index ? candidate : line);
+              const candidateTotal = round2(candidateLines.reduce((sum, i) => sum + i.net, 0));
+              const diff = Math.abs(round2(target - candidateTotal));
+              if (diff < bestDiff) { best = candidate; bestLines = candidateLines; bestTotal = candidateTotal; bestDiff = diff; }
+            }
+            if (best !== lastEditable) { resultLines = bestLines; total = bestTotal; correctionApplied = true; }
+          }
+        }
+
+        const invalidNet = resultLines.find(i => i.net < 0);
+        if (invalidNet) {
+          $('#status').textContent = 'İndirim kontrolü';
+          showMessage(`${invalidNet.name}: hesaplanan POS fiyatı sabit indirimi karşılamıyor; satır neti negatif oluyor. Daha yüksek hedef veya farklı ürün dağılımı gerekiyor.`, 'error');
+        } else {
+          const diff = round2(target - total);
+          $('#status').textContent = Math.abs(diff) < 0.005 ? 'Hedef tutuyor' : 'Kontrol gerekli';
+          if (Math.abs(diff) < 0.005) showMessage(correctionApplied ? 'Hedef tutara ulaşıldı. Son düzenlenebilir satırda kuruş düzeltmesi uygulandı.' : 'Hedef tutar, satır bazındaki yuvarlama ile eşleşiyor.', 'ok');
+          else showMessage(`Yuvarlama sonrası hedef ile tahmini POS toplamı arasında ${moneyText(diff)} fark var. POS'ta doğrulama yapın.`, 'warn');
+        }
+
+        const grossTotal = round2(resultLines.reduce((sum, i) => sum + i.posPrice, 0));
+        const discountTotal = round2(resultLines.reduce((sum, i) => sum + i.percentDiscount + i.fixedDiscount, 0));
+        $('#actualTotal').textContent = moneyText(total);
+        $('#currentTotal').textContent = moneyText(currentTotal);
+        $('#difference').textContent = moneyText(round2(target - total));
+        $('#difference').className = Math.abs(target - total) < 0.005 ? 'positive' : 'negative';
+        $('#grossTotal').textContent = moneyText(grossTotal);
+        $('#discountTotal').textContent = moneyText(discountTotal);
+        $('#coefficient').textContent = number.format(k);
+        $('#coefficientSub').textContent = `Fiyata dahil ürünlerin fiyatı yaklaşık %${number.format(k * 100)} seviyesine gelir.`;
+        renderRows(resultLines);
+        if (invalidNet) {
+          lastCalculation = null;
+        } else {
+          lastCalculation = { target, k, currentTotal, total, grossTotal, discountTotal, lines: resultLines, correctionApplied };
+        }
+      }
+
+      function renderNoSolution(currentTotal, target, k = NaN) {
+        $('#actualTotal').textContent = '—';
+        $('#currentTotal').textContent = moneyText(currentTotal);
+        $('#difference').textContent = moneyText(target - currentTotal);
+        $('#grossTotal').textContent = '—';
+        $('#discountTotal').textContent = '—';
+        $('#coefficient').textContent = Number.isFinite(k) ? number.format(k) : '—';
+        $('#coefficientSub').textContent = 'Geçerli bir ortak katsayı üretilemedi.';
+        $('#resultRows').innerHTML = '<tr><td colspan="6" class="muted" style="text-align:center">Geçerli sonuç oluşturulamadı.</td></tr>';
+        lastCalculation = null;
+      }
+
+      function renderRows(lines) {
+        $('#resultRows').innerHTML = lines.map(i => `
+          <tr>
+            <td>${escapeHtml(i.name)}${i.gift ? ' <span class="tiny muted">· hediye</span>' : ''}${!i.editable ? ' <span class="tiny muted">· korunan</span>' : ''}</td>
+            <td>${money.format(i.price)}</td>
+            <td><strong>${money.format(i.posPrice)}</strong></td>
+            <td>${money.format(i.percentDiscount)}</td>
+            <td>${money.format(i.fixedDiscount)}</td>
+            <td class="${i.net < 0 ? 'negative' : 'positive'}">${money.format(i.net)}</td>
+          </tr>`).join('');
+        lines.forEach(line => {
+          const node = $$('.product', list)[line.index];
+          if (node) $('.p-result', node).textContent = moneyText(line.posPrice);
+        });
+      }
+      function escapeHtml(value) {
+        return String(value).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+      }
+      function loadSample() {
+        list.innerHTML = '';
+        sample.forEach(addProduct);
+        $('#target').value = '175000';
+        calculate();
+      }
+
+      $('#addProduct').addEventListener('click', () => addProduct({ name: '', price: 0, type: 'none', rate: 0, fixed: 0, editable: true, gift: false }));
+      $('#calculate').addEventListener('click', calculate);
+      $('#target').addEventListener('input', calculate);
+      $('#loadSample').addEventListener('click', loadSample);
+      $('#clearAll').addEventListener('click', () => { list.innerHTML = ''; updateCount(); calculate(); });
+      $('#copyResults').addEventListener('click', async () => {
+        if (!lastCalculation) return showMessage('Kopyalanacak geçerli bir hesaplama yok.', 'error');
+        const c = lastCalculation;
+        const lines = [
+          'Ürün\tEski fiyat\tPOS fiyatı\tYüzde indirimi\tSabit indirim\tNet fiyat',
+          ...c.lines.map(i => [i.name, i.price, i.posPrice, i.percentDiscount, i.fixedDiscount, i.net].join('\t')),
+          '', `Ortak katsayı\t${c.k}`, `Hedef\t${c.target}`, `Hesaplanan net toplam\t${c.total}`, `Fark\t${round2(c.target - c.total)}`
+        ].join('\n');
+        try {
+          await navigator.clipboard.writeText(lines);
+          showMessage('Ürün sonuçları panoya kopyalandı.', 'ok');
+        } catch (_) {
+          const area = document.createElement('textarea'); area.value = lines; document.body.appendChild(area); area.select();
+          const copied = document.execCommand('copy'); area.remove();
+          showMessage(copied ? 'Ürün sonuçları panoya kopyalandı.' : 'Tarayıcı kopyalamaya izin vermedi. Tabloyu elle seçebilirsiniz.', copied ? 'ok' : 'warn');
+        }
+      });
+
+      loadSample();
+    })();
+  </script>
+</body>
+</html>

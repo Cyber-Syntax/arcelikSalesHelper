@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ADR-001 Hibrit POS Fiyat Düzeltme Hesap Makinesi</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        table { table-layout: fixed; width: 100%; }
+        th, td { overflow: hidden; word-break: break-word; }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800 min-h-screen p-4 md:p-6">
+
+    <div class="max-w-5xl mx-auto bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden p-5 md:p-6">
+        <!-- Başlık Bölümü -->
+        <div class="mb-5 border-b pb-4">
+            <h1 class="text-xl font-bold text-indigo-700">POS Fiyat Düzeltme Aracı (r, c Modeli)</h1>
+            <p class="text-xs text-gray-500 mt-0.5">ADR-001 Kapalı Formül ve Net Uzayında Orantılı Dağıtım Motoru</p>
+        </div>
+
+        <!-- Üst Parametreler -->
+        <div class="flex flex-col sm:flex-row items-end gap-3 mb-5 bg-indigo-50/70 p-3.5 rounded-lg border border-indigo-100">
+            <div class="w-full sm:w-64">
+                <label class="block text-xs font-semibold text-gray-700 mb-1">Hedef Net Sepet Tutarı (TL)</label>
+                <input type="text" id="targetNet" value="175.000,00" class="w-full px-3 py-1.5 border border-indigo-200 rounded-md focus:ring-2 focus:ring-indigo-500 outline-none font-bold text-indigo-900 bg-white text-sm">
+            </div>
+            <div class="w-full sm:w-auto flex-1 flex justify-end">
+                <button onclick="calculate()" class="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-1.5 px-5 rounded-md transition duration-150 text-sm shadow-sm flex items-center justify-center gap-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>
+                    Hesapla ve POS Fiyatlarını Çıkar
+                </button>
+            </div>
+        </div>
+
+        <!-- Ürünler Tablosu Başlığı -->
+        <div class="mb-3 flex justify-between items-center">
+            <h2 class="text-sm font-semibold text-gray-700 uppercase tracking-wide">Sepet Kalemleri</h2>
+            <button onclick="addItem()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium py-1.5 px-3 rounded-md transition flex items-center gap-1 shadow-sm">
+                <span>+</span> Yeni Ürün Ekle
+            </button>
+        </div>
+
+        <!-- Ürünler Tablosu -->
+        <div class="border rounded-lg overflow-x-auto bg-white">
+            <table id="itemsTable" class="text-left border-collapse">
+                <thead>
+                    <tr class="bg-gray-50 text-[11px] font-semibold text-gray-600 uppercase tracking-wider border-b">
+                        <th style="width: 30%;" class="p-2.5">Ürün Adı</th>
+                        <th style="width: 18%;" class="p-2.5">Orijinal Fiyat ($p$)</th>
+                        <th style="width: 15%;" class="p-2.5">Yüzde Oranı ($r$)</th>
+                        <th style="width: 18%;" class="p-2.5">Sabit İndirim ($c$)</th>
+                        <th style="width: 11%;" class="p-2.5 text-center">Düzenlenebilir?</th>
+                        <th style="width: 8%;" class="p-2.5 text-center">İşlem</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100 text-sm">
+                    <tr data-item>
+                        <td class="p-1.5"><input type="text" value="OCD K 752 EWS" class="w-full px-2 py-1 border rounded text-xs focus:ring-1 focus:ring-indigo-500 outline-none"></td>
+                        <td class="p-1.5"><input type="text" value="33.999,00" class="w-full px-2 py-1 border rounded price text-xs focus:ring-1 focus:ring-indigo-500 outline-none"></td>
+                        <td class="p-1.5"><input type="text" value="0,10" class="w-full px-2 py-1 border rounded rate text-xs focus:ring-1 focus:ring-indigo-500 outline-none"></td>
+                        <td class="p-1.5"><input type="text" value="0,00" class="w-full px-2 py-1 border rounded c-input text-xs focus:ring-1 focus:ring-indigo-500 outline-none"></td>
+                        <td class="p-1.5 text-center"><input type="checkbox" checked class="w-4 h-4 text-indigo-600 rounded border-gray-300 editable accent-indigo-600"></td>
+                        <td class="p-1.5 text-center"><button onclick="removeItem(this)" class="text-red-500 hover:text-red-700 font-medium text-xs">Sil</button></td>
+                    </tr>
+                    <tr data-item>
+                        <td class="p-1.5"><input type="text" value="ADE 9062 S1" class="w-full px-2 py-1 border rounded text-xs focus:ring-1 focus:ring-indigo-500 outline-none"></td>
+                        <td class="p-1.5"><input type="text" value="32.499,00" class="w-full px-2 py-1 border rounded price text-xs focus:ring-1 focus:ring-indigo-500 outline-none"></td>
+                        <td class="p-1.5"><input type="text" value="0,10" class="w-full px-2 py-1 border rounded rate text-xs focus:ring-1 focus:ring-indigo-500 outline-none"></td>
+                        <td class="p-1.5"><input type="text" value="0,00" class="w-full px-2 py-1 border rounded c-input text-xs focus:ring-1 focus:ring-indigo-500 outline-none"></td>
+                        <td class="p-1.5 text-center"><input type="checkbox" checked class="w-4 h-4 text-indigo-600 rounded border-gray-300 editable accent-indigo-600"></td>
+                        <td class="p-1.5 text-center"><button onclick="removeItem(this)" class="text-red-500 hover:text-red-700 font-medium text-xs">Sil</button></td>
+                    </tr>
+                    <tr data-item>
+                        <td class="p-1.5"><input type="text" value="AFC 341 S" class="w-full px-2 py-1 border rounded text-xs focus:ring-1 focus:ring-indigo-500 outline-none"></td>
+                        <td class="p-1.5"><input type="text" value="34.499,00" class="w-full px-2 py-1 border rounded price text-xs focus:ring-1 focus:ring-indigo-500 outline-none"></td>
+                        <td class="p-1.5"><input type="text" value="0,10" class="w-full px-2 py-1 border rounded rate text-xs focus:ring-1 focus:ring-indigo-500 outline-none"></td>
+                        <td class="p-1.5"><input type="text" value="0,00" class="w-full px-2 py-1 border rounded c-input text-xs focus:ring-1 focus:ring-indigo-500 outline-none"></td>
+                        <td class="p-1.5 text-center"><input type="checkbox" checked class="w-4 h-4 text-indigo-600 rounded border-gray-300 editable accent-indigo-600"></td>
+                        <td class="p-1.5 text-center"><button onclick="removeItem(this)" class="text-red-500 hover:text-red-700 font-medium text-xs">Sil</button></td>
+                    </tr>
+                    <tr data-item>
+                        <td class="p-1.5"><input type="text" value="901 KMP IG" class="w-full px-2 py-1 border rounded text-xs focus:ring-1 focus:ring-indigo-500 outline-none"></td>
+                        <td class="p-1.5"><input type="text" value="57.599,00" class="w-full px-2 py-1 border rounded price text-xs focus:ring-1 focus:ring-indigo-500 outline-none"></td>
+                        <td class="p-1.5"><input type="text" value="0,00" class="w-full px-2 py-1 border rounded rate text-xs focus:ring-1 focus:ring-indigo-500 outline-none"></td>
+                        <td class="p-1.5"><input type="text" value="10.000,00" class="w-full px-2 py-1 border rounded c-input text-xs focus:ring-1 focus:ring-indigo-500 outline-none"></td>
+                        <td class="p-1.5 text-center"><input type="checkbox" checked class="w-4 h-4 text-indigo-600 rounded border-gray-300 editable accent-indigo-600"></td>
+                        <td class="p-1.5 text-center"><button onclick="removeItem(this)" class="text-red-500 hover:text-red-700 font-medium text-xs">Sil</button></td>
+                    </tr>
+                    <tr data-item>
+                        <td class="p-1.5"><input type="text" value="A 965 C AI" class="w-full px-2 py-1 border rounded text-xs focus:ring-1 focus:ring-indigo-500 outline-none"></td>
+                        <td class="p-1.5"><input type="text" value="71.399,00" class="w-full px-2 py-1 border rounded price text-xs focus:ring-1 focus:ring-indigo-500 outline-none"></td>
+                        <td class="p-1.5"><input type="text" value="0,00" class="w-full px-2 py-1 border rounded rate text-xs focus:ring-1 focus:ring-indigo-500 outline-none"></td>
+                        <td class="p-1.5"><input type="text" value="8.000,00" class="w-full px-2 py-1 border rounded c-input text-xs focus:ring-1 focus:ring-indigo-500 outline-none"></td>
+                        <td class="p-1.5 text-center"><input type="checkbox" checked class="w-4 h-4 text-indigo-600 rounded border-gray-300 editable accent-indigo-600"></td>
+                        <td class="p-1.5 text-center"><button onclick="removeItem(this)" class="text-red-500 hover:text-red-700 font-medium text-xs">Sil</button></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Sonuçlar için Popup (Modal) Container -->
+    <div id="resultModal" role="dialog" aria-modal="true" aria-label="Hesaplama Sonuçları" class="fixed inset-0 bg-gray-900/60 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
+        <div class="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col overflow-hidden border border-gray-100">
+            <!-- Modal Header -->
+            <div class="flex items-center justify-between px-6 py-4 border-b bg-gray-50">
+                <h3 class="text-lg font-bold text-gray-800">Hesaplama Sonuçları</h3>
+                <button type="button" aria-label="Sonuçları kapat" onclick="closeModal()" class="text-gray-400 hover:text-gray-600 transition p-1 rounded-lg hover:bg-gray-200">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+
+            <!-- Modal Content (Scrollable) -->
+            <div class="p-6 overflow-y-auto space-y-5">
+                <!-- Özet Kartları -->
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div class="bg-gray-50 p-3.5 rounded-lg border border-gray-200">
+                        <span class="text-[11px] font-semibold text-gray-500 uppercase tracking-wider block">Toplam Orijinal POS</span>
+                        <div id="totalOriginalPos" class="text-lg font-bold text-gray-800 mt-0.5">0,00 TL</div>
+                    </div>
+                    <div class="bg-indigo-50 p-3.5 rounded-lg border border-indigo-100">
+                        <span class="text-[11px] font-semibold text-indigo-600 uppercase tracking-wider block">POS'a Girilecek Yeni Toplam</span>
+                        <div id="totalNewPos" class="text-lg font-bold text-indigo-700 mt-0.5">0,00 TL</div>
+                    </div>
+                    <div class="bg-emerald-50 p-3.5 rounded-lg border border-emerald-100">
+                        <span class="text-[11px] font-semibold text-emerald-600 uppercase tracking-wider block">Ulaşılan Net Tutar</span>
+                        <div id="totalNetSummary" class="text-lg font-bold text-emerald-700 mt-0.5">0,00 TL</div>
+                    </div>
+                </div>
+
+                <div id="summaryText" class="text-xs text-gray-600 font-mono bg-gray-100 p-2.5 rounded-md border border-gray-200"></div>
+
+                <!-- Sonuç Tablosu -->
+                <div class="border rounded-lg overflow-hidden">
+                    <table class="bg-white border-collapse" style="table-layout: auto;">
+                        <thead>
+                            <tr class="bg-indigo-50/70 text-[11px] font-semibold text-indigo-800 uppercase tracking-wider border-b">
+                                <th class="p-2.5 text-left">Ürün Adı</th>
+                                <th class="p-2.5 text-right">Eski Fiyat</th>
+                                <th class="p-2.5 text-right">POS'a Girilecek Yeni Fiyat</th>
+                                <th class="p-2.5 text-right">Beklenen Net Karşılığı</th>
+                            </tr>
+                        </thead>
+                        <tbody id="resultTableBody" class="divide-y divide-gray-100 text-xs"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Modal Footer -->
+            <div class="px-6 py-3 bg-gray-50 border-t flex justify-end">
+                <button onclick="closeModal()" class="bg-gray-800 hover:bg-gray-900 text-white font-medium py-1.5 px-5 rounded-md text-sm transition">
+                    Kapat
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function parseTR(val) {
+            if (typeof val === 'number') return val;
+            if (!val || val.toString().trim() === "") return NaN;
+
+            let str = val.toString().trim();
+            const trNumberRegex = /^(\d{1,3}(\.\d{3})*|\d+)(,\d+)?$/;
+
+            if (!trNumberRegex.test(str)) {
+                return NaN;
+            }
+
+            let cleaned = str.replace(/\./g, '').replace(',', '.');
+            return parseFloat(cleaned);
+        }
+
+        function formatTR(val) {
+            return Number(val).toLocaleString('tr-TR', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            });
+        }
+
+        function addItem() {
+            const tbody = document.querySelector("#itemsTable tbody");
+            const tr = document.createElement("tr");
+            tr.setAttribute("data-item", "");
+            tr.innerHTML = `
+                <td class="p-1.5"><input type="text" value="Yeni Ürün" class="w-full px-2 py-1 border rounded text-xs focus:ring-1 focus:ring-indigo-500 outline-none"></td>
+                <td class="p-1.5"><input type="text" value="10.000,00" class="w-full px-2 py-1 border rounded price text-xs focus:ring-1 focus:ring-indigo-500 outline-none"></td>
+                <td class="p-1.5"><input type="text" value="0,00" class="w-full px-2 py-1 border rounded rate text-xs focus:ring-1 focus:ring-indigo-500 outline-none"></td>
+                <td class="p-1.5"><input type="text" value="0,00" class="w-full px-2 py-1 border rounded c-input text-xs focus:ring-1 focus:ring-indigo-500 outline-none"></td>
+                <td class="p-1.5 text-center"><input type="checkbox" checked class="w-4 h-4 text-indigo-600 rounded border-gray-300 editable accent-indigo-600"></td>
+                <td class="p-1.5 text-center"><button onclick="removeItem(this)" class="text-red-500 hover:text-red-700 font-medium text-xs">Sil</button></td>
+            `;
+            tbody.appendChild(tr);
+        }
+
+        function removeItem(btn) {
+            const row = btn.closest("tr");
+            row.remove();
+        }
+
+        function calculate() {
+            const targetRaw = document.getElementById("targetNet").value;
+            const target = parseTR(targetRaw);
+
+            if (isNaN(target)) {
+                alert("Hata: Hedef Net Sepet Tutarı geçerli bir Türkçe sayı formatında olmalıdır (Örn: 175.000,00).");
+                return;
+            }
+
+            const rows = document.querySelectorAll("#itemsTable tbody tr");
+            let items = [];
+            let totalOriginalPosPrice = 0;
+            let hasError = false;
+
+            rows.forEach((row, index) => {
+                if (hasError) return;
+
+                const name = row.querySelector("input[type='text']").value;
+                const pVal = parseTR(row.querySelector(".price").value);
+                const rVal = parseTR(row.querySelector(".rate").value);
+                const cVal = parseTR(row.querySelector(".c-input").value);
+                const editable = row.querySelector(".editable").checked;
+
+                if (isNaN(pVal)) {
+                    alert(`Hata: "${name}" ürününün orijinal fiyatı geçersiz formatta.`);
+                    hasError = true;
+                    return;
+                }
+                // DÜZELTME: r < 0 veya r >= 1 kontrolü (r = 1 durumunda payda sıfır olur / bölme hatası önlenir)
+                if (isNaN(rVal) || rVal < 0 || rVal >= 1) {
+                    alert(`Hata: "${name}" ürününün yüzde oranı (r) 0 ile 1 arasında olmalıdır (100% olamaz).`);
+                    hasError = true;
+                    return;
+                }
+                if (isNaN(cVal)) {
+                    alert(`Hata: "${name}" ürününün sabit indirimi (c) geçersiz formatta.`);
+                    hasError = true;
+                    return;
+                }
+
+                totalOriginalPosPrice += pVal;
+
+                items.push({
+                    id: index,
+                    name: name,
+                    p: pVal,
+                    r: rVal,
+                    c: cVal,
+                    editable: editable
+                });
+            });
+
+            if (hasError) return;
+
+            items.forEach(it => {
+                it.net = it.p * (1 - it.r) - it.c;
+            });
+
+            let F = items.reduce((sum, it) => sum + it.net, 0);
+            let A = items.filter(it => it.editable);
+            let nA = A.reduce((sum, it) => sum + it.net, 0);
+
+            if (nA <= 0 || nA + (target - F) <= 0) {
+                alert("Hata: Düzenlenebilir kalem bulunmuyor veya net toplam hedefi karşılamaya yetmiyor!");
+                return;
+            }
+
+            let k = (nA + (target - F)) / nA;
+
+            let resultsHTML = "";
+            let newTotalNet = 0;
+            let totalNewPosPrice = 0;
+
+            items.forEach(it => {
+                let newPosPrice;
+                let expectedNet;
+
+                if (it.editable) {
+                    let newNet = it.net * k;
+                    let rawPosPrice = (newNet + it.c) / (1 - it.r);
+
+                    // DÜZELTME: Fiyatı ekranda gösterildiği gibi 2 ondalık basamağa yuvarla
+                    newPosPrice = Math.round(rawPosPrice * 100) / 100;
+
+                    // Neti yuvarlanan POS fiyatından tekrar hassas şekilde hesapla
+                    expectedNet = newPosPrice * (1 - it.r) - it.c;
+                } else {
+                    newPosPrice = it.p;
+                    expectedNet = it.net;
+                }
+
+                newTotalNet += expectedNet;
+                totalNewPosPrice += newPosPrice;
+
+                resultsHTML += `
+                    <tr class="${it.editable ? 'hover:bg-gray-50' : 'bg-gray-50/70 text-gray-400'}">
+                        <td class="p-2.5 font-medium">${it.name} ${!it.editable ? '<span class="text-[10px] bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded ml-1">Sabit</span>' : ''}</td>
+                        <td class="p-2.5 text-right font-mono">${formatTR(it.p)} TL</td>
+                        <td class="p-2.5 text-right font-bold font-mono text-indigo-600">${formatTR(newPosPrice)} TL</td>
+                        <td class="p-2.5 text-right font-mono">${formatTR(expectedNet)} TL</td>
+                    </tr>
+                `;
+            });
+
+            document.getElementById("totalOriginalPos").innerText = `${formatTR(totalOriginalPosPrice)} TL`;
+            document.getElementById("totalNewPos").innerText = `${formatTR(totalNewPosPrice)} TL`;
+            document.getElementById("totalNetSummary").innerText = `${formatTR(newTotalNet)} TL`;
+
+            document.getElementById("resultTableBody").innerHTML = resultsHTML;
+            document.getElementById("summaryText").innerHTML = `Dağıtım Katsayısı (k): <b>${k.toFixed(6)}</b> | Hedef Net: <b>${formatTR(target)} TL</b>`;
+
+            // Modal Aç
+            document.getElementById("resultModal").classList.remove("hidden");
+        }
+
+        function closeModal() {
+            document.getElementById("resultModal").classList.add("hidden");
+        }
+
+        // Modal dışına veya ESC tuşuna basıldığında kapatma
+        document.getElementById("resultModal").addEventListener("click", function(e) {
+            if (e.target === this) closeModal();
+        });
+
+        document.addEventListener("keydown", function(e) {
+            if (e.key === "Escape") closeModal();
+        });
+    </script>
+</body>
+</html>

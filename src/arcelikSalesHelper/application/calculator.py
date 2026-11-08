@@ -9,10 +9,10 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass, replace
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 
 from arcelikSalesHelper import strings as T
-from arcelikSalesHelper.domain.arith import ZERO, div, mul, sub
+from arcelikSalesHelper.domain.arith import ZERO, add, div, mul, sub
 from arcelikSalesHelper.domain.campaign import (
     CampaignLine,
     solve_campaign_prices,
@@ -86,42 +86,113 @@ def _adjust_by_discount_model(
     ]
 
 
+def _clean_rate(rate: Decimal) -> Decimal:
+    """Keep a campaign rate readable without losing meaningful precision."""
+    return rate.quantize(Decimal("0.000001"), rounding=ROUND_HALF_UP)
+
+
+def _infer_shown_rate(
+    results: Sequence[LineResult], shown: Decimal
+) -> tuple[Decimal, tuple[int, ...]] | None:
+    """Infer the POS campaign rate and its lines from the shown net total.
+
+    The catalog website price is the normal online price; the POS campaign can
+    use a different uniform rate for a group of lines.  At the shown net total,
+    a line belongs to that group when its catalog discount rate is at most the
+    campaign rate; lines with a larger fixed discount stay fixed.  The
+    resulting piecewise-linear equation has a single solution.
+    """
+    regular = [result.regular_total for result in results]
+    web = [result.website_discounted_total for result in results]
+    web_total = sum(web, ZERO)
+    delta = sub(shown, web_total)
+    if delta >= ZERO or web_total <= ZERO:
+        return None
+    entries = sorted(
+        (
+            (div(sub(regular[i], web[i]), regular[i]), i)
+            for i in range(len(results))
+            if regular[i] > ZERO and ZERO < web[i] <= regular[i]
+        ),
+        key=lambda entry: entry[0],
+    )
+    if not entries:
+        return None
+    discount_sum = ZERO
+    regular_sum = ZERO
+    group: list[int] = []
+    lower = ZERO
+    for upper, index in entries:
+        if regular_sum > ZERO:
+            rate = div(sub(discount_sum, delta), regular_sum)
+            if lower <= rate < upper and ZERO < rate < Decimal(1):
+                return _clean_rate(rate), tuple(group)
+        group.append(index)
+        discount_sum = add(discount_sum, sub(regular[index], web[index]))
+        regular_sum = add(regular_sum, regular[index])
+        lower = upper
+    rate = div(sub(discount_sum, delta), regular_sum)
+    if lower <= rate < Decimal(1):
+        return _clean_rate(rate), tuple(group)
+    return None
+
+
 def _adjust_by_shown_rate(
     forms: Sequence[LineForm],
     results: Sequence[LineResult],
     shown: Decimal,
     target: Decimal,
 ) -> list[LineForm] | None:
-    """Trust the POS net over line website prices when they disagree.
-
-    The catalog's website price is the normal online price; the POS campaign
-    (for example the 10% wedding discount) can be different.  The "discounted
-    total shown in POS" is the observed net basket, so it reveals the real
-    uniform campaign rate even when the per-line website prices do not.
-    """
+    """Use the POS shown total to identify the real campaign group and rate."""
     if any(f.gift_selected for f in forms):
         return None
-    regular_total = sum((r.regular_total for r in results), ZERO)
-    if regular_total <= ZERO or shown <= ZERO or shown >= regular_total:
+    inferred = _infer_shown_rate(results, shown)
+    if inferred is None:
         return None
-    factor = div(shown, regular_total)
-    gross_target = div(target, factor)
-    if gross_target <= ZERO:
-        return None
-    shares = distribute_cents(
-        gross_target, [r.regular_total for r in results]
-    )
-    return [
-        replace(
-            f,
-            manager_value="",
-            manager_value_decimal=mul(share, factor),
-            manager_mode=ManagerMode.LINE,
-            pos_calculation_mode=PosCalculationMode.PERCENTAGE,
-            campaign_profile=CampaignProfile(rate=sub(Decimal(1), factor)),
+    rate, group = inferred
+    group_set = set(group)
+    specs = [
+        PosSpec(
+            result.regular_total,
+            (
+                mul(result.regular_total, sub(Decimal(1), rate))
+                if index in group_set
+                else result.website_discounted_total
+            ),
+            index in group_set,
+            index not in group_set,
         )
-        for f, share in zip(forms, shares, strict=True)
+        for index, result in enumerate(results)
     ]
+    plan = solve_pos_targets(specs, target)
+    adjusted: list[LineForm] = []
+    for index, (form, item) in enumerate(zip(forms, plan, strict=True)):
+        if index in group_set:
+            adjusted.append(
+                replace(
+                    form,
+                    manager_value="",
+                    manager_value_decimal=item.net,
+                    manager_mode=ManagerMode.LINE,
+                    pos_calculation_mode=PosCalculationMode.PERCENTAGE,
+                    campaign_profile=CampaignProfile(rate=rate),
+                )
+            )
+        else:
+            adjusted.append(
+                replace(
+                    form,
+                    manager_value="",
+                    manager_value_decimal=item.net,
+                    manager_mode=ManagerMode.LINE,
+                    pos_calculation_mode=(
+                        PosCalculationMode.PERCENTAGE
+                        if item.percent
+                        else PosCalculationMode.FIXED_AMOUNT
+                    ),
+                )
+            )
+    return adjusted
 
 
 # ---- input ----------------------------------------------------------------
@@ -683,9 +754,12 @@ def evaluate_with_reduction(
             (r.website_discounted_total for r in line_results), ZERO
         )
         if abs(sub(line_website_total, shown_value)) > Decimal("0.01"):
-            shown_forms = _adjust_by_shown_rate(
-                kept, line_results, shown_value, target_value
-            )
+            try:
+                shown_forms = _adjust_by_shown_rate(
+                    kept, line_results, shown_value, target_value
+                )
+            except PosSolveError as error:
+                return _pending(kept, str(error))
             if shown_forms is not None:
                 return _finish_reduction(
                     shown_forms,
