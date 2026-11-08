@@ -112,7 +112,7 @@ def _infer_shown_rate(
         (
             (div(sub(regular[i], web[i]), regular[i]), i)
             for i in range(len(results))
-            if regular[i] > ZERO and ZERO < web[i] < regular[i]
+            if regular[i] > ZERO and ZERO < web[i] <= regular[i]
         ),
         key=lambda entry: entry[0],
     )
