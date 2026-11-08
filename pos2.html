@@ -358,7 +358,7 @@
     if (!duz.length) return { hata: "Düzenlenebilir ürün yok. En az bir üründe 'Düzenle' anahtarı açık olmalı." };
     var duzNet = duz.reduce(function (a, u) { return a + netOf(u); }, 0);
     var dokNet = dok.reduce(function (a, u) { return a + netOf(u); }, 0);
-    if (duzNet <= 0) return { hata: "Düzenlenebilir ürünlerin net toplamı 0 veya negatif. Fiyat/indirim alanlarını kontrol edin." };
+    if (duz.some(function (u) { return !Number.isFinite(netOf(u)) || netOf(u) < 0; })) return { hata: "Düzenlenebilir ürünlerin neti negatif. Fiyat/indirim alanlarını kontrol edin." };
     if (hedef - dokNet <= 0) return { hata: "Düzenlenebilir kalemler hedefe yetmiyor: hedef, dokunulmaz kalemlerin net toplamından büyük olmalı." };
 
     var k = (hedef - dokNet) / duzNet;
