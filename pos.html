@@ -486,7 +486,11 @@
         $('#coefficient').textContent = number.format(k);
         $('#coefficientSub').textContent = `Fiyata dahil ürünlerin fiyatı yaklaşık %${number.format(k * 100)} seviyesine gelir.`;
         renderRows(resultLines);
-        lastCalculation = { target, k, currentTotal, total, grossTotal, discountTotal, lines: resultLines, correctionApplied };
+        if (invalidNet) {
+          lastCalculation = null;
+        } else {
+          lastCalculation = { target, k, currentTotal, total, grossTotal, discountTotal, lines: resultLines, correctionApplied };
+        }
       }
 
       function renderNoSolution(currentTotal, target, k = NaN) {
