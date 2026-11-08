@@ -489,7 +489,7 @@
     if (isNaN(deger) || deger < 0) deger = tip === "yuzde" ? 10 : 0;
     var u = {
       id: uid++,
-      ad: $("fAd").value.trim() || "Ürün " + urunler.length + 1,
+      ad: $("fAd").value.trim() || "Ürün " + (urunler.length + 1),
       fiyat: fiyat, tip: tip, deger: deger, duz: $("fDuz").checked
     };
     urunler.push(u);
